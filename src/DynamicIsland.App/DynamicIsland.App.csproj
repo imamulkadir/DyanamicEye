@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>DynamicIsland</AssemblyName>
+    <RootNamespace>DynamicIsland.App</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DynamicIsland.Core\DynamicIsland.Core.csproj" />
+    <ProjectReference Include="..\DynamicIsland.Widgets\DynamicIsland.Widgets.csproj" />
+    <ProjectReference Include="..\DynamicIsland.Platform.Windows\DynamicIsland.Platform.Windows.csproj" />
+    <ProjectReference Include="..\DynamicIsland.Infrastructure\DynamicIsland.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

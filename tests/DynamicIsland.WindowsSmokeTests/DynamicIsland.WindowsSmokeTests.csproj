@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Launches the real app on an interactive Windows desktop. Requires a desktop session (not Server Core/containers). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Build-order + copy of the app output only; tests drive it as an external process. -->
+    <ProjectReference Include="..\..\src\DynamicIsland.App\DynamicIsland.App.csproj" />
+  </ItemGroup>
+
+</Project>

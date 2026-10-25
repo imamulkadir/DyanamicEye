@@ -4,7 +4,7 @@ A free, open-source, offline-first **Dynamic Island** for Windows: a compact flo
 
 Built with C# / WPF on .NET 10 LTS. Runs as a standard user. No accounts, servers, paid APIs or telemetry.
 
-> **Status:** Pre-alpha. Repository baseline only. **No application code exists yet and nothing has been built or tested.** See [`docs/AGENT_PROGRESS.md`](docs/AGENT_PROGRESS.md) for current state.
+> **Status:** Pre-alpha. The solution skeleton builds and its tests pass, but **no user-facing features exist yet**. See [`docs/AGENT_PROGRESS.md`](docs/AGENT_PROGRESS.md) for current state.
 
 ## Planned v1 scope
 - Island shell: collapsed, peek, expanded and pinned states; multi-monitor selection; auto-hide for fullscreen apps.
@@ -23,6 +23,17 @@ Full requirements: [`docs/IMPLEMENTATION_GUIDE.md`](docs/IMPLEMENTATION_GUIDE.md
 | `docs/ADR/` | Architecture decision records |
 | `src/`, `tests/` | Solution projects (created in P00-03) |
 | `packaging/` | Portable and installer packaging (P06) |
+
+## Build and test
+You need Windows 11 x64 and the .NET 10 SDK. `global.json` pins the SDK version.
+
+```powershell
+dotnet restore DynamicIsland.sln --locked-mode
+dotnet build DynamicIsland.sln -c Release --no-restore
+dotnet test --solution DynamicIsland.sln -c Release --no-build
+```
+
+The Windows smoke test briefly opens the app window, so run it from an interactive desktop session.
 
 ## Working with an AI agent
 Give the agent this instruction (also after any context reset):

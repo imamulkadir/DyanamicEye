@@ -1,0 +1,12 @@
+<Window x:Class="DynamicIsland.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dynamic Island (development skeleton)"
+        Width="480" Height="160"
+        WindowStartupLocation="CenterScreen">
+    <!-- Temporary host window until the island shell (P02) replaces it. -->
+    <TextBlock Margin="16"
+               TextWrapping="Wrap"
+               VerticalAlignment="Center"
+               Text="Development skeleton: island shell is not implemented yet. Close this window to exit." />
+</Window>

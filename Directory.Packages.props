@@ -1,0 +1,14 @@
+<Project>
+  <!-- Central package management: every version pinned here. Add THIRD_PARTY_NOTICES.md entry with each new package. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup Label="Runtime">
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
+  </ItemGroup>
+  <ItemGroup Label="Test only (not redistributed)">
+    <!-- xunit.v3 runs on Microsoft.Testing.Platform (opted in via global.json "test.runner"); no VSTest packages. -->
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Separate short-lived out-of-process updater (P06). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>DynamicIsland.Updater</AssemblyName>
+  </PropertyGroup>
+
+</Project>

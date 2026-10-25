@@ -1,0 +1,26 @@
+<Project>
+  <!-- Repository-wide build policy (P00-03). Project files only state what differs. -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Required for IDE0005 (unused usings) to be reported at build; missing XML docs are not enforced. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- Reproducible restore: lock files committed; CI restores in locked mode. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(CI)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">true</RestoreLockedMode>
+
+    <Company>Dynamic Island for Windows contributors</Company>
+    <Product>Dynamic Island</Product>
+    <Copyright>Copyright (c) 2026 Dynamic Island for Windows contributors</Copyright>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>

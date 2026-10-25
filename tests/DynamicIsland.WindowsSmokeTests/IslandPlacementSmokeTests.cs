@@ -69,17 +69,34 @@ public sealed partial class IslandPlacementSmokeTests : IDisposable
             await RealApp.WaitForMainWindowAsync(app);
             var window = app.MainWindowHandle;
 
-            var (center, corner, below) = Measure(() =>
+            // A layered window is hit-tested by its painted pixels only after WPF's first render; under load that can
+            // lag behind the window becoming visible. Wait for the painted state, then assert it.
+            (bool Center, bool Corner, bool Below) probe = default;
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            do
             {
-                // The window has the expanded size; the collapsed pill sits at its top center.
-                var bounds = IslandWindowInterop.GetBounds(window);
-                var scale = bounds.Width / IslandLayout.Max.Width;
-                var centerX = bounds.Left + (bounds.Width / 2);
-                return (
-                    IslandWindowInterop.ReceivesClickAt(window, centerX, bounds.Top + (int)(IslandLayout.Collapsed.Height * scale / 2)),
-                    IslandWindowInterop.ReceivesClickAt(window, bounds.Left, bounds.Top),
-                    IslandWindowInterop.ReceivesClickAt(window, centerX, bounds.Bottom - 3));
-            });
+                probe = Measure(() =>
+                {
+                    // The window has the expanded size; the collapsed notch sits at its top center.
+                    var bounds = IslandWindowInterop.GetBounds(window);
+                    var scale = bounds.Width / IslandLayout.Max.Width;
+                    var centerX = bounds.Left + (bounds.Width / 2);
+                    return (
+                        IslandWindowInterop.ReceivesClickAt(window, centerX, bounds.Top + (int)(IslandLayout.Collapsed.Height * scale / 2)),
+                        IslandWindowInterop.ReceivesClickAt(window, bounds.Left, bounds.Top),
+                        IslandWindowInterop.ReceivesClickAt(window, centerX, bounds.Bottom - 3));
+                });
+
+                if (probe.Center && !probe.Corner && !probe.Below)
+                {
+                    break;
+                }
+
+                await Task.Delay(50, TestContext.Current.CancellationToken);
+            }
+            while (stopwatch.Elapsed < TimeSpan.FromSeconds(5));
+
+            var (center, corner, below) = probe;
 
             Assert.True(center, "The pill itself must be clickable.");
             Assert.False(corner, "Transparent window area must let clicks through to the window below.");

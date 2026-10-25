@@ -2,6 +2,61 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-25 (P02-04, P02-05)
+
+### Verified changes
+- 2026-10-25 **P02-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). Decisions are in ADR 0011 and the ADR 0010 amendment.
+  - **Core:** `Shell/MotionPolicy.cs` (`IMotionGate`, pure `MotionPolicy`: off/reduced/saver → no animation).
+  - **Platform.Windows:**
+    - `Power/PowerStatus.cs` (`GetSystemPowerStatus` saver flag)
+    - fullscreen detector fix: `EVENT_OBJECT_UNCLOAKED` hook, one-shot 0.5 s follow-up after a foreground change, thread-safe `Refresh`, `ActiveHookCount`
+  - **App:**
+    - New `MotionGate.cs`.
+    - New `NotchView.xaml(.cs)`: the notch visuals extracted from `IslandWindow` with `ApplyVisualState`.
+    - `IslandWindow.xaml` is now hosting only; the code-behind uses `NotchView` and `IMotionGate`.
+    - `FullscreenCoordinator` logs the hook count; `AppHost` registers `IMotionGate`.
+  - **Tests:**
+    - `UnitTests/Shell/MotionPolicyTests.cs` (7)
+    - `IntegrationTests/NotchVisualTests.cs` (4 states) with `References/*.png` (our renderings, reviewed)
+    - smoke `IdleBudgetSmokeTests.cs`
+    - `FullscreenSmokeTests` sizes the helper before showing it and prints the app log tail on failure
+    - The integration csproj gains `References` copy and a global `System.IO` using; redundant per-file usings were removed.
+  - **CI/README:** tests run with `--max-parallel-test-modules 1`; the CI artifact includes `VisualDiffs`.
+  - **Docs:** `TEST_MATRIX.md` has the G02 sign-off checklist (P1, P2, V1).
+- 2026-10-25 P02-04 pushed; CI run 40205375218 **FAILED** (fullscreen smoke test: island did not hide). Root cause was cloaked windows, fixed above and not yet pushed.
+- 2026-10-25 **P02-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). Decisions are in ADR 0010.
+  - **Core:**
+    - `Display/Fullscreen.cs`: `FullscreenSource`, `FullscreenSnapshot`, `IFullscreenDetector`, pure `FullscreenPolicy`.
+    - Settings `Behavior.FullscreenExceptions` (validated exe names, ≤ 50, never logged) with value equality.
+  - **Platform.Windows:**
+    - `Display/Win32FullscreenDetector.cs`: WinEvent hooks for foreground, minimize-end and foreground location change; covers-monitor and not-maximized-with-caption check; shell, cloaked and own process excluded; D3D/presentation notification state.
+    - `Win32MonitorService.IdFor`/`BoundsOf`.
+    - `IslandWindowInterop.IsForeground` and `SetBounds(..., topmost)`.
+    - New interop.
+  - **App:**
+    - `FullscreenCoordinator.cs`: 300 ms debounce → policy → state machine; logs hidden true/false only.
+    - `AppHost` registrations; `App.xaml.cs` starts it after the window. `AppLog.FullscreenHide`.
+  - **Tests:**
+    - `UnitTests/Display/FullscreenPolicyTests.cs` (policy ×9, validation ×8)
+    - `IntegrationTests/Win32FullscreenDetectorTests.cs` (5, real helper windows)
+    - smoke `FullscreenSmokeTests.cs` (end to end; skipped if Windows refuses foreground)
+    - shared `tests/Shared/StaDispatcherThread.cs`, linked into both Windows test projects
+  - **Debugging note:** the first full run failed 2 smoke tests. Integration helper windows were topmost and covered the screen while the smoke tests ran in parallel. Helpers are now non-topmost; temporary diagnostics were added and removed.
+- 2026-10-25 Notch design + P02-03 pushed; CI run 40204446036 **success**.
+
+### Test evidence
+| UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
+|---|---|---|---|---|---|
+| 2026-10-25 | P02-05 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | Reproduced the CI failure locally (Release suite) | FAIL → fixed | The app log showed hooks installed but no fullscreen detection. Cause: the new window was DWM-cloaked during the foreground event. Fix: uncloak hook + one-shot follow-up. Release smoke 3/3 afterwards. |
+| 2026-10-25 | P02-05 | same, `CI=true` | `dotnet test --solution … --max-parallel-test-modules 1`, Release and Debug ×2; plus Release in parallel mode ×2 | PASS | Release 342/342 ×4, Debug 343/343 ×2, **0 skipped**, no stray processes |
+| 2026-10-25 | P02-05 | same | Idle budget smoke: 10 s idle, collapsed | PASS | **0 ms CPU**, working set 94 MiB |
+| 2026-10-25 | P02-05 | same | Visual references generated and reviewed (composite preview of the 4 states) | PASS | Notch outline, shoulders, sensor housing, expanded panel and green pin correct |
+| — | G02 | real hardware | `TEST_MATRIX.md` G02 NOT_RUN rows | PENDING_WINDOWS | Owner |
+| 2026-10-25 | P02-04 | Windows 11 Pro 25H2 x64, one monitor at 100 % | `dotnet test --solution` (first run) | FAIL → fixed | Release: the fullscreen smoke test did not hide; Debug: the corner click-through failed. Cause: integration helper windows were topmost and covered the screen in parallel. Fixed with `topmost: false`. |
+| 2026-10-25 | P02-04 | same | `dotnet build` + `dotnet test --solution` for Release and Debug, twice each | PASS | 0 warnings. Release 330/330 ×2 (end-to-end fullscreen hide and return **passed**). Debug 330 passed + 1 **skipped** ×2: Windows refused foreground to the test window, reported as a skip. |
+| 2026-10-25 | P02-04 | same | Integration `Win32FullscreenDetectorTests` on real windows | PASS | Covering window → fullscreen on the primary monitor with the exe name; half-size, maximized-with-caption and own-process windows → not fullscreen |
+| — | P02-04 | real video, game, browser F11, presentation, 2 monitors | `docs/TEST_MATRIX.md` rows F1–F8 | PENDING_WINDOWS | Owner to run |
+
 ## Archived 2026-10-25 (P02-03, notch redesign, P02-02 evidence)
 
 ### Verified changes

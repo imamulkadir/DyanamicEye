@@ -90,6 +90,7 @@ public partial class App : Application
 
         _instance.StartListening(OnActivationRequested, OnActivationUnavailable);
         _host.Services.GetRequiredService<FullscreenCoordinator>().Start();
+        _host.Services.GetRequiredService<TrayController>().Start(); // Disposed (icon removed) with the host on exit.
 
         // Optional components (widgets/providers, P04) run isolated; failures surface as status changes and notices.
         var logger = _logger;

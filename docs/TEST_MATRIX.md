@@ -63,6 +63,20 @@ Automated coverage (CI + dev host): placement, click-through, UIA expand/pin/col
 | I1 | App icon | Explorer: view `DynamicIsland.exe` with small, medium, large and extra-large icons at 100 % and 200 % | The original dark-tile capsule icon, crisp at every size | NOT_RUN |
 | A1 | Not in taskbar / Alt+Tab | Start the app, look at the taskbar, press Alt+Tab | No taskbar button and no Alt+Tab entry (the automated smoke test checks the style) | NOT_RUN |
 
+## G03 — Tray, settings, sign-in (P03; started 2026-10-25 with owner approval while G02 is open)
+
+**G03 PASS needs** (guide §5): Explorer restart restores the tray icon; sign-in starts one collapsed island when opted in; the user can fully exit, change monitor and reset an off-screen position.
+
+| # | Scenario | Steps | Expected | Status |
+|---|---|---|---|---|
+| Y1 | Tray icon present | Start the app; look in the notification area (or its overflow ^) | The original dark-tile icon with the tooltip "Dynamic Island" | NOT_RUN |
+| Y2 | Left click toggles | Click the tray icon twice | The notch hides, then returns | NOT_RUN |
+| Y3 | Keyboard | Win+B to reach the notification area, arrow keys to the icon, Enter; then Shift+F10 | Enter toggles the island; Shift+F10 opens the menu, arrow keys and Enter work, Esc closes | NOT_RUN |
+| Y4 | Right-click menu | Right-click the icon; click elsewhere | The menu shows "Hide island"/"Show island" and "Exit"; it closes when you click elsewhere | NOT_RUN |
+| Y5 | Exit from tray | Menu → Exit | The app exits and the icon disappears immediately (no ghost icon on hover) | NOT_RUN |
+| Y6 | Explorer restart | Task Manager → Windows Explorer → Restart | The icon comes back within a few seconds and still works | NOT_RUN (automated simulation PASS) |
+| Y7 | High DPI | Set 150 % or 200 % scaling, restart the app | The tray icon is crisp, not blurry | NOT_RUN |
+
 ## G01 — Reliability (all automated; recorded for completeness)
 | # | Scenario | Status |
 |---|---|---|

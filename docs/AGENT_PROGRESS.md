@@ -3,9 +3,9 @@
 > **Keep this file accurate on every session.** This is the durable checkpoint that lets a new agent resume after a context reset. Update it alongside source changes, and never mark anything DONE without evidence. Move older detail to `docs/WORK_LOG.md` so this file stays short.
 
 ## CURRENT STATUS (read first)
-- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented; **G02 waits for the owner's hardware matrix**.
-- **Active task:** G02 sign-off (owner hardware matrix), then P03-01.
-- **Active task status:** BLOCKED on owner validation (G02). P02-05 is IMPLEMENTED_AWAITING_VALIDATION and uncommitted; it includes the fix for the P02-04 CI failure (run 40205375218).
+- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01 is implemented.
+- **Active task:** P03-02: tray actions, settings service, shutdown mode. G02 and the P03-01 manual rows are owed by the owner.
+- **Active task status:** NOT_STARTED. P03-01 is IMPLEMENTED_AWAITING_VALIDATION and uncommitted. P02-05 was pushed and CI 40207131071 is green.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,15 +23,30 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-25 (P02-05 implemented; G02 pending owner)
+- **Last updated:** 2026-10-25 (P03-01 implemented; G02 still pending owner)
 
 ## NEXT ACTION (ONE task only)
-**G02 sign-off: the owner runs the manual hardware rows; the agent fixes anything that fails. Then start P03-01.** (guide §5 "do not skip gates")
-1. **Owner:** run every `NOT_RUN` row in `docs/TEST_MATRIX.md` → G02 section (D2–D5, M1–M6, T1–T2, S1–S2, H2–H8, F1–F8, P2, I1, A1) on real hardware, and report PASS/FAIL per row. N/A is fine where hardware is missing, for example no second monitor or no battery; give the reason.
-2. **Agent:** record the results in `TEST_MATRIX.md` and TEST EVIDENCE. Fix each FAIL in the owning task (P02-01..05) with a regression test. Re-run the full suite with `--max-parallel-test-modules 1` in both configs and check CI.
-3. When every row is PASS or a justified N/A: mark P02-02..P02-05 DONE, record **G02 PASS** with the evidence, and set NEXT ACTION to **P03-01** (tray icon and menu; guide §5 P03, D01–D02, §4.4). Reconfirm the P03 task list from the guide at that point.
-
-If the owner explicitly approves continuing P03 while G02 is pending, record that approval with its date here and keep G02 open.
+**P03-02 — Tray actions:** show/hide, pin, pause/resume, move to display and reset display, settings, update check, logs, Safe Mode, restart, Exit. Closing the settings window must never shut the app down. (guide §5 P03-02, §0.1 tray list, D05; ADRs 0005/0006/0009/0012)
+1. **Menu items in `TrayController`**, keyboard accessible with access keys, wired to existing services:
+   - **Show/Hide:** done.
+   - **Pin/Unpin:** `TogglePin`.
+   - **Pause/Resume:** state machine `Pause`/`Resume`. While paused, optional components also pause, i.e. `ComponentHost` stops optional components and restarts them on resume (ADR 0007).
+   - **Display:** a submenu listing monitors (from `IMonitorService`, with friendly labels such as "Display 1 (primary)", never device paths). Choosing one sets `General.PreferredMonitorId`, saves through `ISettingsStore` and re-places the island. "Reset to primary display" clears the preference; it is also the fix for an off-screen or lost island.
+   - **Settings…:** placeholder until P03-03; it opens a minimal settings window or is disabled with a tooltip. Do not fake functionality.
+   - **Check for updates:** disabled until P06, with the tooltip "Coming in a later version".
+   - **Open logs folder:** opens Explorer on the logs folder.
+   - **Restart in Safe Mode / Leave Safe Mode:** exit code 3 (`ExitReason.Restart`) plus the launcher relaunch with or without `--safe-mode`. This needs a restart-with-arguments contract: extend the launcher protocol, e.g. a `data/restart-request.json` the launcher reads, or a distinct exit code for Safe Mode. Decide in an ADR.
+   - **Restart:** `ExitReason.Restart`.
+   - **Exit:** done.
+2. **Settings persistence:** add a settings service (Core interface, App implementation) with `Current`, `UpdateAsync(Func<AppSettings, AppSettings>)` (validate → save → `Changed` event) and a read-only guard, replacing `AppSettingsSnapshot` usage. The island re-places on change.
+3. **Shutdown mode:** `ShutdownMode = OnExplicitShutdown`. Only the lifecycle (Exit, session end, fatal) ends the app, so closing the island or settings windows never exits it. Update smoke tests that rely on `CloseMainWindow`, which currently exits, to use the tray Exit path or a close request to the tray window (already handled).
+4. **Tests:**
+   - unit tests for the menu-model builder (items, enabled states, labels per state; pure, Core or App-testable)
+   - the settings service (update → validate → save → event)
+   - smoke: choose "Reset to primary display" through the tray-menu UIA, or via the callback message to open the menu followed by UIA `Invoke`; verify the island re-places
+   - smoke: Pause hides and Resume shows
+   - smoke: the restart path relaunches through the launcher (Debug, isolated data root)
+5. **Verify:** Release + Debug builds with 0 warnings and all tests green (`--max-parallel-test-modules 1`); CI green after the owner pushes. Add `TEST_MATRIX.md` rows for every menu action. Do not commit.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -40,7 +55,7 @@ If the owner explicitly approves continuing P03 while G02 is pending, record tha
 | P00 — Environment and baseline | P00-01…P00-04 | DONE | **G00 PASS** 2026-10-25, run 40196393380 (`963b01c`) |
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
-| P03 — Tray/settings/startup | P03-01…P03-05 | NOT_STARTED | G03 pending |
+| P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending |
 | P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
@@ -56,44 +71,25 @@ If the owner explicitly approves continuing P03 while G02 is pending, record tha
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
-- 2026-10-25 **P02-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). Decisions are in ADR 0011 and the ADR 0010 amendment.
-  - **Core:** `Shell/MotionPolicy.cs` (`IMotionGate`, pure `MotionPolicy`: off/reduced/saver → no animation).
+- 2026-10-25 **Owner approval:** "pushed, proceed" after G02 was set up for owner validation. Recorded as approval to **continue P03 while G02 stays open**; the hardware matrix rows are still owed.
+- 2026-10-25 **P03-01 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). Decisions are in ADR 0012.
   - **Platform.Windows:**
-    - `Power/PowerStatus.cs` (`GetSystemPowerStatus` saver flag)
-    - fullscreen detector fix: `EVENT_OBJECT_UNCLOAKED` hook, one-shot 0.5 s follow-up after a foreground change, thread-safe `Refresh`, `ActiveHookCount`
-  - **App:**
-    - New `MotionGate.cs`.
-    - New `NotchView.xaml(.cs)`: the notch visuals extracted from `IslandWindow` with `ApplyVisualState`.
-    - `IslandWindow.xaml` is now hosting only; the code-behind uses `NotchView` and `IMotionGate`.
-    - `FullscreenCoordinator` logs the hook count; `AppHost` registers `IMotionGate`.
-  - **Tests:**
-    - `UnitTests/Shell/MotionPolicyTests.cs` (7)
-    - `IntegrationTests/NotchVisualTests.cs` (4 states) with `References/*.png` (our renderings, reviewed)
-    - smoke `IdleBudgetSmokeTests.cs`
-    - `FullscreenSmokeTests` sizes the helper before showing it and prints the app log tail on failure
-    - The integration csproj gains `References` copy and a global `System.IO` using; redundant per-file usings were removed.
-  - **CI/README:** tests run with `--max-parallel-test-modules 1`; the CI artifact includes `VisualDiffs`.
-  - **Docs:** `TEST_MATRIX.md` has the G02 sign-off checklist (P1, P2, V1).
-- 2026-10-25 P02-04 pushed; CI run 40205375218 **FAILED** (fullscreen smoke test: island did not hide). Root cause was cloaked windows, fixed above and not yet pushed.
-- 2026-10-25 **P02-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). Decisions are in ADR 0010.
-  - **Core:**
-    - `Display/Fullscreen.cs`: `FullscreenSource`, `FullscreenSnapshot`, `IFullscreenDetector`, pure `FullscreenPolicy`.
-    - Settings `Behavior.FullscreenExceptions` (validated exe names, ≤ 50, never logged) with value equality.
-  - **Platform.Windows:**
-    - `Display/Win32FullscreenDetector.cs`: WinEvent hooks for foreground, minimize-end and foreground location change; covers-monitor and not-maximized-with-caption check; shell, cloaked and own process excluded; D3D/presentation notification state.
-    - `Win32MonitorService.IdFor`/`BoundsOf`.
-    - `IslandWindowInterop.IsForeground` and `SetBounds(..., topmost)`.
+    - `Tray/Win32TrayIcon.cs`: `Shell_NotifyIcon` v4, select/keyselect/contextmenu events, `TaskbarCreated` re-add, DPI-sized icon from the exe (group 32512) via `LoadImageW` with a system-icon fallback, `IsRegistered`, `PrepareForMenu`, `SendTaskbarCreated`.
+    - `IslandWindowInterop.FindTopLevelWindow` and `RequestClose`.
     - New interop.
   - **App:**
-    - `FullscreenCoordinator.cs`: 300 ms debounce → policy → state machine; logs hidden true/false only.
-    - `AppHost` registrations; `App.xaml.cs` starts it after the window. `AppLog.FullscreenHide`.
+    - New `TrayController.cs`: hidden top-level owner `HwndSource`, accessible WPF menu (Show/Hide, Exit), left-click toggle, `WM_CLOSE` treated as Exit.
+    - `AppHost` registration; `App.xaml.cs` starts it (disposed with the host); `AppLog.TrayUnavailable`.
   - **Tests:**
-    - `UnitTests/Display/FullscreenPolicyTests.cs` (policy ×9, validation ×8)
-    - `IntegrationTests/Win32FullscreenDetectorTests.cs` (5, real helper windows)
-    - smoke `FullscreenSmokeTests.cs` (end to end; skipped if Windows refuses foreground)
-    - shared `tests/Shared/StaDispatcherThread.cs`, linked into both Windows test projects
-  - **Debugging note:** the first full run failed 2 smoke tests. Integration helper windows were topmost and covered the screen while the smoke tests ran in parallel. Helpers are now non-topmost; temporary diagnostics were added and removed.
-- 2026-10-25 Notch design + P02-03 pushed; CI run 40204446036 **success**.
+    - `IntegrationTests/Win32TrayIconTests.cs`: real registration, simulated Explorer restart, removal; v4 event mapping.
+    - Smoke `TraySmokeTests.cs`: real app icon, `TaskbarCreated` recovery, removed on exit, and the WM_CLOSE regression.
+    - `IslandPlacementSmokeTests` click-through now waits for the first paint.
+  - **Bugs found:**
+    - (1) `taskkill` closed the hidden tray window, so the app kept running with an orphaned icon. Fixed and regression-tested.
+    - (2) The intermittent Debug click-through failure was a race with the first WPF paint of the layered window. Fixed in the test, by waiting for the painted state.
+    - Known limitation: a close request while the tray menu is open only dismisses the menu.
+- 2026-10-25 P02-05 pushed; CI run 40207131071 **success**: Release 342, Debug 343, **0 skipped**, including the fullscreen end-to-end and visual regression tests.
+- 2026-10-25 P02-04 + P02-05 IMPLEMENTED_AWAITING_VALIDATION: fullscreen detection with the cloaked-window fix, idle budget (0 ms CPU), power-aware motion, notch visual regression (ADRs 0010/0011). Details are in WORK_LOG.
 - 2026-10-25 P02-03 IMPLEMENTED_AWAITING_VALIDATION + notch redesign: state machine, UIA, keyboard/focus, notch design (ADR 0009 + amendment); CI 40204446036 success. Details are in WORK_LOG.
 - 2026-10-25 P02-02 IMPLEMENTED_AWAITING_VALIDATION: display-change debounce, placement controller, click-through, DPI scope, original icon (ADR 0008 amendment). Details are in WORK_LOG.
 - 2026-10-25 P02-01 pushed; CI run 40201946771 **success**, including the placement smoke test on the runner.
@@ -109,17 +105,13 @@ If the owner explicitly approves continuing P03 while G02 is pending, record tha
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
 |---|---|---|---|---|---|
+| 2026-10-25 | P02-05 | GitHub Actions `windows-2025` | CI workflow (Release + Debug, sequential modules) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40207131071; 342/343, 0 skipped |
+| 2026-10-25 | P03-01 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | Integration 44/44 and smoke 12/12 (Release), first run | PASS | Tray registered, recovered after a simulated `TaskbarCreated`, removed on exit; 0 skipped |
+| 2026-10-25 | P03-01 | same, real desktop | Opened the tray menu via the callback message (no synthetic mouse) and took a screenshot; then `taskkill` | FAIL → fixed | The menu shows "Hide island" and "Exit" with focus on the first item. `taskkill` left the app running with the tray window destroyed. Fixed: WM_CLOSE on the tray window means Exit; `taskkill` now exits with code 0. |
+| 2026-10-25 | P03-01 | same, `CI=true` | `dotnet test --solution … --max-parallel-test-modules 1`, Release and Debug ×2 | PASS | Release 350/350, Debug 351/351, 0 skipped, no stray processes. One earlier Debug run failed the click-through test (first-paint race); fixed in the test. |
+| — | P03-01 | real Explorer restart, keyboard, high DPI | `TEST_MATRIX.md` rows Y1–Y7 | PENDING_WINDOWS | Owner |
 | 2026-10-25 | P02-04 | GitHub Actions `windows-2025` | CI workflow | **FAIL** | https://github.com/imamulkadir/DyanamicEye/actions/runs/40205375218: `Island_hides_while_a_fullscreen_window_is_in_front_and_returns_afterwards`, 329/330 |
-| 2026-10-25 | P02-05 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | Reproduced the CI failure locally (Release suite) | FAIL → fixed | The app log showed hooks installed but no fullscreen detection. Cause: the new window was DWM-cloaked during the foreground event. Fix: uncloak hook + one-shot follow-up. Release smoke 3/3 afterwards. |
-| 2026-10-25 | P02-05 | same, `CI=true` | `dotnet test --solution … --max-parallel-test-modules 1`, Release and Debug ×2; plus Release in parallel mode ×2 | PASS | Release 342/342 ×4, Debug 343/343 ×2, **0 skipped**, no stray processes |
-| 2026-10-25 | P02-05 | same | Idle budget smoke: 10 s idle, collapsed | PASS | **0 ms CPU**, working set 94 MiB |
-| 2026-10-25 | P02-05 | same | Visual references generated and reviewed (composite preview of the 4 states) | PASS | Notch outline, shoulders, sensor housing, expanded panel and green pin correct |
-| — | G02 | real hardware | `TEST_MATRIX.md` G02 NOT_RUN rows | PENDING_WINDOWS | Owner |
 | 2026-10-25 | P02-03 notch | GitHub Actions `windows-2025` | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40204446036 |
-| 2026-10-25 | P02-04 | Windows 11 Pro 25H2 x64, one monitor at 100 % | `dotnet test --solution` (first run) | FAIL → fixed | Release: the fullscreen smoke test did not hide; Debug: the corner click-through failed. Cause: integration helper windows were topmost and covered the screen in parallel. Fixed with `topmost: false`. |
-| 2026-10-25 | P02-04 | same | `dotnet build` + `dotnet test --solution` for Release and Debug, twice each | PASS | 0 warnings. Release 330/330 ×2 (end-to-end fullscreen hide and return **passed**). Debug 330 passed + 1 **skipped** ×2: Windows refused foreground to the test window, reported as a skip. |
-| 2026-10-25 | P02-04 | same | Integration `Win32FullscreenDetectorTests` on real windows | PASS | Covering window → fullscreen on the primary monitor with the exe name; half-size, maximized-with-caption and own-process windows → not fullscreen |
-| — | P02-04 | real video, game, browser F11, presentation, 2 monitors | `docs/TEST_MATRIX.md` rows F1–F8 | PENDING_WINDOWS | Owner to run |
 | 2026-10-25 | P02-02 | GitHub Actions `windows-2025` | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40202761834 |
 | 2026-10-25 | P02-01 | GitHub Actions `windows-2025` | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40201946771 |
 | — | P02-01 | multi-monitor, mixed DPI, 125–200 % | Placement on a secondary or high-DPI monitor, fallback when unplugged | PENDING_WINDOWS | Single 100 % monitor on the dev host; covered by unit tests; G02 matrix in P02-02 || 2026-10-25 | P01-04 | GitHub Actions `windows-2025`, owner push | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40200547110 |
@@ -133,10 +125,10 @@ If the owner explicitly approves continuing P03 while G02 is pending, record tha
 
 ## ARCHITECTURE DECISIONS / ADRS
 - Frozen D01–D15: see guide §0. No deviations approved.
-- 0001 supported Windows versions · 0002 solution/build/test platform · 0003 settings persistence (consent defaults `NotAsked`; schema-bump rule for new enum values) · 0004 local logging and redaction · 0005 lifecycle, exit codes 0/1/3, single instance with acknowledged pipe · 0006 crash supervision, Safe Mode, Debug-only test hooks, launcher as the entry point · 0007 component error boundaries, notices (keys only), user-reviewed diagnostic export · 0008 island window (tool window + PerMonitorV2), monitor identity (device interface path, never logged), placement calculator, display-change debounce · 0009 state machine (exhaustive table), fixed-size window with animated island, motion preference, keyboard/focus return, UI Automation patterns; amended: notch design (flush top, shoulders, sensor housing) · 0010 fullscreen detection (WinEvent hooks, covers-monitor rule, per-monitor policy, exe-name exceptions, honest exclusive-fullscreen limit; amended: uncloak hook + one-shot follow-up) · 0011 idle activity budget, power-aware motion policy, offscreen visual regression with own references, sequential test modules.
+- 0001 supported Windows versions · 0002 solution/build/test platform · 0003 settings persistence (consent defaults `NotAsked`; schema-bump rule for new enum values) · 0004 local logging and redaction · 0005 lifecycle, exit codes 0/1/3, single instance with acknowledged pipe · 0006 crash supervision, Safe Mode, Debug-only test hooks, launcher as the entry point · 0007 component error boundaries, notices (keys only), user-reviewed diagnostic export · 0008 island window (tool window + PerMonitorV2), monitor identity (device interface path, never logged), placement calculator, display-change debounce · 0009 state machine (exhaustive table), fixed-size window with animated island, motion preference, keyboard/focus return, UI Automation patterns; amended: notch design (flush top, shoulders, sensor housing) · 0010 fullscreen detection (WinEvent hooks, covers-monitor rule, per-monitor policy, exe-name exceptions, honest exclusive-fullscreen limit; amended: uncloak hook + one-shot follow-up) · 0011 idle activity budget, power-aware motion policy, offscreen visual regression with own references, sequential test modules · 0012 Win32 tray icon (v4 events, TaskbarCreated, DPI icon, WM_CLOSE → Exit).
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **G02 sign-off by the owner, then P03-01**.
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P03-02** (G02 still owed by the owner).
 - Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

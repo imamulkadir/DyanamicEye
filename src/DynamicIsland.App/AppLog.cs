@@ -70,6 +70,10 @@ internal static partial class AppLog
         Message = "Fullscreen app on the island's monitor: island hidden {Hidden}")]
     public static partial void FullscreenHide(ILogger logger, bool hidden);
 
+    [LoggerMessage(EventId = 1040, EventName = "TrayUnavailable", Level = LogLevel.Warning,
+        Message = "The notification-area icon could not be added (no shell tray); the island remains usable without it")]
+    public static partial void TrayUnavailable(ILogger logger);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

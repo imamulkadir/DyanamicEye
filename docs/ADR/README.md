@@ -41,5 +41,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0009 — Island state machine, interaction and accessibility](0009-island-states-and-interaction.md) — Accepted (P02-03, amended: notch design)
 - [0010 — Fullscreen detection and auto-hide](0010-fullscreen-detection.md) — Accepted (P02-04, amended: cloaked windows)
 - [0011 — Activity budget, power-aware motion and visual regression](0011-activity-budget-motion-visual-qa.md) — Accepted (P02-05)
+- [0012 — Notification-area (tray) icon](0012-tray-icon.md) — Accepted (P03-01)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

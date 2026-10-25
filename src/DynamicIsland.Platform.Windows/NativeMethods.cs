@@ -161,6 +161,102 @@ internal static unsafe partial class NativeMethods
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     public static partial int SHQueryUserNotificationState(out int state);
 
+    public const uint NimAdd = 0;
+    public const uint NimModify = 1;
+    public const uint NimDelete = 2;
+    public const uint NimSetVersion = 4;
+    public const uint NifMessage = 0x01;
+    public const uint NifIcon = 0x02;
+    public const uint NifTip = 0x04;
+    public const uint NifShowTip = 0x80;
+    public const uint NotifyIconVersion4 = 4;
+    public const int SmCxSmIcon = 49;
+    public const int SmCySmIcon = 50;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct NotifyIconData
+    {
+        public uint Size;
+        public IntPtr Window;
+        public uint Id;
+        public uint Flags;
+        public uint CallbackMessage;
+        public IntPtr Icon;
+        public fixed char Tip[128];
+        public uint State;
+        public uint StateMask;
+        public fixed char Info[256];
+        public uint TimeoutOrVersion;
+        public fixed char InfoTitle[64];
+        public uint InfoFlags;
+        public Guid GuidItem;
+        public IntPtr BalloonIcon;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NotifyIconIdentifier
+    {
+        public uint Size;
+        public IntPtr Window;
+        public uint Id;
+        public Guid GuidItem;
+    }
+
+    [LibraryImport("shell32.dll", EntryPoint = "Shell_NotifyIconW")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ShellNotifyIcon(uint message, NotifyIconData* data);
+
+    [LibraryImport("shell32.dll", EntryPoint = "Shell_NotifyIconGetRect")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial int ShellNotifyIconGetRect(NotifyIconIdentifier* identifier, Rect* iconLocation);
+
+    [LibraryImport("user32.dll", EntryPoint = "RegisterWindowMessageW", StringMarshalling = StringMarshalling.Utf16)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial uint RegisterWindowMessage(string message);
+
+    [LibraryImport("user32.dll", EntryPoint = "FindWindowExW", StringMarshalling = StringMarshalling.Utf16)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr FindWindowEx(IntPtr parent, IntPtr childAfter, string? className, string? windowName);
+
+    [LibraryImport("user32.dll", EntryPoint = "PostMessageW")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
+    [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr FindWindow(string? className, string? windowName);
+
+    public const uint ImageIcon = 1;
+    public const uint LrShared = 0x8000;
+    public static readonly IntPtr IdiApplication = new(32512);
+
+    [LibraryImport("user32.dll", EntryPoint = "LoadImageW", SetLastError = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr LoadImage(IntPtr instance, IntPtr name, uint type, int width, int height, uint flags);
+
+    [LibraryImport("kernel32.dll", EntryPoint = "GetModuleHandleW", StringMarshalling = StringMarshalling.Utf16)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr GetModuleHandle(string? moduleName);
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial int GetSystemMetricsForDpi(int index, uint dpi);
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial uint GetDpiForWindow(IntPtr window);
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DestroyIcon(IntPtr icon);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct SystemPowerStatus
     {

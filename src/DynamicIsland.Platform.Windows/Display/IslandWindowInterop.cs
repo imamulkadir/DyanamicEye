@@ -43,6 +43,25 @@ public static class IslandWindowInterop
 
     public static bool IsVisible(IntPtr window) => NativeMethods.IsWindowVisible(window);
 
+    /// <summary>Top-level window with this exact title owned by <paramref name="processId"/> (hidden windows included).</summary>
+    public static IntPtr FindTopLevelWindow(int processId, string title)
+    {
+        var current = IntPtr.Zero;
+        while ((current = NativeMethods.FindWindowEx(IntPtr.Zero, current, null, title)) != IntPtr.Zero)
+        {
+            NativeMethods.GetWindowThreadProcessId(current, out var owner);
+            if (owner == (uint)processId)
+            {
+                return current;
+            }
+        }
+
+        return IntPtr.Zero;
+    }
+
+    /// <summary>Posts <c>WM_CLOSE</c>, as tools such as taskkill (without /F) do.</summary>
+    public static void RequestClose(IntPtr window) => NativeMethods.PostMessage(window, 0x0010, IntPtr.Zero, IntPtr.Zero);
+
     public static bool IsForeground(IntPtr window) => window != IntPtr.Zero && NativeMethods.GetForegroundWindow() == window;
 
     /// <summary>

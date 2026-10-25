@@ -18,7 +18,9 @@ Guide §4.4 requires a per-user named mutex plus secure local IPC for second-ins
    - Activation goes over the pipe `DynamicIsland.{UserSid}.activate`:
      - The server is created with `FirstPipeInstance` and a protected DACL that grants only the current user SID.
      - The client connects with `CurrentUserOnly`, so it refuses a pipe owned by anyone else; that blocks squatting and impersonation.
-     - The protocol is the exact ASCII string `activate`, at most 64 bytes, read within 2 s. Anything else is ignored.
+     - The protocol is one request/reply exchange. The client sends the line `activate\n` and waits for `ok\n` (accepted) or `no\n` (rejected), so a successful signal means the running instance really accepted it.
+     - The server reads at most 64 ASCII bytes within 2 s, runs the activation callback before replying, then waits for the client to close, with a timeout and at most 64 KiB drained.
+     - The first version was fire-and-forget (write then close). On the slower CI runner the request could be lost even though the sender reported success; CI run 40198912460 failed this way. The reply step fixes that.
    - The second instance calls `AllowSetForegroundWindow(ASFW_ANY)`, signals, and exits with code 0 without building the host or touching any files.
    - If the pipe cannot be created, a warning is logged and the app runs without activation.
 4. **Exception policy:**

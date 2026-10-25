@@ -1,4 +1,5 @@
 using DynamicIsland.Core.Lifecycle;
+using DynamicIsland.UnitTests.TestSupport;
 
 namespace DynamicIsland.UnitTests.Lifecycle;
 
@@ -122,13 +123,19 @@ public sealed class LifecycleCoordinatorTests
     [Fact]
     public async Task Components_beyond_the_total_budget_are_skipped()
     {
-        using var coordinator = new LifecycleCoordinator(TimeProvider.System, ShortStep, ShortStep);
+        // Deterministic clock: the slow component consumes more than the whole budget.
+        var time = new FixedTimeProvider(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
+        using var coordinator = new LifecycleCoordinator(time, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5));
         coordinator.Register("skipped", _ => Task.CompletedTask);
-        coordinator.Register("hangs", _ => Task.Delay(Timeout.Infinite, CancellationToken.None));
+        coordinator.Register("slow", _ =>
+        {
+            time.UtcNow += TimeSpan.FromSeconds(6);
+            return Task.CompletedTask;
+        });
 
         var report = await coordinator.ShutdownAsync();
 
-        Assert.Equal(ShutdownStepStatus.TimedOut, report.Steps[0].Status);
+        Assert.Equal(ShutdownStepStatus.Completed, report.Steps[0].Status);
         Assert.Equal(ShutdownStepStatus.Skipped, report.Steps[1].Status);
     }
 

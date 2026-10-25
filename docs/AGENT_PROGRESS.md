@@ -5,7 +5,8 @@
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS — Phase P00 complete; gate G00 PASS. Starting P01 (reliability kernel).
 - **Active task:** P01-04 — Safe Mode, crash counter, launcher.
-- **Active task status:** NOT_STARTED (P01-03 DONE, uncommitted, awaiting owner review; P01-02 pushed, CI green)
+- **Active task status:** NOT_STARTED. **Do not start until the owner pushes the P01-03 CI fix and CI is green.** P01-03 was pushed as `c0c237f`, and its CI run 40198912460 failed: 2 timing races, fixed locally and uncommitted.
+- **CI logs:** `gh` CLI installed and authenticated as imamulkadir (2026-10-25). Use `gh run view <id> --repo imamulkadir/DyanamicEye --log-failed` and `gh run list --repo imamulkadir/DyanamicEye -L 3`.
 - **Last passed gate:** G00 (2026-10-25, CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40196393380)
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public). CI status for any run can be read without auth: `Invoke-RestMethod https://api.github.com/repos/imamulkadir/DyanamicEye/actions/workflows/ci.yml/runs?per_page=1`.
 - **Current branch / commit:** Repo created by owner (2026-10-25); default branch `master`. **Owner reviews and makes all commits. Agents must NOT commit.** Report changed files and the owner commits them.
@@ -49,6 +50,9 @@
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10)
+- 2026-10-25 P01-03 CI fix (uncommitted; owner commits). CI run 40198912460 on `c0c237f` failed 2 tests (119/121):
+  - (a) `Components_beyond_the_total_budget_are_skipped` was a test flaw: real Windows timers fire up to about 15 ms early. Now it uses a deterministic clock; `TestSupport/FixedTimeProvider` also drives `GetTimestamp`.
+  - (b) `Unknown_commands_are_ignored...` exposed a real protocol weakness: activation was fire-and-forget, so a request could be lost while the sender reported success. `SingleInstanceGuard` now uses request/reply (`activate\n` → `ok\n`/`no\n`). The callback runs before the reply, and the server drains until the client closes. Tests were rewritten to assert deterministically, plus a new unterminated-command test. ADR 0005 updated.
 - 2026-10-25 P01-03 DONE (uncommitted; owner commits). Decisions are in ADR 0005.
   - **Core `Lifecycle/`:**
     - `ExitReason.cs` (+ `ExitCodes`)
@@ -144,6 +148,8 @@
 | 2026-10-25 | P01-03 | Windows 11 Pro 25H2 26200.9711 x64, SDK 10.0.401 | `dotnet build DynamicIsland.sln -c Release --no-restore` | PASS | 0 warnings, after suppressing CS1573 repo-wide |
 | 2026-10-25 | P01-03 | same | `dotnet test --solution DynamicIsland.sln -c Release --no-build`, 4 consecutive runs | PASS | 121/121 each run (includes the two-instance smoke test) |
 | 2026-10-25 | P01-03 | same, real desktop | Real `DynamicIsland.exe`: corrupt `settings.json` and launch, then kill the process, then relaunch and close | PASS | Log: `ResetAfterCorruption`; marker kept after kill; next start logs `PreviousSessionUnclean`; clean close removes the marker, exit code 0. The test-created quarantine file was deleted afterwards. |
+| 2026-10-25 | P01-03 | GitHub Actions `windows-2025`, commit `c0c237f` | CI workflow | **FAIL** | https://github.com/imamulkadir/DyanamicEye/actions/runs/40198912460: budget-skip test (timer granularity) and unknown-command activation test (lost fire-and-forget message). Passed locally, including with `CI=true`. |
+| 2026-10-25 | P01-03 fix | Windows 11 Pro 25H2, 6 CPUs | `dotnet test --solution DynamicIsland.sln -c Release --no-build` 3 times; then Integration and Unit projects 3 times each with all 6 cores saturated by busy-loop jobs | PASS | 123/123 each run; 18/18 and 103/103 under load |
 
 ## BLOCKERS / RISKS
 - No target Windows development/testing host verified yet. Do not assert WPF UI tests passed.

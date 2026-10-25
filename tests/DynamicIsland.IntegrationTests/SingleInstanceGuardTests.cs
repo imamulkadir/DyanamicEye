@@ -9,8 +9,7 @@ namespace DynamicIsland.IntegrationTests;
 
 public sealed class SingleInstanceGuardTests
 {
-    private static readonly TimeSpan SignalTimeout = TimeSpan.FromSeconds(3);
-    private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan SignalTimeout = TimeSpan.FromSeconds(5);
 
     private readonly string _appId = "DynamicIsland.Tests." + Guid.NewGuid().ToString("N");
 
@@ -37,16 +36,16 @@ public sealed class SingleInstanceGuardTests
     }
 
     [Fact]
-    public async Task Activation_request_reaches_the_running_instance()
+    public async Task Accepted_activation_has_already_reached_the_running_instance()
     {
         using var guard = SingleInstanceGuard.TryAcquire(_appId)!;
-        var activated = new TaskCompletionSource();
-        guard.StartListening(() => activated.TrySetResult(), ex => activated.TrySetException(ex));
+        var count = 0;
+        guard.StartListening(() => Interlocked.Increment(ref count), _ => { });
 
-        var delivered = await SingleInstanceGuard.SignalExistingInstanceAsync(_appId, SignalTimeout, Ct);
+        var accepted = await SingleInstanceGuard.SignalExistingInstanceAsync(_appId, SignalTimeout, Ct);
 
-        Assert.True(delivered);
-        await activated.Task.WaitAsync(WaitTimeout, Ct);
+        Assert.True(accepted);
+        Assert.Equal(1, Volatile.Read(ref count));
     }
 
     [Fact]
@@ -61,26 +60,39 @@ public sealed class SingleInstanceGuardTests
             Assert.True(await SingleInstanceGuard.SignalExistingInstanceAsync(_appId, SignalTimeout, Ct));
         }
 
-        await WaitUntilAsync(() => Volatile.Read(ref count) == 3);
-        Assert.Equal(3, count);
+        Assert.Equal(3, Volatile.Read(ref count));
     }
 
     [Theory]
-    [InlineData("hello")]
-    [InlineData("ACTIVATE")]
-    [InlineData("activate ")]
-    public async Task Unknown_commands_are_ignored_and_listening_continues(string message)
+    [InlineData("hello\n")]
+    [InlineData("ACTIVATE\n")]
+    [InlineData("activate \n")]
+    [InlineData("activaté\n")]
+    public async Task Unknown_commands_are_rejected_and_listening_continues(string message)
     {
         using var guard = SingleInstanceGuard.TryAcquire(_appId)!;
         var count = 0;
         guard.StartListening(() => Interlocked.Increment(ref count), _ => { });
 
-        await SendRawAsync(Encoding.ASCII.GetBytes(message));
-        Assert.True(await SingleInstanceGuard.SignalExistingInstanceAsync(_appId, SignalTimeout, Ct));
+        var response = await SendRawAsync(Encoding.UTF8.GetBytes(message));
 
-        await WaitUntilAsync(() => Volatile.Read(ref count) >= 1);
-        await Task.Delay(100, Ct);
-        Assert.Equal(1, count);
+        Assert.Equal(SingleInstanceGuard.RejectedResponse, response);
+        Assert.Equal(0, Volatile.Read(ref count));
+        Assert.True(await SingleInstanceGuard.SignalExistingInstanceAsync(_appId, SignalTimeout, Ct));
+        Assert.Equal(1, Volatile.Read(ref count));
+    }
+
+    [Fact]
+    public async Task Unterminated_command_times_out_and_is_rejected()
+    {
+        using var guard = SingleInstanceGuard.TryAcquire(_appId)!;
+        var count = 0;
+        guard.StartListening(() => Interlocked.Increment(ref count), _ => { });
+
+        var response = await SendRawAsync(Encoding.ASCII.GetBytes(SingleInstanceGuard.ActivateCommand));
+
+        Assert.Equal(SingleInstanceGuard.RejectedResponse, response);
+        Assert.Equal(0, Volatile.Read(ref count));
     }
 
     [Fact]
@@ -90,11 +102,11 @@ public sealed class SingleInstanceGuardTests
         var count = 0;
         guard.StartListening(() => Interlocked.Increment(ref count), _ => { });
 
-        await SendRawAsync(Encoding.ASCII.GetBytes(SingleInstanceGuard.ActivateCommand + new string(' ', 4096)));
-        Assert.True(await SingleInstanceGuard.SignalExistingInstanceAsync(_appId, SignalTimeout, Ct));
+        var response = await SendRawAsync(Encoding.ASCII.GetBytes(new string('a', 4096) + "\n"));
 
-        await WaitUntilAsync(() => Volatile.Read(ref count) >= 1);
-        Assert.Equal(1, count);
+        Assert.Equal(SingleInstanceGuard.RejectedResponse, response);
+        Assert.Equal(0, Volatile.Read(ref count));
+        Assert.True(await SingleInstanceGuard.SignalExistingInstanceAsync(_appId, SignalTimeout, Ct));
     }
 
     [Fact]
@@ -128,27 +140,16 @@ public sealed class SingleInstanceGuardTests
         Assert.Throws<ArgumentException>(() => SingleInstanceGuard.TryAcquire(" "));
     }
 
-    private async Task SendRawAsync(byte[] payload)
+    /// <summary>Sends arbitrary bytes and returns the server's reply line.</summary>
+    private async Task<string?> SendRawAsync(byte[] payload)
     {
         var sid = WindowsIdentity.GetCurrent().User!.Value;
-        using var client = new NamedPipeClientStream(".", $"{_appId}.{sid}.activate", PipeDirection.Out, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        using var client = new NamedPipeClientStream(".", $"{_appId}.{sid}.activate", PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         await client.ConnectAsync((int)SignalTimeout.TotalMilliseconds, Ct);
-        try
-        {
-            await client.WriteAsync(payload, Ct);
-        }
-        catch (IOException)
-        {
-            // The server may close the pipe as soon as the message exceeds its limit.
-        }
-    }
+        await client.WriteAsync(payload, Ct);
+        await client.FlushAsync(Ct);
 
-    private static async Task WaitUntilAsync(Func<bool> condition)
-    {
-        var deadline = DateTime.UtcNow + WaitTimeout;
-        while (!condition() && DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(20, Ct);
-        }
+        using var reader = new StreamReader(client, Encoding.ASCII, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        return await reader.ReadLineAsync(Ct);
     }
 }

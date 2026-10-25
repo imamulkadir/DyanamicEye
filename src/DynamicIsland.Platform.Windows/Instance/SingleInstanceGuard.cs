@@ -9,18 +9,24 @@ namespace DynamicIsland.Platform.Windows.Instance;
 /// Per-user single instance (guide §4.4).
 /// <list type="bullet">
 /// <item>Ownership: named mutex <c>Local\{appId}.{userSid}.instance</c>; held while the guard lives.</item>
-/// <item>Activation: a second instance sends the fixed command <see cref="ActivateCommand"/> over the named pipe
-/// <c>{appId}.{userSid}.activate</c>. The pipe ACL grants only the current user; the client requires the server to be
-/// owned by the current user, so another user cannot squat the pipe or impersonate the app.</item>
+/// <item>Activation: a second instance sends the line <c>activate</c> over the named pipe
+/// <c>{appId}.{userSid}.activate</c> and waits for <c>ok</c> (accepted) or <c>no</c> (rejected), so success means the
+/// running instance really received the request. The pipe ACL grants only the current user and the client requires the
+/// server to be owned by the current user, so another user cannot squat the pipe or impersonate the app.</item>
+/// <item>Limits: one line of at most 64 ASCII bytes within 2 seconds; anything else is rejected.</item>
 /// </list>
 /// </summary>
 public sealed class SingleInstanceGuard : IDisposable
 {
     public const string ActivateCommand = "activate";
+    public const string AcceptedResponse = "ok";
+    public const string RejectedResponse = "no";
 
-    private const int MaxMessageBytes = 64;
-    private static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(2);
+    private const byte LineEnd = (byte)'\n';
+    private const int MaxLineBytes = 64;
+    private const int MaxDrainBytes = 64 * 1024;
+    private static readonly TimeSpan ExchangeTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(3);
 
     private readonly Mutex _mutex;
     private readonly string _pipeName;
@@ -48,7 +54,7 @@ public sealed class SingleInstanceGuard : IDisposable
     }
 
     /// <summary>Asks the running instance to show itself.</summary>
-    /// <returns><c>false</c> when no instance answered within <paramref name="timeout"/>.</returns>
+    /// <returns><c>true</c> only when the running instance accepted the request within <paramref name="timeout"/>.</returns>
     public static async Task<bool> SignalExistingInstanceAsync(string appId, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var names = InstanceNames.For(appId);
@@ -56,13 +62,19 @@ public sealed class SingleInstanceGuard : IDisposable
         // Best effort; failure only means Windows may flash the taskbar instead of focusing the window.
         _ = NativeMethods.AllowSetForegroundWindow(NativeMethods.AllowAnyProcess);
 
-        using var client = new NamedPipeClientStream(".", names.Pipe, PipeDirection.Out, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout);
+
+        using var client = new NamedPipeClientStream(".", names.Pipe, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         try
         {
-            await client.ConnectAsync((int)timeout.TotalMilliseconds, cancellationToken).ConfigureAwait(false);
-            await client.WriteAsync(Encoding.ASCII.GetBytes(ActivateCommand), cancellationToken).ConfigureAwait(false);
-            await client.FlushAsync(cancellationToken).ConfigureAwait(false);
-            return true;
+            await client.ConnectAsync(deadline.Token).ConfigureAwait(false);
+            await WriteLineAsync(client, ActivateCommand, deadline.Token).ConfigureAwait(false);
+            return await ReadLineAsync(client, deadline.Token).ConfigureAwait(false) == AcceptedResponse;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
         }
         catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
         {
@@ -71,7 +83,7 @@ public sealed class SingleInstanceGuard : IDisposable
     }
 
     /// <summary>Starts accepting activation requests. Callbacks run on a background thread.</summary>
-    /// <param name="onActivate">Invoked for each valid activation request.</param>
+    /// <param name="onActivate">Invoked for each valid request, before the client is answered.</param>
     /// <param name="onListenerFailed">Invoked once if the pipe cannot be created (activation then stays unavailable).</param>
     public void StartListening(Action onActivate, Action<Exception> onListenerFailed)
     {
@@ -114,12 +126,12 @@ public sealed class SingleInstanceGuard : IDisposable
             {
                 server = NamedPipeServerStreamAcl.Create(
                     _pipeName,
-                    PipeDirection.In,
+                    PipeDirection.InOut,
                     maxNumberOfServerInstances: 1,
                     PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous | PipeOptions.FirstPipeInstance,
-                    inBufferSize: MaxMessageBytes,
-                    outBufferSize: 0,
+                    inBufferSize: MaxLineBytes,
+                    outBufferSize: MaxLineBytes,
                     CreatePipeSecurity());
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -133,10 +145,7 @@ public sealed class SingleInstanceGuard : IDisposable
                 try
                 {
                     await server.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
-                    if (await ReadCommandAsync(server, cancellationToken).ConfigureAwait(false) == ActivateCommand)
-                    {
-                        onActivate();
-                    }
+                    await HandleClientAsync(server, onActivate, cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -144,39 +153,90 @@ public sealed class SingleInstanceGuard : IDisposable
                 }
                 catch (IOException)
                 {
-                    // Client disconnected mid-message; wait for the next one.
+                    // Client vanished mid-exchange; wait for the next one.
                 }
             }
         }
     }
 
-    /// <returns>The ASCII command, or <c>null</c> when the message is too long, too slow or not ASCII.</returns>
-    private static async Task<string?> ReadCommandAsync(NamedPipeServerStream server, CancellationToken cancellationToken)
+    private static async Task HandleClientAsync(NamedPipeServerStream server, Action onActivate, CancellationToken cancellationToken)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(ReadTimeout);
+        using var exchange = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        exchange.CancelAfter(ExchangeTimeout);
 
-        var buffer = new byte[MaxMessageBytes + 1];
-        var length = 0;
+        string? command;
         try
         {
-            int read;
-            while ((read = await server.ReadAsync(buffer.AsMemory(length), timeout.Token).ConfigureAwait(false)) > 0)
-            {
-                length += read;
-                if (length > MaxMessageBytes)
-                {
-                    return null;
-                }
-            }
+            command = await ReadLineAsync(server, exchange.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return null;
+            command = null;
         }
 
-        var bytes = buffer.AsSpan(0, length);
-        return Ascii.IsValid(bytes) ? Encoding.ASCII.GetString(bytes) : null;
+        var accepted = command == ActivateCommand;
+        if (accepted)
+        {
+            onActivate();
+        }
+
+        using var reply = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        reply.CancelAfter(ExchangeTimeout);
+        try
+        {
+            await WriteLineAsync(server, accepted ? AcceptedResponse : RejectedResponse, reply.Token).ConfigureAwait(false);
+
+            // Keep the instance until the client has read the reply and closed (or the timeout passes).
+            await DrainUntilClosedAsync(server, reply.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Slow or stuck client: drop it.
+        }
+    }
+
+    private static async Task WriteLineAsync(PipeStream pipe, string line, CancellationToken cancellationToken)
+    {
+        var bytes = Encoding.ASCII.GetBytes(line + "\n");
+        await pipe.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        await pipe.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <returns>The ASCII line without its terminator, or <c>null</c> when it is too long, not ASCII or not terminated.</returns>
+    private static async Task<string?> ReadLineAsync(PipeStream pipe, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[MaxLineBytes];
+        var length = 0;
+        var single = new byte[1];
+
+        while (length < MaxLineBytes)
+        {
+            if (await pipe.ReadAsync(single, cancellationToken).ConfigureAwait(false) == 0)
+            {
+                return null;
+            }
+
+            if (single[0] == LineEnd)
+            {
+                var line = buffer.AsSpan(0, length);
+                return Ascii.IsValid(line) ? Encoding.ASCII.GetString(line) : null;
+            }
+
+            buffer[length++] = single[0];
+        }
+
+        return null;
+    }
+
+    private static async Task DrainUntilClosedAsync(PipeStream pipe, CancellationToken cancellationToken)
+    {
+        var scratch = new byte[MaxLineBytes];
+        var drained = 0;
+        int read;
+        while (drained < MaxDrainBytes && (read = await pipe.ReadAsync(scratch, cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            drained += read;
+        }
     }
 
     private readonly record struct InstanceNames(string Mutex, string Pipe)

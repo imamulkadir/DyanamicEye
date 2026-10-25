@@ -10,9 +10,9 @@
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <!-- Required for IDE0005 (unused usings) to be reported at build; missing XML docs are not enforced. -->
+    <!-- Required for IDE0005 (unused usings) to be reported at build; missing (or partial) XML docs are not enforced. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
 
     <!-- Reproducible restore: lock files committed; CI restores in locked mode. -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>

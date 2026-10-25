@@ -1,6 +1,8 @@
 using DynamicIsland.Core.Diagnostics;
+using DynamicIsland.Core.Lifecycle;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Infrastructure;
+using DynamicIsland.Infrastructure.Lifecycle;
 using DynamicIsland.Infrastructure.Logging;
 using DynamicIsland.Infrastructure.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,7 +45,11 @@ public static class AppHost
         builder.Services.AddSingleton(_ => new FileLoggerOptions(System.IO.Path.Combine(root, AppDataPaths.LogsFolderName)));
         builder.Services.AddSingleton<ILoggerProvider, FileLoggerProvider>();
 
-        builder.Services.AddSingleton(_ => new SettingsStoreOptions(System.IO.Path.Combine(root, AppDataPaths.DataFolderName)));
+        var dataDirectory = System.IO.Path.Combine(root, AppDataPaths.DataFolderName);
+        builder.Services.AddSingleton<LifecycleCoordinator>();
+        builder.Services.AddSingleton<ISessionStateMarker>(sp =>
+            new FileSessionStateMarker(dataDirectory, sp.GetRequiredService<ILogger<FileSessionStateMarker>>()));
+        builder.Services.AddSingleton(_ => new SettingsStoreOptions(dataDirectory));
         builder.Services.AddSingleton<ISettingsStore, JsonSettingsStore>();
 
         builder.Services.AddSingleton<MainWindow>();

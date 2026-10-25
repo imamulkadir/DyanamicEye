@@ -4,45 +4,43 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS — Phase P00 complete; gate G00 PASS. Starting P01 (reliability kernel).
-- **Active task:** P01-03 — Lifecycle coordinator, single instance, activation IPC.
-- **Active task status:** NOT_STARTED (P01-02 DONE, uncommitted, awaiting owner review; P01-01 pushed, CI green)
+- **Active task:** P01-04 — Safe Mode, crash counter, launcher.
+- **Active task status:** NOT_STARTED (P01-03 DONE, uncommitted, awaiting owner review; P01-02 pushed, CI green)
 - **Last passed gate:** G00 (2026-10-25, CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40196393380)
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public). CI status for any run can be read without auth: `Invoke-RestMethod https://api.github.com/repos/imamulkadir/DyanamicEye/actions/workflows/ci.yml/runs?per_page=1`.
 - **Current branch / commit:** Repo created by owner (2026-10-25); default branch `master`. **Owner reviews and makes all commits. Agents must NOT commit.** Report changed files and the owner commits them.
 - **Host (P00-02, verified):** Windows 11 Pro 25H2, build 26200.9711, x64 (RID `win-x64`). .NET SDK 10.0.401 (pinned) + 8.0.425; runtimes NETCore/WindowsDesktop/AspNetCore 10.0.12 + 8.0.31; x86 dotnet also present.
 - **Supported OS policy:** see `docs/ADR/0001-supported-windows-versions.md` (tested target Win11 24H2/25H2 x64; Win10 22H2 Home/Pro NOT supported by .NET 10).
 - **Build/test commands:** `dotnet restore DynamicIsland.sln --locked-mode`; `dotnet build DynamicIsland.sln -c Release --no-restore`; `dotnet test --solution DynamicIsland.sln -c Release` (Microsoft.Testing.Platform runner via `global.json`; legacy VSTest-style `dotnet test` fails by design). The smoke test opens the real app window on the desktop.
-- **Last updated:** 2026-10-25 (P01-02 DONE)
+- **Last updated:** 2026-10-25 (P01-03 DONE)
 
 ## NEXT ACTION (ONE task only)
-**P01-03 — App lifecycle coordinator: explicit shutdown vs. session end vs. crash, cancellation/disposal, single instance + activation IPC.** (guide §5 P01-03, §4.4, §4.5)
-1. **Core (`Core/Lifecycle/`, pure, unit-tested):**
-   - an `ExitReason` enum (`UserExit`, `SessionEnding`, `Restart`, `Fatal`)
-   - `ILifecycleCoordinator`: one-shot `RequestShutdown(reason)`, an app-wide `CancellationToken` cancelled on shutdown, and an ordered async shutdown of registered components with a time budget (e.g. 5 s) that logs any component exceeding it
-   - a clean-shutdown marker contract for P01-04: a clean exit clears the "session unhealthy" flag, a fatal exit leaves it set
-2. **Single instance (`Platform.Windows`):**
-   - a per-user named mutex `Local\DynamicIsland.{UserSid}`
-   - a named pipe `DynamicIsland.{UserSid}.activate`, created with `NamedPipeServerStreamAcl.Create` and a `PipeSecurity` that allows only the current user SID (plus `PipeOptions.CurrentUserOnly`)
-   - the protocol is one fixed short command (`activate`), with a length limit and timeout; reject anything else
-   - a second instance sends `activate`, then exits with code 0 and **no** window; the first instance receives it and brings its window forward without forcing focus. Note that the shell is still the dev window until P02.
-3. **App wiring (`App.xaml.cs` → thin; logic in the coordinator):**
-   - startup order: acquire single instance, build host, load settings (`ISettingsStore.LoadAsync`; log the `Outcome` and the correction count only), show the window
-   - `SessionEnding` → `ExitReason.SessionEnding`, which shuts down promptly
-   - unhandled exceptions: `DispatcherUnhandledException`, `AppDomain.UnhandledException` and `TaskScheduler.UnobservedTaskException` are logged as Critical, the session is marked unhealthy and the app exits with a non-zero code. **Never set `Handled = true` unconditionally** (guide §0.2).
-4. **Tests:**
-   - Unit: coordinator ordering, timeout, the one-shot request, the cancellation token, the marker set/clear contract
-   - Integration (Windows): mutex contention between two processes or handles; pipe round-trip (`activate`); invalid messages rejected; the ACL denies other users (assert the security descriptor owner/rules)
-   - Smoke: launching the exe twice leaves one process, the second exits 0; closing leaves no process
-5. **Verify:** Release build with 0 warnings; full test suite green; manual check that a double launch shows one window. Update this file; list changed files; do not commit.
+**P01-04 — Safe Mode state, rolling crash counter (D03: at most 2 automatic restarts per 5 minutes), launcher spawn strategy, mock-process and injected-crash tests.** (guide §5 P01-04, §4.5, D03; ADR 0005)
+1. **Core (`Core/Lifecycle/`, pure):**
+   - `CrashPolicy`: given the crash timestamps and now, decide `Restart`, `RestartInSafeMode` or `Stop`. Allow at most 2 automatic restarts in a rolling 5 minutes; on the third crash, use Safe Mode once, then stop.
+   - `ICrashStateStore`, a guide §3 contract: crash timestamps, Safe Mode flag and the last exit reason, persisted as small atomic JSON under `data/`, reusing the settings atomic-write approach.
+2. **Launcher (`src/DynamicIsland.Launcher`; replaces the current "not implemented" stub):**
+   - starts `DynamicIsland.exe` (same folder) as a child, passing only an allow-listed `--safe-mode` argument, and waits for it
+   - exit code 0 (UserExit/SessionEnding) → stop and never relaunch; 3 (Restart) → relaunch without counting a crash; any other code or abnormal termination → record a crash, apply `CrashPolicy`, and relaunch or stop
+   - on Stop, shows a short native message with manual recovery steps (the log folder, starting in Safe Mode) and exits
+   - not a long-running service: it lives exactly as long as the app
+   - **Decide by ADR** whether the startup registration (P03) targets the launcher or the app, and how a direct app launch behaves without the launcher (it still works, without auto-restart).
+3. **App:** `--safe-mode` sets the app's Safe Mode. In Safe Mode it skips optional components; only the shell and settings load (widgets do not exist yet, so record which components it skips). Read the crash state at startup and log the Safe Mode reason.
+4. **Injected crash for tests only:** an environment variable such as `DYNAMICISLAND_TEST_CRASH=ui|background|startup`, honored **only in Debug builds or when a test-only build constant is set**. Never ship it as an active switch in Release; record the choice in the ADR.
+5. **Tests:**
+   - Unit: `CrashPolicy` across the window (2 crashes → restart, 3rd → Safe Mode, after Safe Mode crash → stop, old crashes outside 5 min ignored); the crash state store round-trips and recovers from corruption
+   - Launcher with a mock child process, e.g. a tiny test exe or an injected process-runner interface, returning scripted exit codes: Exit 0 never relaunches; the 3rd crash → Safe Mode; Restart is not counted
+   - Smoke/integration: the injected UI-thread crash → app exit code 1, session marker kept, Critical entry in the log
+6. **Verify:** Release build with 0 warnings; all tests green; CI green after the owner pushes. Update this file; do not commit.
 
-**Expected verification:** the G01 items "no duplicate app" and "deliberate Exit is distinguishable from a crash" are proven by tests.
+**Expected verification:** the G01 items "deliberate Exit never auto-relaunches" and "third crash does not loop" are proven by tests.
 
 ## TASK BOARD (compact; detailed definitions live in guide)
 
 | Phase | Task IDs | Status | Gate evidence |
 |---|---|---|---|
 | P00 — Environment and baseline | P00-01…P00-04 | DONE | **G00 PASS** 2026-10-25, run 40196393380 (`963b01c`) |
-| P01 — Reliability kernel | P01-01…P01-05 | IN_PROGRESS (P01-01, P01-02 DONE) | G01 pending (corrupt-settings recovery covered by P01-01 tests) |
+| P01 — Reliability kernel | P01-01…P01-05 | IN_PROGRESS (P01-01..03 DONE) | G01 pending. Covered so far: corrupt-settings recovery (tests and a real app run); no duplicate app (smoke test); Exit distinguished from a crash (marker tests and a real kill run). |
 | P02 — Island shell | P02-01…P02-05 | NOT_STARTED | G02 pending |
 | P03 — Tray/settings/startup | P03-01…P03-05 | NOT_STARTED | G03 pending |
 | P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
@@ -51,6 +49,24 @@
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10)
+- 2026-10-25 P01-03 DONE (uncommitted; owner commits). Decisions are in ADR 0005.
+  - **Core `Lifecycle/`:**
+    - `ExitReason.cs` (+ `ExitCodes`)
+    - `ISessionStateMarker.cs`
+    - `LifecycleCoordinator.cs`: one-shot request, stopping token, reverse-order stop with 2 s per step and a 5 s total budget, failures reported by type.
+  - **Infrastructure:** `Lifecycle/FileSessionStateMarker.cs` (`data/session.running`).
+  - **Platform.Windows:**
+    - `Instance/SingleInstanceGuard.cs`: `Local\` + SID mutex; current-user-ACL pipe with `FirstPipeInstance`; client uses `CurrentUserOnly`; exact `activate` command, 64-byte and 2 s limits.
+    - `NativeMethods.cs` (`AllowSetForegroundWindow`)
+    - csproj: `AllowUnsafeBlocks` for LibraryImport; `InternalsVisibleTo` IntegrationTests.
+  - **App:**
+    - `App.xaml.cs` rewritten. Startup order: instance → host → marker → settings → window → listener. Handles `SessionEnding` and unhandled exceptions; Fatal is a controlled exit.
+    - `AppLog.cs`: 9 more events.
+    - `AppHost.cs` registers the coordinator and the marker.
+  - **Build:** `Directory.Build.props` now also suppresses CS1573 (partial param docs).
+  - **Tests:** `UnitTests/Lifecycle/LifecycleCoordinatorTests.cs`, `UnitTests/Lifecycle/FileSessionStateMarkerTests.cs`, `IntegrationTests/SingleInstanceGuardTests.cs`, `WindowsSmokeTests/AppLaunchSmokeTests.cs` (adds the second-launch test).
+  - **Not covered yet:** the UI-thread fatal path has no injected-crash test; it is planned in P01-04.
+- 2026-10-25 P01-02 pushed by owner (`9a8f822`); CI run 40198235944 **success**.
 - 2026-10-25 P01-02 DONE (uncommitted; owner commits). Decisions are in ADR 0004.
   - **Core:** `Diagnostics/LogRedactor.cs`. Redacts profile path, user/machine/domain names (whole words), GitHub/bearer tokens, secret assignments and emails; fails closed on regex timeout.
   - **Infrastructure:**
@@ -124,6 +140,10 @@
 | 2026-10-25 | P01-02 | same | `dotnet test --solution DynamicIsland.sln -c Release --no-build` | FAIL → fixed | Size-cap test exposed the FileInfo.Length-after-Delete bug |
 | 2026-10-25 | P01-02 | same | `dotnet test --solution DynamicIsland.sln -c Release --no-build`, 4 consecutive runs | PASS | 92/92 each run, no flakiness |
 | 2026-10-25 | P01-02 | same, real desktop | The smoke-test launch of `DynamicIsland.exe` wrote `%LOCALAPPDATA%\DynamicIsland\logs\dynamicisland-20261025.log`; contents inspected | PASS | JSON lines with AppStarted/AppExiting; checked that user name and machine name are absent |
+| 2026-10-25 | P01-02 | GitHub Actions `windows-2025`, commit `9a8f822` | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40198235944 |
+| 2026-10-25 | P01-03 | Windows 11 Pro 25H2 26200.9711 x64, SDK 10.0.401 | `dotnet build DynamicIsland.sln -c Release --no-restore` | PASS | 0 warnings, after suppressing CS1573 repo-wide |
+| 2026-10-25 | P01-03 | same | `dotnet test --solution DynamicIsland.sln -c Release --no-build`, 4 consecutive runs | PASS | 121/121 each run (includes the two-instance smoke test) |
+| 2026-10-25 | P01-03 | same, real desktop | Real `DynamicIsland.exe`: corrupt `settings.json` and launch, then kill the process, then relaunch and close | PASS | Log: `ResetAfterCorruption`; marker kept after kill; next start logs `PreviousSessionUnclean`; clean close removes the marker, exit code 0. The test-created quarantine file was deleted afterwards. |
 
 ## BLOCKERS / RISKS
 - No target Windows development/testing host verified yet. Do not assert WPF UI tests passed.
@@ -135,13 +155,14 @@
 - Frozen D01–D15: see guide §0. No deviations approved.
 - ADR 0001 (Accepted): supported Windows versions. It clarifies guide §0 and does not deviate from it.
 - ADR 0002 (Accepted): `.sln` format, per-project TFMs, build/lock policy, xUnit v3 on Microsoft.Testing.Platform, host without default sources.
+- ADR 0005 (Accepted): lifecycle coordinator, exit codes (0/1/3), session marker, `Local\`+SID mutex, ACL'd activation pipe, exception policy (unobserved task exceptions are Error, not fatal).
 - ADR 0004 (Accepted): in-house JSON-lines file logger (no Serilog), retention/caps, non-blocking queue, fail-safe, redaction scope; callers must never log free text.
 - ADR 0003 (Accepted): settings model and consent defaults (startup and update checks are `NotAsked` and asked in P03), atomic save + `.bak`, quarantine, read-only for newer schemas, migrations, **schema-bump rule for new enum values**, reflection-based STJ.
 - Pending ADRs: concrete per-user installer technology and updater trust/provenance model when P06 begins.
 
 ## HANDOFF NOTES
 - Read `AGENTS.md` first; guide §5 holds task-by-task definitions.
-- Current next task: **P01-03**. P01 builds on `AppHost` and the empty Core/Infrastructure projects. Do not jump to UI implementation.
+- Current next task: **P01-04**. P01 builds on `AppHost` and the empty Core/Infrastructure projects. Do not jump to UI implementation.
 - Owner handles git repo creation and all commits (owner instruction 2026-10-25). The owner pushed P00-03 on 2026-10-25. `gh` is not installed, but the repo is public, so CI run status can be read through the GitHub REST API without auth (see CURRENT STATUS).
 - If a fresh agent finds code already present, inspect git + tests and reconcile this file before editing anything.
 

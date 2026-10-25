@@ -3,7 +3,13 @@
   <!-- Windows OS adapters (P/Invoke, WinRT) implementing Core abstractions. -->
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- Required by LibraryImport-generated P/Invoke stubs. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DynamicIsland.IntegrationTests" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DynamicIsland.Core\DynamicIsland.Core.csproj" />

@@ -34,5 +34,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0002 — Solution layout, build policy and test platform](0002-solution-layout-and-test-platform.md) — Accepted (P00-03)
 - [0003 — Settings persistence, recovery and versioning](0003-settings-persistence.md) — Accepted (P01-01)
 - [0004 — Local logging sink and redaction](0004-local-logging.md) — Accepted (P01-02)
+- [0005 — App lifecycle, exit classification and single instance](0005-lifecycle-and-single-instance.md) — Accepted (P01-03)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

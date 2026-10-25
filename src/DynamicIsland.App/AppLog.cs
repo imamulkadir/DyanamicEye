@@ -1,8 +1,10 @@
+using DynamicIsland.Core.Lifecycle;
+using DynamicIsland.Core.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace DynamicIsland.App;
 
-/// <summary>App lifecycle log events. Messages carry no personal data.</summary>
+/// <summary>App lifecycle log events. Messages carry no personal data: names, counts and exception types only.</summary>
 internal static partial class AppLog
 {
     [LoggerMessage(EventId = 1000, EventName = "AppStarted", Level = LogLevel.Information,
@@ -10,6 +12,38 @@ internal static partial class AppLog
     public static partial void Started(ILogger logger, string version, string osVersion, string architecture);
 
     [LoggerMessage(EventId = 1001, EventName = "AppExiting", Level = LogLevel.Information,
-        Message = "Dynamic Island exiting with code {ExitCode}")]
-    public static partial void Exiting(ILogger logger, int exitCode);
+        Message = "Dynamic Island exiting: reason {Reason}, exit code {ExitCode}")]
+    public static partial void Exiting(ILogger logger, ExitReason reason, int exitCode);
+
+    [LoggerMessage(EventId = 1002, EventName = "PreviousSessionUnclean", Level = LogLevel.Warning,
+        Message = "The previous session did not exit cleanly (crash, forced termination or power loss)")]
+    public static partial void PreviousSessionUnclean(ILogger logger);
+
+    [LoggerMessage(EventId = 1003, EventName = "SettingsLoaded", Level = LogLevel.Information,
+        Message = "Settings loaded: outcome {Outcome}, {CorrectionCount} correction(s), read-only {ReadOnly}")]
+    public static partial void SettingsLoaded(ILogger logger, SettingsLoadOutcome outcome, int correctionCount, bool readOnly);
+
+    [LoggerMessage(EventId = 1004, EventName = "ShutdownRequested", Level = LogLevel.Information,
+        Message = "Shutdown requested: {Reason}")]
+    public static partial void ShutdownRequested(ILogger logger, ExitReason reason);
+
+    [LoggerMessage(EventId = 1005, EventName = "ShutdownStepIncomplete", Level = LogLevel.Warning,
+        Message = "Shutdown step {Step} {Status} after {ElapsedMs} ms ({ErrorType})")]
+    public static partial void ShutdownStepIncomplete(ILogger logger, string step, ShutdownStepStatus status, long elapsedMs, string? errorType);
+
+    [LoggerMessage(EventId = 1006, EventName = "ActivationRequested", Level = LogLevel.Information,
+        Message = "Another launch asked this instance to show itself")]
+    public static partial void ActivationRequested(ILogger logger);
+
+    [LoggerMessage(EventId = 1007, EventName = "ActivationUnavailable", Level = LogLevel.Warning,
+        Message = "Second-launch activation is unavailable ({ErrorType})")]
+    public static partial void ActivationUnavailable(ILogger logger, string errorType);
+
+    [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
+        Message = "Unhandled exception on {Source}; the app will exit")]
+    public static partial void UnhandledException(ILogger logger, Exception exception, string source);
+
+    [LoggerMessage(EventId = 1011, EventName = "UnobservedTaskException", Level = LogLevel.Error,
+        Message = "A background task failed without being observed")]
+    public static partial void UnobservedTaskException(ILogger logger, Exception exception);
 }

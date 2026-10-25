@@ -41,6 +41,15 @@ public static class IslandWindowInterop
         return hit != IntPtr.Zero && NativeMethods.GetAncestor(hit, NativeMethods.GaRoot) == window;
     }
 
+    public static bool IsVisible(IntPtr window) => NativeMethods.IsWindowVisible(window);
+
+    /// <summary>
+    /// Gives focus back to <paramref name="window"/> (the window that was active before the island) when it still exists.
+    /// Only works while the island is foreground; Windows refuses otherwise, which is the intended "no force" behaviour.
+    /// </summary>
+    public static bool TryActivate(IntPtr window) =>
+        window != IntPtr.Zero && NativeMethods.IsWindow(window) && NativeMethods.IsWindowVisible(window) && NativeMethods.SetForegroundWindow(window);
+
     public static bool IsTopmost(IntPtr window) =>
         (NativeMethods.GetWindowLongPtr(window, NativeMethods.GwlExStyle) & NativeMethods.WsExTopmost) != 0;
 

@@ -24,6 +24,15 @@ public sealed class Debouncer(TimeSpan quietPeriod, TimeProvider timeProvider, A
         }
     }
 
+    /// <summary>Drops a pending callback, if any.</summary>
+    public void Cancel()
+    {
+        lock (_gate)
+        {
+            _timer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate)

@@ -37,15 +37,15 @@ public sealed record AppearanceSettings
 
     public double Scale { get; init; } = 1.0;
 
-    public double Opacity { get; init; } = 0.95;
+    public double Opacity { get; init; } = 1.0;
 
     public IslandPlacement Placement { get; init; } = IslandPlacement.TopCenter;
 
     /// <summary>Horizontal nudge in DIPs (right for top-left/center, inward for top-right).</summary>
     public double HorizontalOffset { get; init; }
 
-    /// <summary>Gap below the top of the work area in DIPs.</summary>
-    public double VerticalOffset { get; init; } = 8;
+    /// <summary>Gap below the top of the work area in DIPs; 0 attaches the notch to the top edge.</summary>
+    public double VerticalOffset { get; init; }
 
     public MotionPreference Motion { get; init; } = MotionPreference.System;
 }

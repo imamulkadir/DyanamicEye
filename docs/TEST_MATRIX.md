@@ -10,17 +10,17 @@ monitors (resolution @ scaling) and PASS/FAIL with a note. Status values: `NOT_R
 3. Exit: run `taskkill /IM DynamicIsland.exe` (without `/F`). It sends a normal close request, so the app exits cleanly with code 0. Clicking the island and pressing Alt+F4 should also work but is not verified yet. The tray "Exit" arrives in P03.
 4. Logs are in `%LOCALAPPDATA%\DynamicIsland\logs\dynamicisland-YYYYMMDD.log`. Each placement writes an `IslandPlaced` entry: primary monitor yes/no, fallback yes/no, scale, size in px. Monitor ids are never logged.
 
-Expected size of the collapsed island: **200 × 36 px × the monitor's scale**, for example 300 × 54 px at 150 %. It sits **8 px × scale** below the top of the usable screen area and is centered horizontally.
+The island is drawn as a **notch attached to the top of the usable screen area** (flat top, small curved shoulders, rounded bottom corners, black), with a speaker slit and a front-camera lens inside. Collapsed size: **236 × 32 px × the monitor's scale**, for example 354 × 48 px at 150 %. It is centered horizontally with no gap at the top. The (transparent) window is always 420 × 180 px × scale.
 
 ## G02 — Island shell (P02-02 adds these; P02-03..05 extend them)
 
 | # | Scenario | Steps | Expected | Status |
 |---|---|---|---|---|
-| D1 | Scaling 100 % | Settings → Display → Scale 100 %, start the app | Island top-center, 200×36 px, crisp edges | PASS (agent, 2026-10-25, 1920-px monitor) |
-| D2 | Scaling 125 % | Set 125 %, start the app | 250×45 px, top-center, crisp (no blur) | NOT_RUN |
-| D3 | Scaling 150 % | Set 150 %, start the app | 300×54 px, crisp | NOT_RUN |
-| D4 | Scaling 200 % | Set 200 %, start the app | 400×72 px, crisp | NOT_RUN |
-| D5 | Scaling changed while running | With the app open, switch 100 % → 150 % | Within ~1 s the island resizes to 300×54 px and stays centered; log shows `IslandPlaced` | NOT_RUN |
+| D1 | Scaling 100 % | Settings → Display → Scale 100 %, start the app | Notch top-center, flush with the top edge, 236×32 px, crisp edges | PASS (agent, 2026-10-25, 1920-px monitor, screenshot) |
+| D2 | Scaling 125 % | Set 125 %, start the app | Notch 295×40 px, flush top, crisp (no blur) | NOT_RUN |
+| D3 | Scaling 150 % | Set 150 %, start the app | Notch 354×48 px, crisp | NOT_RUN |
+| D4 | Scaling 200 % | Set 200 %, start the app | Notch 472×64 px, crisp | NOT_RUN |
+| D5 | Scaling changed while running | With the app open, switch 100 % → 150 % | Within ~1 s the notch resizes to 354×48 px and stays centered; log shows `IslandPlaced` | NOT_RUN |
 | M1 | Two monitors, primary | Two monitors, start the app | Island on the **primary** monitor | NOT_RUN |
 | M2 | Mixed DPI | Primary 100 %, secondary 150 %, make the secondary primary in Settings | Island moves to the new primary at 150 % size, crisp | NOT_RUN |
 | M3 | Unplug the island's monitor | Island on a monitor, unplug that monitor (or disable it in Display settings) | Island appears on the remaining monitor within ~1 s; log `fallback True` only if a preferred monitor was set | NOT_RUN |
@@ -32,7 +32,14 @@ Expected size of the collapsed island: **200 × 36 px × the monitor's scale**, 
 | S1 | Sleep / wake | Sleep the PC, wake it | Island still visible at the correct place; no duplicate; log shows a placement after resume | NOT_RUN |
 | S2 | Lock / unlock | Win+L, unlock | Island unchanged | NOT_RUN |
 | H1 | Click-through corners | Put a window under the island's rounded corner and click exactly at the corner | The window below receives the click (the automated smoke test checks this too) | PASS (automated, 100 %) |
-| H2 | Keyboard | Click the island, press Tab / Escape | Focus behaviour is defined in P02-03; for now the window must not trap focus | NOT_RUN |
+| H2 | Keyboard | Click the island, press Escape; click it, press Tab to the pin button, press Space; press Ctrl+P | Escape collapses and returns focus to the previous app; Tab reaches the pin button (visible focus ring); Space and Ctrl+P toggle the pin | NOT_RUN |
+| H3 | Hover preview | Rest the mouse on the collapsed notch about 0.3 s, then move away | It grows slightly (264×38 at 100 %) after about 1/4 s, and shrinks back immediately on leaving; brushing past quickly does nothing | NOT_RUN |
+| H4 | Click expand / collapse | Click the island; move the mouse away; click again, then press Escape | Click expands it downward from the top edge (420×180 px at 100 %; sensor row stays at the top); moving away collapses it unless pinned; Escape collapses it | NOT_RUN |
+| H5 | Pin | Expand, click the pin, move the mouse away | It stays expanded with a green pin; Escape or the pin again collapses it | NOT_RUN |
+| H6 | Click-through while expanded | Expand the island and click just outside its rounded edge | The window below receives the click | NOT_RUN |
+| H7 | Narrator | Turn on Narrator (Ctrl+Win+Enter), Tab or click to the island | Narrator reads "Dynamic Island, collapsed" and offers expand; after expanding it reads "expanded"; the pin is announced as a toggle | NOT_RUN |
+| H8 | Reduced motion | Settings → Accessibility → Visual effects → Animation effects **off**; expand and collapse | Size changes instantly, with no animation | NOT_RUN |
+| H9 | Expanded screenshots | — | Notch design captured by the agent 2026-10-25: collapsed notch flush with the top edge (speaker slit, camera lens, sensor dot); expanded notch with title, placeholder and pin | PASS (agent, 100 %) |
 | I1 | App icon | Explorer: view `DynamicIsland.exe` with small, medium, large and extra-large icons at 100 % and 200 % | The original dark-tile capsule icon, crisp at every size | NOT_RUN |
 | A1 | Not in taskbar / Alt+Tab | Start the app, look at the taskbar, press Alt+Tab | No taskbar button and no Alt+Tab entry (the automated smoke test checks the style) | NOT_RUN |
 

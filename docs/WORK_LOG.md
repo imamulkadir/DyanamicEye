@@ -2,6 +2,36 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-25 (P02-01)
+
+### Verified changes
+- 2026-10-25 **P02-01 DONE** (uncommitted; owner commits). Decisions are in ADR 0008.
+  - **Core:**
+    - `Display/Display.cs`: `PixelRect`, `MonitorInfo`, `IMonitorService`, `PlacementRequest`/`PlacementResult`, and `IslandPlacementCalculator` (work area, offsets, clamping, preferred → primary → first fallback).
+    - Settings gain `Appearance.HorizontalOffset` (0, ±4000) and `VerticalOffset` (8, 0..1000), validated without a schema bump.
+  - **Platform.Windows:**
+    - `Display/Win32MonitorService.cs`: `EnumDisplayMonitors` with an `UnmanagedCallersOnly` callback, `GetMonitorInfoW`, `GetDpiForMonitor`; ids are device interface paths.
+    - `Display/IslandWindowInterop.cs`: tool window, `SetBounds`, `GetBounds`, `IsTopmost`.
+    - `NativeMethods.cs`: new interop.
+  - **App:**
+    - New `IslandWindow.xaml(.cs)`: an original capsule. It re-places itself on DPI, display and work-area changes, coalesced.
+    - New `AppSettingsSnapshot.cs`.
+    - New `app.manifest`: PerMonitorV2, asInvoker.
+    - `MainWindow.xaml(.cs)` **deleted**.
+    - `AppHost` registers the snapshot, monitor service and window. `App.xaml.cs` passes loaded settings to the snapshot.
+  - **Tests:**
+    - `UnitTests/Display/IslandPlacementCalculatorTests.cs` (13)
+    - `SettingsValidatorTests`: offsets clamped
+    - `IntegrationTests/Win32MonitorServiceTests.cs` (2)
+    - `WindowsSmokeTests/IslandPlacementSmokeTests.cs`: compares the real window rectangle to the calculator within ±2 px; checks tool window and topmost.
+  - **Deviation from the plan:** no `MonitorsChanged` event on `IMonitorService` yet. The window's message hook drives re-placement; P02-02 decides whether the event is needed.
+
+### Test evidence
+| UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
+|---|---|---|---|---|---|
+| 2026-10-25 | P02-01 | Windows 11 Pro 25H2 x64, single monitor 1920 px wide at 96 DPI (100 %) | `dotnet build` and `dotnet test --solution` for Release and Debug | PASS | 0 warnings; Release 189/189, Debug 190/190 |
+| 2026-10-25 | P02-01 | same, real desktop | Launched the Release `DynamicIsland.exe`; read `GetWindowRect` as a per-monitor-aware process; screenshot of the top 120 px | PASS | Rect `L=860 T=8 W=200 H=36` (exactly top-center, 8 DIP gap); window DPI 96; screenshot shows a rounded dark capsule with a green dot above other windows; exit code 0 |
+
 ## Archived 2026-10-25 (P01-04/P01-05 evidence)
 
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |

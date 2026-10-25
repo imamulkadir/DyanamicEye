@@ -5,7 +5,14 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <!-- Required by LibraryImport-generated P/Invoke stubs. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- UI Automation client (System.Windows.Automation) drives the island like a screen reader would. -->
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WPF implicit usings omit System.IO. -->
+    <Using Include="System.IO" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Build-order + copy of the app and launcher outputs only; tests drive them as external processes. -->

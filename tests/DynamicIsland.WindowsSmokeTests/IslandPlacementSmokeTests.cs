@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using DynamicIsland.Core.Display;
 using DynamicIsland.Core.Settings;
+using DynamicIsland.Core.Shell;
 using DynamicIsland.Platform.Windows.Display;
 
 namespace DynamicIsland.WindowsSmokeTests;
@@ -41,7 +42,7 @@ public sealed partial class IslandPlacementSmokeTests : IDisposable
                 var defaults = new AppSettings().Appearance;
                 var placement = IslandPlacementCalculator.Place(
                     new Win32MonitorService().GetMonitors(),
-                    new PlacementRequest(null, defaults.Placement, defaults.HorizontalOffset, defaults.VerticalOffset, 200 * defaults.Scale, 36 * defaults.Scale));
+                    new PlacementRequest(null, defaults.Placement, defaults.HorizontalOffset, defaults.VerticalOffset, IslandLayout.Max.Width * defaults.Scale, IslandLayout.Max.Height * defaults.Scale));
                 return (placement, IslandWindowInterop.GetBounds(window));
             });
 
@@ -68,16 +69,21 @@ public sealed partial class IslandPlacementSmokeTests : IDisposable
             await RealApp.WaitForMainWindowAsync(app);
             var window = app.MainWindowHandle;
 
-            var (center, corner) = Measure(() =>
+            var (center, corner, below) = Measure(() =>
             {
+                // The window has the expanded size; the collapsed pill sits at its top center.
                 var bounds = IslandWindowInterop.GetBounds(window);
+                var scale = bounds.Width / IslandLayout.Max.Width;
+                var centerX = bounds.Left + (bounds.Width / 2);
                 return (
-                    IslandWindowInterop.ReceivesClickAt(window, bounds.Left + (bounds.Width / 2), bounds.Top + (bounds.Height / 2)),
-                    IslandWindowInterop.ReceivesClickAt(window, bounds.Left, bounds.Top));
+                    IslandWindowInterop.ReceivesClickAt(window, centerX, bounds.Top + (int)(IslandLayout.Collapsed.Height * scale / 2)),
+                    IslandWindowInterop.ReceivesClickAt(window, bounds.Left, bounds.Top),
+                    IslandWindowInterop.ReceivesClickAt(window, centerX, bounds.Bottom - 3));
             });
 
             Assert.True(center, "The pill itself must be clickable.");
-            Assert.False(corner, "The transparent rounded corner must let clicks through to the window below.");
+            Assert.False(corner, "Transparent window area must let clicks through to the window below.");
+            Assert.False(below, "The empty area reserved for the expanded island must not block clicks while collapsed.");
 
             await RealApp.CloseAndAssertCleanExitAsync(app);
         }

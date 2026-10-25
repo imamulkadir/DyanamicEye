@@ -4,6 +4,7 @@ using DynamicIsland.Core.Display;
 using DynamicIsland.Core.Lifecycle;
 using DynamicIsland.Core.Notifications;
 using DynamicIsland.Core.Settings;
+using DynamicIsland.Core.Shell;
 using DynamicIsland.Infrastructure;
 using DynamicIsland.Infrastructure.Diagnostics;
 using DynamicIsland.Infrastructure.Lifecycle;
@@ -69,6 +70,9 @@ public static class AppHost
 
         builder.Services.AddSingleton<AppSettingsSnapshot>();
         builder.Services.AddSingleton<IMonitorService, Win32MonitorService>();
+        builder.Services.AddSingleton<IIslandStateMachine>(sp => new IslandStateMachine(
+            sp.GetRequiredService<TimeProvider>(),
+            action => System.Windows.Application.Current.Dispatcher.BeginInvoke(action)));
         builder.Services.AddSingleton<IslandWindow>();
 
         return builder;

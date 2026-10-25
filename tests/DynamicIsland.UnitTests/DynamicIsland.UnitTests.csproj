@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="Settings\Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\DynamicIsland.Core\DynamicIsland.Core.csproj" />
     <ProjectReference Include="..\..\src\DynamicIsland.Widgets\DynamicIsland.Widgets.csproj" />
     <ProjectReference Include="..\..\src\DynamicIsland.Infrastructure\DynamicIsland.Infrastructure.csproj" />

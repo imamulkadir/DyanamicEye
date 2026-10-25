@@ -1,3 +1,6 @@
+using DynamicIsland.Core.Settings;
+using DynamicIsland.Infrastructure;
+using DynamicIsland.Infrastructure.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -23,6 +26,10 @@ public static class AppHost
             ValidateOnBuild = true,
             ValidateScopes = true,
         }));
+
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(_ => new SettingsStoreOptions(AppDataPaths.Data));
+        builder.Services.AddSingleton<ISettingsStore, JsonSettingsStore>();
 
         builder.Services.AddSingleton<MainWindow>();
 

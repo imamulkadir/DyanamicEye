@@ -1,0 +1,7 @@
+// Hypothetical unversioned (v0) settings shape used to exercise the migration pipeline.
+{
+  "theme": "Dark",
+  "opacityPercent": 80,
+  "hoverDelay": 500,
+  "widgets": [ "notes", "clock" ],
+}

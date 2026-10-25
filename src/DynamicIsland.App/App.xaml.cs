@@ -78,7 +78,8 @@ public partial class App : Application
         var settings = Task.Run(() => store.LoadAsync(token), token).GetAwaiter().GetResult();
         AppLog.SettingsLoaded(_logger, settings.Outcome, settings.Corrections.Count, store.IsReadOnly);
 
-        var window = _host.Services.GetRequiredService<MainWindow>();
+        _host.Services.GetRequiredService<AppSettingsSnapshot>().Current = settings.Settings;
+        var window = _host.Services.GetRequiredService<IslandWindow>();
         if (launch.SafeMode)
         {
             window.Title += " (Safe Mode)";

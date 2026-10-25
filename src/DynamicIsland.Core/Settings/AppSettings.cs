@@ -41,6 +41,12 @@ public sealed record AppearanceSettings
 
     public IslandPlacement Placement { get; init; } = IslandPlacement.TopCenter;
 
+    /// <summary>Horizontal nudge in DIPs (right for top-left/center, inward for top-right).</summary>
+    public double HorizontalOffset { get; init; }
+
+    /// <summary>Gap below the top of the work area in DIPs.</summary>
+    public double VerticalOffset { get; init; } = 8;
+
     public MotionPreference Motion { get; init; } = MotionPreference.System;
 }
 

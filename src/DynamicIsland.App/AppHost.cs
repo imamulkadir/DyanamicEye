@@ -1,5 +1,6 @@
 using DynamicIsland.Core.Components;
 using DynamicIsland.Core.Diagnostics;
+using DynamicIsland.Core.Display;
 using DynamicIsland.Core.Lifecycle;
 using DynamicIsland.Core.Notifications;
 using DynamicIsland.Core.Settings;
@@ -8,6 +9,7 @@ using DynamicIsland.Infrastructure.Diagnostics;
 using DynamicIsland.Infrastructure.Lifecycle;
 using DynamicIsland.Infrastructure.Logging;
 using DynamicIsland.Infrastructure.Settings;
+using DynamicIsland.Platform.Windows.Display;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -65,7 +67,9 @@ public static class AppHost
         builder.Services.AddSingleton(_ => new SettingsStoreOptions(dataDirectory));
         builder.Services.AddSingleton<ISettingsStore, JsonSettingsStore>();
 
-        builder.Services.AddSingleton<MainWindow>();
+        builder.Services.AddSingleton<AppSettingsSnapshot>();
+        builder.Services.AddSingleton<IMonitorService, Win32MonitorService>();
+        builder.Services.AddSingleton<IslandWindow>();
 
         return builder;
     }

@@ -37,5 +37,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0005 — App lifecycle, exit classification and single instance](0005-lifecycle-and-single-instance.md) — Accepted (P01-03)
 - [0006 — Crash supervision, Safe Mode and test-only hooks](0006-crash-supervision-and-safe-mode.md) — Accepted (P01-04)
 - [0007 — Component error boundaries, user notices and diagnostic export](0007-error-boundaries-notices-diagnostics.md) — Accepted (P01-05)
+- [0008 — Island window, monitor identity and placement](0008-island-window-and-placement.md) — Accepted (P02-01)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

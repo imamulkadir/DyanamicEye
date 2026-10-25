@@ -57,6 +57,18 @@ public sealed class SettingsValidatorTests
     }
 
     [Fact]
+    public void Placement_offsets_are_clamped()
+    {
+        var settings = new AppSettings { Appearance = new AppearanceSettings { HorizontalOffset = -99_999, VerticalOffset = -4 } };
+
+        var result = SettingsValidator.Normalize(settings);
+
+        Assert.Equal(-SettingsValidator.MaxHorizontalOffset, result.Settings.Appearance.HorizontalOffset);
+        Assert.Equal(0, result.Settings.Appearance.VerticalOffset);
+        Assert.Equal(2, result.Corrections.Count);
+    }
+
+    [Fact]
     public void Undefined_enum_values_fall_back_to_defaults()
     {
         var settings = new AppSettings

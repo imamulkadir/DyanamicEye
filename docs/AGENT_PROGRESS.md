@@ -3,10 +3,10 @@
 > **Keep this file accurate on every session.** This is the durable checkpoint that lets a new agent resume after a context reset. Update it alongside source changes, and never mark anything DONE without evidence. Move older detail to `docs/WORK_LOG.md` so this file stays short.
 
 ## CURRENT STATUS (read first)
-- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS locally; CI confirmation comes on the owner's push of P01-05). P02 is next.
-- **Active task:** P02-01: island window + monitor placement service.
-- **Active task status:** NOT_STARTED. P01-05 is DONE but uncommitted, awaiting owner review and push. **First confirm that P01-05 CI is green.**
-- **Last passed gate:** G01 (local, 2026-10-25); G00 (CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40196393380).
+- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02 is next.
+- **Active task:** P02-02: per-monitor DPI, display-change reactions, hit-test geometry, high-DPI icons.
+- **Active task status:** NOT_STARTED. P02-01 is DONE locally but uncommitted, awaiting owner review and push. Its multi-monitor/DPI aspects are `PENDING_WINDOWS` until G02.
+- **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
 - **CI:** the `gh` CLI is authenticated as imamulkadir but is not on the agent's PowerShell PATH, so use `& "C:\Program Files\GitHub CLI\gh.exe"`.
@@ -23,33 +23,27 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-25 (P01-05 DONE, G01 PASS locally)
+- **Last updated:** 2026-10-25 (P02-01 DONE; G01 confirmed on CI)
 
 ## NEXT ACTION (ONE task only)
-**P02-01 — Island window and monitor placement service.** Top-center default, configurable offsets, work area, display ID persistence, primary fallback. (guide §5 P02-01, §4.1 focus/click rules, D05, D08)
-1. **Core (pure, unit-tested):**
-   - the `IMonitorService` contract (guide §3) with `MonitorInfo` (stable `Id`, physical `Bounds` and `WorkArea`, `DpiScale`, `IsPrimary`) and a `MonitorsChanged` event
-   - `IslandPlacementCalculator`: monitors + `PreferredMonitorId` + `IslandPlacement` + offsets + island size in DIPs → target monitor and physical rectangle inside the **work area**. It falls back to the primary monitor, then the first monitor, when the preferred one is missing. It clamps to stay fully visible.
-   - Add settings `Appearance.HorizontalOffset` / `VerticalOffset` (DIPs, clamped). Under ADR 0003 rule 7 these are new properties with defaults, so no schema bump is needed.
-2. **Platform.Windows:** `Win32MonitorService` using `EnumDisplayMonitors` + `GetMonitorInfo` (`MONITORINFOEXW`) + `GetDpiForMonitor`. Derive a stable device id via `EnumDisplayDevices` (device interface name), not the volatile `\\.\DISPLAYn` alone. Raise `MonitorsChanged` on `WM_DISPLAYCHANGE` / `WM_DPICHANGED` / `WM_SETTINGCHANGE(SPI_SETWORKAREA)`; the listener lives in the shell window.
-3. **App: island window** replacing the dev `MainWindow`.
-   - Borderless, transparent, topmost, not shown in the taskbar or Alt+Tab (`WS_EX_TOOLWINDOW`), without stealing focus on show (`ShowActivated=false`). Keyboard focus must still work when clicked (§4.1).
-   - Placed with `SetWindowPos` in physical pixels. Add `app.manifest` with **PerMonitorV2** DPI awareness.
-   - Draw a simple collapsed pill with original styling (no copied assets). The state machine is P02-03.
-   - Keep single-instance activation working.
-4. **Tests:**
-   - Unit: calculator across 1–2 monitors, negative-coordinate monitors, mixed DPI (100/150 %), taskbar-reduced work areas, a missing preferred monitor (falls back), offsets and clamping.
-   - Integration: `Win32MonitorService` on the real host returns at least one primary monitor whose work area is inside its bounds.
-   - Smoke: the app window appears, top-centered within ±2 px of the expected rectangle on the primary monitor (compare `GetWindowRect` with the calculator), and is not in the taskbar.
-5. **Verify:** Release + Debug builds with 0 warnings and all tests green. Do a manual check on this host at the current DPI and record it. Multi-monitor and DPI matrix checks belong to G02, so mark what can't be checked on one monitor as `PENDING_WINDOWS`. Do not commit.
+**P02-02 — Per-monitor DPI awareness, display-change reactions, resolution/taskbar changes, correct no-click-through geometry, high-DPI icons.** (guide §5 P02-02, §4.1; ADR 0008)
+1. **Display-change handling (keep the logic testable):** extract the re-placement trigger from `IslandWindow` into a small `DisplayChangeMonitor`.
+   - Triggers: `WM_DISPLAYCHANGE`, `WM_DPICHANGED`, `WM_SETTINGCHANGE(SPI_SETWORKAREA)`, plus `SystemEvents.DisplaySettingsChanged` and `PowerModeChanged(Resume)` for sleep/wake.
+   - Coalesce a burst of changes into one pass (unit-test the debouncer with a fake clock).
+   - If the preferred monitor disappears, use the fallback placement; when it returns, restore it (test via the calculator plus a fake `IMonitorService`).
+2. **DPI correctness:** confirm WPF honours PerMonitorV2. Moving between monitors with different DPI must keep the pill crisp and at the calculated physical size. Handle `WM_DPICHANGED` by re-placing after WPF's own resize; current code queues the reposition. Add a `MonitorsChanged`-style event to `IMonitorService` only if tests need it.
+3. **Hit-test geometry:** clicks outside the visible pill, including the transparent rounded corners, must pass through to the windows below. The layered window's per-pixel alpha should already do this; verify with a smoke test that sends a click at a corner pixel to a helper window underneath. Document behaviour for future expanded states.
+4. **High-DPI icons:** add an original multi-resolution app icon (`.ico` with 16/20/24/32/40/48/64/256 sizes, created in-repo from a simple vector shape). Reference it as the WPF `ApplicationIcon` and the launcher icon. List its origin in `THIRD_PARTY_NOTICES.md` as original work.
+5. **Tests:** unit (debouncer, restore-after-reconnect logic); smoke (corner click-through, icon resource present). **Manual matrix for the owner** (record in TEST EVIDENCE as `PENDING_WINDOWS` until done): 100/125/150/200 % scaling, 2 monitors with mixed DPI, unplug/replug, rotate, taskbar moved to top/left, sleep/wake. Write exact steps in `docs/TEST_MATRIX.md` (guide §3 file).
+6. **Verify:** Release + Debug builds with 0 warnings and all tests green; CI green after the owner pushes. Do not commit.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
 | Phase | Task IDs | Status | Gate evidence |
 |---|---|---|---|
 | P00 — Environment and baseline | P00-01…P00-04 | DONE | **G00 PASS** 2026-10-25, run 40196393380 (`963b01c`) |
-| P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS (local)** 2026-10-25; CI confirmation pending the owner's P01-05 push. See the G01 evidence below. |
-| P02 — Island shell | P02-01…P02-05 | NOT_STARTED | G02 pending (needs a real multi-DPI/multi-monitor check) |
+| P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
+| P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (P02-01 DONE) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | NOT_STARTED | G03 pending |
 | P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
@@ -66,6 +60,27 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-25 **P02-01 DONE** (uncommitted; owner commits). Decisions are in ADR 0008.
+  - **Core:**
+    - `Display/Display.cs`: `PixelRect`, `MonitorInfo`, `IMonitorService`, `PlacementRequest`/`PlacementResult`, and `IslandPlacementCalculator` (work area, offsets, clamping, preferred → primary → first fallback).
+    - Settings gain `Appearance.HorizontalOffset` (0, ±4000) and `VerticalOffset` (8, 0..1000), validated without a schema bump.
+  - **Platform.Windows:**
+    - `Display/Win32MonitorService.cs`: `EnumDisplayMonitors` with an `UnmanagedCallersOnly` callback, `GetMonitorInfoW`, `GetDpiForMonitor`; ids are device interface paths.
+    - `Display/IslandWindowInterop.cs`: tool window, `SetBounds`, `GetBounds`, `IsTopmost`.
+    - `NativeMethods.cs`: new interop.
+  - **App:**
+    - New `IslandWindow.xaml(.cs)`: an original capsule. It re-places itself on DPI, display and work-area changes, coalesced.
+    - New `AppSettingsSnapshot.cs`.
+    - New `app.manifest`: PerMonitorV2, asInvoker.
+    - `MainWindow.xaml(.cs)` **deleted**.
+    - `AppHost` registers the snapshot, monitor service and window. `App.xaml.cs` passes loaded settings to the snapshot.
+  - **Tests:**
+    - `UnitTests/Display/IslandPlacementCalculatorTests.cs` (13)
+    - `SettingsValidatorTests`: offsets clamped
+    - `IntegrationTests/Win32MonitorServiceTests.cs` (2)
+    - `WindowsSmokeTests/IslandPlacementSmokeTests.cs`: compares the real window rectangle to the calculator within ±2 px; checks tool window and topmost.
+  - **Deviation from the plan:** no `MonitorsChanged` event on `IMonitorService` yet. The window's message hook drives re-placement; P02-02 decides whether the event is needed.
+- 2026-10-25 P01-05 pushed; CI run 40201274900 **success**. **G01 confirmed on CI.**
 - 2026-10-25 **P01-05 DONE** (uncommitted; owner commits). Decisions are in ADR 0007.
   - **Core:**
     - `Components/ComponentContracts.cs`: `IIsolatedComponent`, `IComponentContext`, `ComponentState`, `ComponentStatus`, `FailureKind`, `ComponentFailureException`, `ReasonCodes`, `DefaultFailureClassifier`, `RetryPolicy`.
@@ -89,7 +104,10 @@
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
 |---|---|---|---|---|---|
-| 2026-10-25 | P01-04 | GitHub Actions `windows-2025`, owner push | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40200547110 |
+| 2026-10-25 | P01-05 | GitHub Actions `windows-2025`, owner push | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900 (confirms G01) |
+| 2026-10-25 | P02-01 | Windows 11 Pro 25H2 x64, single monitor 1920 px wide at 96 DPI (100 %) | `dotnet build` and `dotnet test --solution` for Release and Debug | PASS | 0 warnings; Release 189/189, Debug 190/190 |
+| 2026-10-25 | P02-01 | same, real desktop | Launched the Release `DynamicIsland.exe`; read `GetWindowRect` as a per-monitor-aware process; screenshot of the top 120 px | PASS | Rect `L=860 T=8 W=200 H=36` (exactly top-center, 8 DIP gap); window DPI 96; screenshot shows a rounded dark capsule with a green dot above other windows; exit code 0 |
+| — | P02-01 | multi-monitor, mixed DPI, 125–200 % | Placement on a secondary or high-DPI monitor, fallback when unplugged | PENDING_WINDOWS | Single 100 % monitor on the dev host; covered by unit tests; G02 matrix in P02-02 || 2026-10-25 | P01-04 | GitHub Actions `windows-2025`, owner push | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40200547110 |
 | 2026-10-25 | P01-05 | Windows 11 Pro 25H2 26200.9711 x64, SDK 10.0.401 | `dotnet build DynamicIsland.sln -c Release\|Debug --no-restore` | PASS | 0 warnings. An earlier attempt failed on IDE0005 and CA2201 in a test file; fixed. |
 | 2026-10-25 | P01-05 | same | `dotnet test --project tests/DynamicIsland.UnitTests -c Release --no-build` 3 times with all 6 cores saturated | PASS | 151/151 each run |
 | 2026-10-25 | P01-05 | same, `CI=true`, real desktop | `dotnet test --solution DynamicIsland.sln -c Release\|Debug --no-build`, twice each | PASS | Release 173/173, Debug 174/174; no stray processes |
@@ -103,10 +121,10 @@
 
 ## ARCHITECTURE DECISIONS / ADRS
 - Frozen D01–D15: see guide §0. No deviations approved.
-- 0001 supported Windows versions · 0002 solution/build/test platform · 0003 settings persistence (consent defaults `NotAsked`; schema-bump rule for new enum values) · 0004 local logging and redaction · 0005 lifecycle, exit codes 0/1/3, single instance with acknowledged pipe · 0006 crash supervision, Safe Mode, Debug-only test hooks, launcher as the entry point · 0007 component error boundaries, notices (keys only), user-reviewed diagnostic export.
+- 0001 supported Windows versions · 0002 solution/build/test platform · 0003 settings persistence (consent defaults `NotAsked`; schema-bump rule for new enum values) · 0004 local logging and redaction · 0005 lifecycle, exit codes 0/1/3, single instance with acknowledged pipe · 0006 crash supervision, Safe Mode, Debug-only test hooks, launcher as the entry point · 0007 component error boundaries, notices (keys only), user-reviewed diagnostic export · 0008 island window (tool window + PerMonitorV2), monitor identity (device interface path, never logged), placement calculator.
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P02-01**.
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P02-02**.
 - Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

@@ -18,6 +18,8 @@ public static class SettingsValidator
     public const int MinHoverPreviewDelayMs = 100;
     public const int MaxHoverPreviewDelayMs = 2000;
     public const int MaxMonitorIdLength = 512;
+    public const double MaxHorizontalOffset = 4000;
+    public const double MaxVerticalOffset = 1000;
 
     public static SettingsValidationResult Normalize(AppSettings? settings)
     {
@@ -79,6 +81,8 @@ public static class SettingsValidator
             Scale = Clamp(appearance.Scale, MinScale, MaxScale, defaults.Scale, "appearance.scale", corrections),
             Opacity = Clamp(appearance.Opacity, MinOpacity, MaxOpacity, defaults.Opacity, "appearance.opacity", corrections),
             Placement = Defined(appearance.Placement, defaults.Placement, "appearance.placement", corrections),
+            HorizontalOffset = Clamp(appearance.HorizontalOffset, -MaxHorizontalOffset, MaxHorizontalOffset, defaults.HorizontalOffset, "appearance.horizontalOffset", corrections),
+            VerticalOffset = Clamp(appearance.VerticalOffset, 0, MaxVerticalOffset, defaults.VerticalOffset, "appearance.verticalOffset", corrections),
             Motion = Defined(appearance.Motion, defaults.Motion, "appearance.motion", corrections),
         };
     }

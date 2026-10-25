@@ -3,10 +3,10 @@
 > **Keep this file accurate on every session.** This is the durable checkpoint that lets a new agent resume after a context reset. Update it alongside source changes, and never mark anything DONE without evidence. Move older detail to `docs/WORK_LOG.md` so this file stays short.
 
 ## CURRENT STATUS (read first)
-- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01-01..P01-04 are done; P01-05 is next.
-- **Active task:** P01-05: Windows integration error boundaries, nonfatal error display contracts, diagnostic export preview.
-- **Active task status:** NOT_STARTED. P01-04 is DONE but uncommitted, awaiting owner review and push.
-- **Last passed gate:** G00 (2026-10-25, CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40196393380).
+- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS locally; CI confirmation comes on the owner's push of P01-05). P02 is next.
+- **Active task:** P02-01: island window + monitor placement service.
+- **Active task status:** NOT_STARTED. P01-05 is DONE but uncommitted, awaiting owner review and push. **First confirm that P01-05 CI is green.**
+- **Last passed gate:** G01 (local, 2026-10-25); G00 (CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40196393380).
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
 - **CI:** the `gh` CLI is authenticated as imamulkadir but is not on the agent's PowerShell PATH, so use `& "C:\Program Files\GitHub CLI\gh.exe"`.
@@ -23,100 +23,90 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-25 (P01-04 DONE)
+- **Last updated:** 2026-10-25 (P01-05 DONE, G01 PASS locally)
 
 ## NEXT ACTION (ONE task only)
-**P01-05 — Windows integration error boundaries, nonfatal error display contracts, diagnostic export preview.** (guide §5 P01-05, §4.2, §4.5, D14; G01 "simulated widget failure isolated")
-1. **Error boundary (Core, pure):** a component/provider runner that executes bounded async work with a timeout and `CancellationToken`.
-   - Classify failures per §4.5: transient means retry with exponential backoff + jitter and a cap; recoverable means isolate and reinitialize; fatal means escalate to `LifecycleCoordinator.RequestShutdown(Fatal)`.
-   - Expose a per-component status (`Healthy` / `Degraded` / `Failed`) with a user-safe reason code. Never expose exception messages to UI.
-   - No fire-and-forget: every background task is observed.
-2. **Nonfatal notices (Core contract + in-memory implementation):** `INotificationService` (guide §3) publishes `UserNotice` records (severity, stable message key, optional action id) for the shell/tray UI (P02/P03) to render later.
-   - De-duplicate repeated notices and rate-limit them.
-   - Notices never contain personal data or raw exception text.
-3. **Diagnostic export preview (Infrastructure):** `DiagnosticBundleBuilder` builds a **preview** for user review; nothing is written or uploaded without a later explicit user action (P03 UI, D14).
-   - Contents: app version, OS version/architecture, Safe Mode, settings load outcome, recent crash timestamps, and the last N lines of the redacted app and launcher logs.
-   - Re-run `LogRedactor` on all text. Exclude settings values that could be personal.
-   - Add `WriteZipAsync(previewApproved, path)` with a size cap. Its manifest lists every included file.
-4. **App wiring:** register the services in `AppHost`. Respect `LaunchArguments.SafeMode`: optional components are not started.
-5. **Tests:**
-   - a fake widget/provider that throws or hangs is isolated, its status is `Failed`/`Degraded`, other components keep running and the app is not shut down
-   - backoff schedule bounds
-   - fatal escalation requests shutdown
-   - notice de-duplication and rate limiting
-   - the preview contains no user name, profile path or token (seed logs with them)
-   - the zip contains exactly the previewed files
-6. **Verify:** Release + Debug builds with 0 warnings; all tests green in both; CI green after the owner pushes. If G01 is satisfied, record G01 PASS evidence here. Do not commit.
-
-**Expected verification:** the G01 items are all proven: corrupt settings recover; simulated widget failure is isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app.
+**P02-01 — Island window and monitor placement service.** Top-center default, configurable offsets, work area, display ID persistence, primary fallback. (guide §5 P02-01, §4.1 focus/click rules, D05, D08)
+1. **Core (pure, unit-tested):**
+   - the `IMonitorService` contract (guide §3) with `MonitorInfo` (stable `Id`, physical `Bounds` and `WorkArea`, `DpiScale`, `IsPrimary`) and a `MonitorsChanged` event
+   - `IslandPlacementCalculator`: monitors + `PreferredMonitorId` + `IslandPlacement` + offsets + island size in DIPs → target monitor and physical rectangle inside the **work area**. It falls back to the primary monitor, then the first monitor, when the preferred one is missing. It clamps to stay fully visible.
+   - Add settings `Appearance.HorizontalOffset` / `VerticalOffset` (DIPs, clamped). Under ADR 0003 rule 7 these are new properties with defaults, so no schema bump is needed.
+2. **Platform.Windows:** `Win32MonitorService` using `EnumDisplayMonitors` + `GetMonitorInfo` (`MONITORINFOEXW`) + `GetDpiForMonitor`. Derive a stable device id via `EnumDisplayDevices` (device interface name), not the volatile `\\.\DISPLAYn` alone. Raise `MonitorsChanged` on `WM_DISPLAYCHANGE` / `WM_DPICHANGED` / `WM_SETTINGCHANGE(SPI_SETWORKAREA)`; the listener lives in the shell window.
+3. **App: island window** replacing the dev `MainWindow`.
+   - Borderless, transparent, topmost, not shown in the taskbar or Alt+Tab (`WS_EX_TOOLWINDOW`), without stealing focus on show (`ShowActivated=false`). Keyboard focus must still work when clicked (§4.1).
+   - Placed with `SetWindowPos` in physical pixels. Add `app.manifest` with **PerMonitorV2** DPI awareness.
+   - Draw a simple collapsed pill with original styling (no copied assets). The state machine is P02-03.
+   - Keep single-instance activation working.
+4. **Tests:**
+   - Unit: calculator across 1–2 monitors, negative-coordinate monitors, mixed DPI (100/150 %), taskbar-reduced work areas, a missing preferred monitor (falls back), offsets and clamping.
+   - Integration: `Win32MonitorService` on the real host returns at least one primary monitor whose work area is inside its bounds.
+   - Smoke: the app window appears, top-centered within ±2 px of the expected rectangle on the primary monitor (compare `GetWindowRect` with the calculator), and is not in the taskbar.
+5. **Verify:** Release + Debug builds with 0 warnings and all tests green. Do a manual check on this host at the current DPI and record it. Multi-monitor and DPI matrix checks belong to G02, so mark what can't be checked on one monitor as `PENDING_WINDOWS`. Do not commit.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
 | Phase | Task IDs | Status | Gate evidence |
 |---|---|---|---|
 | P00 — Environment and baseline | P00-01…P00-04 | DONE | **G00 PASS** 2026-10-25, run 40196393380 (`963b01c`) |
-| P01 — Reliability kernel | P01-01…P01-05 | IN_PROGRESS (01..04 DONE) | G01 pending P01-05. Proven so far: corrupt settings recover (tests + real run); no duplicate app (smoke); Exit never relaunches and the 3rd crash does not loop (unit + Debug end-to-end launcher smoke). |
-| P02 — Island shell | P02-01…P02-05 | NOT_STARTED | G02 pending |
+| P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS (local)** 2026-10-25; CI confirmation pending the owner's P01-05 push. See the G01 evidence below. |
+| P02 — Island shell | P02-01…P02-05 | NOT_STARTED | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | NOT_STARTED | G03 pending |
 | P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
+### G01 evidence (guide §5: "corrupt settings recover; simulated widget failure isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app")
+| Criterion | Proof |
+|---|---|
+| Corrupt settings recover | `JsonSettingsStoreTests` (12 corrupt variants, backup recovery); real app run with a corrupt file logs `ResetAfterCorruption` (P01-03, WORK_LOG) |
+| Simulated widget failure isolated | `ComponentBoundaryTests.Failing_component_is_isolated_while_others_keep_running`: the faulty component ends `Failed` after 1+3 runs, the other stays `Healthy`, no shutdown is requested, and a Warning notice is published |
+| Deliberate Exit never auto-relaunches | `AppSupervisorTests.Clean_exit_is_never_relaunched`; smoke `Deliberate_exit_through_the_launcher_is_never_relaunched` with the real launcher and app |
+| Third crash does not loop | `AppSupervisorTests.Crash_loop_…`; Debug end-to-end smoke `Crash_loop_restarts_twice_tries_safe_mode_once_then_stops`, also green on CI run 40200547110 |
+| No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
+
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
-- 2026-10-25 **P01-04 DONE** (uncommitted; owner commits). Decisions are in ADR 0006.
+- 2026-10-25 **P01-05 DONE** (uncommitted; owner commits). Decisions are in ADR 0007.
   - **Core:**
-    - `Lifecycle/CrashPolicy.cs`: 2 restarts per 5-minute window → Safe Mode once → stop.
-    - `Lifecycle/AppSupervisor.cs`: `ICrashStateStore`, `IAppProcessRunner`, `IRecoveryNotifier`, `SupervisorStep`/`SupervisorAction`. Exit 0 finishes, exit 3 relaunches (at most 5 times), anything else counts as a crash.
-    - `Lifecycle/LaunchArguments.cs`: allow-listed `--safe-mode`; other arguments are counted and ignored.
-    - `Diagnostics/TestHooks.cs`: env-var hooks active only with `DYNAMICISLAND_TEST_HOOKS`, which is defined in Debug builds only (`Directory.Build.props`).
+    - `Components/ComponentContracts.cs`: `IIsolatedComponent`, `IComponentContext`, `ComponentState`, `ComponentStatus`, `FailureKind`, `ComponentFailureException`, `ReasonCodes`, `DefaultFailureClassifier`, `RetryPolicy`.
+    - `Components/ComponentBoundary.cs`: transient failures retry forever with capped jittered backoff; recoverable ones retry 3× then `Failed`; fatal ones request shutdown.
+    - `Components/ComponentHost.cs`: skips optional components in Safe Mode; stops are registered with the lifecycle.
+    - `Notifications/Notifications.cs`: `UserNotice` (validated keys only), `INotificationService`, `InMemoryNotificationService` (10-minute de-dup, 5 per minute, 20 active).
   - **Infrastructure:**
-    - `Lifecycle/JsonCrashStateStore.cs` (`data/crash-history.json`; atomic; falls back to memory).
-    - `AppDataPaths.Root` honours the test data-root hook.
-    - `FileLoggerOptions.FilePrefix` is now configurable and validated (constant renamed to `DefaultFilePrefix`).
-  - **Launcher:** real implementation replaces the stub; `WinExe`.
-    - `Program.cs`, `ProcessAppRunner.cs`, `MessageBoxRecoveryNotifier.cs` (native `MessageBoxW`), `LauncherLog.cs`.
-    - csproj references Core and Infrastructure, with `AllowUnsafeBlocks`.
-  - **App:**
-    - `App.xaml.cs` parses `LaunchArguments`, logs Safe Mode and ignored arguments, adds a "(Safe Mode)" title suffix, and has the Debug-only crash hook.
-    - `AppHost.CreateBuilder(dataRoot, launchArguments)`.
-    - `AppLog` adds `SafeModeActive` and `ArgumentsIgnored`.
+    - `Diagnostics/DiagnosticBundleBuilder.cs`: re-redacted preview (summary plus the last 500 log lines each); `WriteZipAsync` writes the approved preview plus a SHA-256 manifest and never overwrites.
+    - `JsonCrashStateStore.ReadRecentCrashes`.
+  - **App:** `AppHost` registers notices, the classifier, the component host and the diagnostics builder. `App.xaml.cs` logs status changes and notices and starts the component host after the window. `AppLog` adds 2 events.
   - **Tests:**
-    - `UnitTests/Lifecycle/CrashRecoveryTests.cs`: policy, supervisor with a scripted runner, crash store, arguments.
-    - `DependencyBoundaryTests`: Launcher may reference Core and Infrastructure.
-    - Smoke: new `RealApp.cs` (shared helpers plus a non-parallel `RealApp` collection), `CrashRecoverySmokeTests.cs`, refactored `AppLaunchSmokeTests.cs`. The smoke csproj references the Launcher.
-  - **CI:** `ci.yml` gained Debug build + Debug test steps.
-  - **Docs:** progress compacted; history moved to `docs/WORK_LOG.md`.
-  - **Bugs found by the new tests and fixed:** the crash store lost its in-memory history when the folder was unusable (it now merges); CA1711 and CA1822 analyzer findings.
-- 2026-10-25 P01-03 CI fix pushed (`c0c237f`, then the fix commit); CI run 40199779718 **success**. It added acknowledged activation IPC and a deterministic budget test (details in WORK_LOG).
-- 2026-10-25 P01-03 DONE: lifecycle coordinator, session marker, single instance + activation pipe, exception policy (ADR 0005).
-- 2026-10-25 P01-02 DONE: redacting rolling JSON-lines file logger (ADR 0004); CI 40198235944 success.
-- 2026-10-25 P01-01 DONE: versioned settings store with atomic writes and recovery (ADR 0003); CI 40197494204 success.
-- 2026-10-25 P00-01..04 DONE: repo baseline, SDK pin (ADR 0001), solution and build policy (ADR 0002), Windows CI; G00 PASS.
+    - `UnitTests/Components/ComponentBoundaryTests.cs` (8)
+    - `UnitTests/Components/FailureHandlingTests.cs`: retry, classifier, notices
+    - `UnitTests/Diagnostics/DiagnosticBundleBuilderTests.cs` (5)
+- 2026-10-25 P01-04 pushed; CI run 40200547110 **success** (Release and Debug steps, including the crash-injection smoke tests on the runner).
+- 2026-10-25 P01-04 DONE: crash supervision, launcher, Safe Mode, Debug-only test hooks (ADR 0006). Details are in WORK_LOG.
+- 2026-10-25 P01-03 DONE + CI fix: lifecycle coordinator, single instance with acknowledged pipe (ADR 0005); CI 40199779718 success.
+- 2026-10-25 P01-02 DONE: redacting rolling log (ADR 0004). P01-01 DONE: versioned settings store (ADR 0003).
+- 2026-10-25 P00-01..04 DONE: baseline, SDK pin, solution/build policy, Windows CI; G00 PASS.
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
 |---|---|---|---|---|---|
-| 2026-10-25 | P01-03 fix | GitHub Actions `windows-2025` | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40199779718 |
-| 2026-10-25 | P01-04 | Windows 11 Pro 25H2 26200.9711 x64, SDK 10.0.401 | `dotnet build DynamicIsland.sln -c Release` and `-c Debug` | PASS | 0 warnings each. Earlier attempts failed on CA1822 and CA1711; fixed. |
-| 2026-10-25 | P01-04 | same | `dotnet test --solution DynamicIsland.sln -c Release\|Debug --no-build` (first run) | FAIL → fixed | 4 failures: 3 were a wrong test expectation (a second `RecordCrash` adds a crash), 1 was a real bug (history lost when the folder was unusable) |
-| 2026-10-25 | P01-04 | same, `CI=true`, real desktop | Release and Debug, each run twice | PASS | Release 146/146, Debug 147/147 both times. No stray processes and no leftover temp data root. The real profile holds only the Release smoke logs (no crash history). |
-| 2026-10-25 | P01-04 | same, Debug end-to-end | `CrashRecoverySmokeTests.Crash_loop_…`: launcher + app with `DYNAMICISLAND_TEST_CRASH=ui` in a temp data root | PASS | Launcher log shows 4 runs: Relaunch, Relaunch, RelaunchInSafeMode, then Stop (safe mode True). Launcher exit code 1. App log has one `SafeModeActive`. |
-| 2026-10-25 | P01-04 | same, Release | `Release_build_ignores_the_test_crash_switch` | PASS | With the crash and data-root variables set, Release starts normally, exits 0 and creates no temp data root |
+| 2026-10-25 | P01-04 | GitHub Actions `windows-2025`, owner push | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40200547110 |
+| 2026-10-25 | P01-05 | Windows 11 Pro 25H2 26200.9711 x64, SDK 10.0.401 | `dotnet build DynamicIsland.sln -c Release\|Debug --no-restore` | PASS | 0 warnings. An earlier attempt failed on IDE0005 and CA2201 in a test file; fixed. |
+| 2026-10-25 | P01-05 | same | `dotnet test --project tests/DynamicIsland.UnitTests -c Release --no-build` 3 times with all 6 cores saturated | PASS | 151/151 each run |
+| 2026-10-25 | P01-05 | same, `CI=true`, real desktop | `dotnet test --solution DynamicIsland.sln -c Release\|Debug --no-build`, twice each | PASS | Release 173/173, Debug 174/174; no stray processes |
 
 ## BLOCKERS / RISKS
 - Enterprise policy may block an unsigned per-user executable; never bypass it.
 - Self-update and rollback must handle a read-only portable folder and DB schema compatibility (P06).
 - The dev host is one security patch behind (runtime 10.0.12 / SDK 10.0.401 vs 10.0.13 / 10.0.402). The owner should update before any release build.
-- Packaging (P06) must ship `DynamicIsland.Launcher.exe` next to `DynamicIsland.exe`, and shortcuts and sign-in startup target the launcher (ADR 0006).
+- Packaging (P06) must ship `DynamicIsland.Launcher.exe` next to `DynamicIsland.exe`, and shortcuts and startup target the launcher (ADR 0006).
+- G02 requires multi-monitor, DPI 100–200 %, unplug/rotate and sleep/wake checks on real hardware. The dev host has one monitor visible to the agent, so the owner may need to run part of that matrix.
 
 ## ARCHITECTURE DECISIONS / ADRS
 - Frozen D01–D15: see guide §0. No deviations approved.
-- 0001 supported Windows versions · 0002 solution/build/test platform · 0003 settings persistence (consent defaults `NotAsked`; schema-bump rule for new enum values) · 0004 local logging and redaction · 0005 lifecycle, exit codes 0/1/3, single instance with acknowledged pipe · 0006 crash supervision, Safe Mode, Debug-only test hooks, launcher as the entry point.
+- 0001 supported Windows versions · 0002 solution/build/test platform · 0003 settings persistence (consent defaults `NotAsked`; schema-bump rule for new enum values) · 0004 local logging and redaction · 0005 lifecycle, exit codes 0/1/3, single instance with acknowledged pipe · 0006 crash supervision, Safe Mode, Debug-only test hooks, launcher as the entry point · 0007 component error boundaries, notices (keys only), user-reviewed diagnostic export.
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P01-05**.
-- Do not jump to UI (P02) before G01 passes.
-- From P04 on, widgets and providers must honour `LaunchArguments.SafeMode` (ADR 0006 §5) and must never log free text (ADR 0004).
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P02-01**.
+- Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

@@ -1,7 +1,10 @@
+using DynamicIsland.Core.Components;
 using DynamicIsland.Core.Diagnostics;
 using DynamicIsland.Core.Lifecycle;
+using DynamicIsland.Core.Notifications;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Infrastructure;
+using DynamicIsland.Infrastructure.Diagnostics;
 using DynamicIsland.Infrastructure.Lifecycle;
 using DynamicIsland.Infrastructure.Logging;
 using DynamicIsland.Infrastructure.Settings;
@@ -51,6 +54,14 @@ public static class AppHost
         builder.Services.AddSingleton<LifecycleCoordinator>();
         builder.Services.AddSingleton<ISessionStateMarker>(sp =>
             new FileSessionStateMarker(dataDirectory, sp.GetRequiredService<ILogger<FileSessionStateMarker>>()));
+        builder.Services.AddSingleton<INotificationService, InMemoryNotificationService>();
+        builder.Services.AddSingleton<IFailureClassifier, DefaultFailureClassifier>();
+        builder.Services.AddSingleton<ComponentHost>();
+        builder.Services.AddSingleton(sp => new DiagnosticBundleBuilder(
+            System.IO.Path.Combine(root, AppDataPaths.LogsFolderName),
+            dataDirectory,
+            sp.GetRequiredService<LogRedactor>(),
+            sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton(_ => new SettingsStoreOptions(dataDirectory));
         builder.Services.AddSingleton<ISettingsStore, JsonSettingsStore>();
 

@@ -1,4 +1,6 @@
+using DynamicIsland.Core.Components;
 using DynamicIsland.Core.Lifecycle;
+using DynamicIsland.Core.Notifications;
 using DynamicIsland.Core.Settings;
 using Microsoft.Extensions.Logging;
 
@@ -46,6 +48,14 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1009, EventName = "ArgumentsIgnored", Level = LogLevel.Information,
         Message = "{Count} unrecognized command-line argument(s) ignored")]
     public static partial void ArgumentsIgnored(ILogger logger, int count);
+
+    [LoggerMessage(EventId = 1020, EventName = "ComponentStatusChanged", Level = LogLevel.Information,
+        Message = "Component {Component}: {State} (reason {Reason}, failures {Failures}, error {ErrorType})")]
+    public static partial void ComponentStatusChanged(ILogger logger, string component, ComponentState state, string? reason, int failures, string? errorType);
+
+    [LoggerMessage(EventId = 1021, EventName = "NoticePublished", Level = LogLevel.Information,
+        Message = "Notice {Severity}: {MessageKey} ({Subject})")]
+    public static partial void NoticePublished(ILogger logger, NoticeSeverity severity, string messageKey, string? subject);
 
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]

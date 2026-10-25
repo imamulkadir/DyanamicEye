@@ -36,6 +36,10 @@ public sealed class JsonCrashStateStore(string dataDirectory) : ICrashStateStore
         return recent;
     }
 
+    /// <summary>Recent crashes for diagnostics, without recording a new one.</summary>
+    public IReadOnlyList<DateTimeOffset> ReadRecentCrashes(DateTimeOffset now) =>
+        (TryLoad() ?? []).Union(_fallback).Where(t => CrashPolicy.IsRecent(t, now)).Order().ToList();
+
     private List<DateTimeOffset>? TryLoad()
     {
         try

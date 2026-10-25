@@ -2,6 +2,44 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-25 (P01-04)
+
+### Verified changes
+- 2026-10-25 **P01-04 DONE** (uncommitted; owner commits). Decisions are in ADR 0006.
+  - **Core:**
+    - `Lifecycle/CrashPolicy.cs`: 2 restarts per 5-minute window → Safe Mode once → stop.
+    - `Lifecycle/AppSupervisor.cs`: `ICrashStateStore`, `IAppProcessRunner`, `IRecoveryNotifier`, `SupervisorStep`/`SupervisorAction`. Exit 0 finishes, exit 3 relaunches (at most 5 times), anything else counts as a crash.
+    - `Lifecycle/LaunchArguments.cs`: allow-listed `--safe-mode`; other arguments are counted and ignored.
+    - `Diagnostics/TestHooks.cs`: env-var hooks active only with `DYNAMICISLAND_TEST_HOOKS`, which is defined in Debug builds only (`Directory.Build.props`).
+  - **Infrastructure:**
+    - `Lifecycle/JsonCrashStateStore.cs` (`data/crash-history.json`; atomic; falls back to memory).
+    - `AppDataPaths.Root` honours the test data-root hook.
+    - `FileLoggerOptions.FilePrefix` is now configurable and validated (constant renamed to `DefaultFilePrefix`).
+  - **Launcher:** real implementation replaces the stub; `WinExe`.
+    - `Program.cs`, `ProcessAppRunner.cs`, `MessageBoxRecoveryNotifier.cs` (native `MessageBoxW`), `LauncherLog.cs`.
+    - csproj references Core and Infrastructure, with `AllowUnsafeBlocks`.
+  - **App:**
+    - `App.xaml.cs` parses `LaunchArguments`, logs Safe Mode and ignored arguments, adds a "(Safe Mode)" title suffix, and has the Debug-only crash hook.
+    - `AppHost.CreateBuilder(dataRoot, launchArguments)`.
+    - `AppLog` adds `SafeModeActive` and `ArgumentsIgnored`.
+  - **Tests:**
+    - `UnitTests/Lifecycle/CrashRecoveryTests.cs`: policy, supervisor with a scripted runner, crash store, arguments.
+    - `DependencyBoundaryTests`: Launcher may reference Core and Infrastructure.
+    - Smoke: new `RealApp.cs` (shared helpers plus a non-parallel `RealApp` collection), `CrashRecoverySmokeTests.cs`, refactored `AppLaunchSmokeTests.cs`. The smoke csproj references the Launcher.
+  - **CI:** `ci.yml` gained Debug build + Debug test steps.
+  - **Docs:** progress compacted; history moved to `docs/WORK_LOG.md`.
+  - **Bugs found by the new tests and fixed:** the crash store lost its in-memory history when the folder was unusable (it now merges); CA1711 and CA1822 analyzer findings.
+
+### Test evidence
+| UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
+|---|---|---|---|---|---|
+| 2026-10-25 | P01-03 fix | GitHub Actions `windows-2025` | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40199779718 |
+| 2026-10-25 | P01-04 | Windows 11 Pro 25H2 26200.9711 x64, SDK 10.0.401 | `dotnet build DynamicIsland.sln -c Release` and `-c Debug` | PASS | 0 warnings each. Earlier attempts failed on CA1822 and CA1711; fixed. |
+| 2026-10-25 | P01-04 | same | `dotnet test --solution DynamicIsland.sln -c Release\|Debug --no-build` (first run) | FAIL → fixed | 4 failures: 3 were a wrong test expectation (a second `RecordCrash` adds a crash), 1 was a real bug (history lost when the folder was unusable) |
+| 2026-10-25 | P01-04 | same, `CI=true`, real desktop | Release and Debug, each run twice | PASS | Release 146/146, Debug 147/147 both times. No stray processes and no leftover temp data root. The real profile holds only the Release smoke logs (no crash history). |
+| 2026-10-25 | P01-04 | same, Debug end-to-end | `CrashRecoverySmokeTests.Crash_loop_…`: launcher + app with `DYNAMICISLAND_TEST_CRASH=ui` in a temp data root | PASS | Launcher log shows 4 runs: Relaunch, Relaunch, RelaunchInSafeMode, then Stop (safe mode True). Launcher exit code 1. App log has one `SafeModeActive`. |
+| 2026-10-25 | P01-04 | same, Release | `Release_build_ignores_the_test_crash_switch` | PASS | With the crash and data-root variables set, Release starts normally, exits 0 and creates no temp data root |
+
 ## Archived 2026-10-25 (P00-01 … P01-03)
 
 ### Verified changes

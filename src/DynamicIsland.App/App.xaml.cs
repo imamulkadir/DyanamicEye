@@ -2,8 +2,10 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Threading;
+using DynamicIsland.Core.Components;
 using DynamicIsland.Core.Diagnostics;
 using DynamicIsland.Core.Lifecycle;
+using DynamicIsland.Core.Notifications;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Platform.Windows.Instance;
 using Microsoft.Extensions.DependencyInjection;
@@ -86,6 +88,16 @@ public partial class App : Application
         window.Show();
 
         _instance.StartListening(OnActivationRequested, OnActivationUnavailable);
+
+        // Optional components (widgets/providers, P04) run isolated; failures surface as status changes and notices.
+        var logger = _logger;
+        _host.Services.GetRequiredService<INotificationService>().Published +=
+            (_, notice) => AppLog.NoticePublished(logger, notice.Severity, notice.MessageKey, notice.Subject);
+        var components = _host.Services.GetRequiredService<ComponentHost>();
+        components.StatusChanged +=
+            (_, s) => AppLog.ComponentStatusChanged(logger, s.Name, s.State, s.ReasonCode, s.ConsecutiveFailures, s.LastErrorType);
+        components.StartAll();
+
         ApplyTestCrashHook();
     }
 

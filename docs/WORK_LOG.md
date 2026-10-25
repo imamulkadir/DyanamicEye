@@ -2,6 +2,33 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-25 (P01-04/P01-05 evidence)
+
+| UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
+|---|---|---|---|---|---|
+| 2026-10-25 | P01-05 | GitHub Actions `windows-2025`, owner push | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900 (confirms G01) |
+| 2026-10-25 | P01-05 | Windows 11 Pro 25H2 26200.9711 x64, SDK 10.0.401 | `dotnet build DynamicIsland.sln -c Release\|Debug --no-restore` | PASS | 0 warnings. An earlier attempt failed on IDE0005 and CA2201 in a test file; fixed. |
+| 2026-10-25 | P01-05 | same | `dotnet test --project tests/DynamicIsland.UnitTests -c Release --no-build` 3 times with all 6 cores saturated | PASS | 151/151 each run |
+| 2026-10-25 | P01-05 | same, `CI=true`, real desktop | `dotnet test --solution DynamicIsland.sln -c Release\|Debug --no-build`, twice each | PASS | Release 173/173, Debug 174/174; no stray processes |
+
+## Archived 2026-10-25 (P01-05)
+
+### Verified changes
+- 2026-10-25 **P01-05 DONE** (uncommitted; owner commits). Decisions are in ADR 0007.
+  - **Core:**
+    - `Components/ComponentContracts.cs`: `IIsolatedComponent`, `IComponentContext`, `ComponentState`, `ComponentStatus`, `FailureKind`, `ComponentFailureException`, `ReasonCodes`, `DefaultFailureClassifier`, `RetryPolicy`.
+    - `Components/ComponentBoundary.cs`: transient failures retry forever with capped jittered backoff; recoverable ones retry 3× then `Failed`; fatal ones request shutdown.
+    - `Components/ComponentHost.cs`: skips optional components in Safe Mode; stops are registered with the lifecycle.
+    - `Notifications/Notifications.cs`: `UserNotice` (validated keys only), `INotificationService`, `InMemoryNotificationService` (10-minute de-dup, 5 per minute, 20 active).
+  - **Infrastructure:**
+    - `Diagnostics/DiagnosticBundleBuilder.cs`: re-redacted preview (summary plus the last 500 log lines each); `WriteZipAsync` writes the approved preview plus a SHA-256 manifest and never overwrites.
+    - `JsonCrashStateStore.ReadRecentCrashes`.
+  - **App:** `AppHost` registers notices, the classifier, the component host and the diagnostics builder. `App.xaml.cs` logs status changes and notices and starts the component host after the window. `AppLog` adds 2 events.
+  - **Tests:**
+    - `UnitTests/Components/ComponentBoundaryTests.cs` (8)
+    - `UnitTests/Components/FailureHandlingTests.cs`: retry, classifier, notices
+    - `UnitTests/Diagnostics/DiagnosticBundleBuilderTests.cs` (5)
+
 ## Archived 2026-10-25 (P01-04)
 
 ### Verified changes

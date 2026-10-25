@@ -3,6 +3,8 @@
   <!-- Launches the real app on an interactive Windows desktop. Requires a desktop session (not Server Core/containers). -->
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- Required by LibraryImport-generated P/Invoke stubs. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

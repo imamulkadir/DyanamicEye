@@ -56,6 +56,10 @@ Versions are pinned in `Directory.Packages.props`. Resolved transitive packages 
   SOFTWARE.
   ```
 
+## Original artwork (not third-party)
+
+- `assets/DynamicIsland.ico`: the app icon. Original work by the Dynamic Island for Windows contributors (MIT), generated from simple shapes by `tools/New-AppIcon.ps1`. No external icon sets, fonts or images are used.
+
 ## Build/test-only components (not redistributed)
 
 ### xunit.v3 4.0.2

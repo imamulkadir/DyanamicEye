@@ -31,6 +31,16 @@ public static class IslandWindowInterop
         return new PixelRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
     }
 
+    /// <summary>
+    /// Whether a mouse click at a physical screen point would reach <paramref name="window"/>. Transparent pixels of a
+    /// layered window are not hit-testable, so clicks there go to the window underneath.
+    /// </summary>
+    public static bool ReceivesClickAt(IntPtr window, int x, int y)
+    {
+        var hit = NativeMethods.WindowFromPoint(new NativeMethods.Point { X = x, Y = y });
+        return hit != IntPtr.Zero && NativeMethods.GetAncestor(hit, NativeMethods.GaRoot) == window;
+    }
+
     public static bool IsTopmost(IntPtr window) =>
         (NativeMethods.GetWindowLongPtr(window, NativeMethods.GwlExStyle) & NativeMethods.WsExTopmost) != 0;
 

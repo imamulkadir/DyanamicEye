@@ -83,6 +83,27 @@ internal static unsafe partial class NativeMethods
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     public static partial nint SetWindowLongPtr(IntPtr window, int index, nint value);
 
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr WindowFromPoint(Point point);
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr GetAncestor(IntPtr window, uint flags);
+
+    public const uint GaRoot = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Point
+    {
+        public int X;
+        public int Y;
+    }
+
     [LibraryImport("user32.dll", SetLastError = true)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [return: MarshalAs(UnmanagedType.Bool)]

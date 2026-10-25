@@ -8,6 +8,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <AssemblyName>DynamicIsland.Launcher</AssemblyName>
+    <ApplicationIcon>..\..\assets\DynamicIsland.ico</ApplicationIcon>
     <!-- Required by LibraryImport-generated P/Invoke stubs. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>

@@ -57,6 +57,11 @@ internal static partial class AppLog
         Message = "Notice {Severity}: {MessageKey} ({Subject})")]
     public static partial void NoticePublished(ILogger logger, NoticeSeverity severity, string messageKey, string? subject);
 
+    /// <remarks>Monitor ids contain hardware identifiers and are never logged (ADR 0008).</remarks>
+    [LoggerMessage(EventId = 1030, EventName = "IslandPlaced", Level = LogLevel.Information,
+        Message = "Island placed: primary monitor {IsPrimary}, fallback {UsedFallback}, scale {DpiScale}, size {Width}x{Height} px")]
+    public static partial void IslandPlaced(ILogger logger, bool isPrimary, bool usedFallback, double dpiScale, int width, int height);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

@@ -1,0 +1,45 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+artifacts/
+publish/
+*.binlog
+
+# IDE / user state
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.rsuser
+
+# Test results / coverage
+TestResults/
+[Tt]est[Rr]esult*/
+coverage*/
+*.coverage
+*.trx
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+
+# Packaging output
+packaging/**/out/
+*.msi
+*.msix
+
+# Local runtime data (never commit)
+*.db
+*.db-journal
+*.log
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Agent/tool local state
+.claude/

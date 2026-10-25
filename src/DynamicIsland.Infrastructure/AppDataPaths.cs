@@ -1,3 +1,5 @@
+using DynamicIsland.Core.Diagnostics;
+
 namespace DynamicIsland.Infrastructure;
 
 /// <summary>
@@ -9,8 +11,17 @@ public static class AppDataPaths
     public const string DataFolderName = "data";
     public const string LogsFolderName = "logs";
 
-    /// <summary><c>%LOCALAPPDATA%\DynamicIsland</c>.</summary>
-    public static string Root => Path.Combine(LocalApplicationData(), ProductFolderName);
+    /// <summary><c>%LOCALAPPDATA%\DynamicIsland</c> (tests in Debug builds may redirect it, see <see cref="TestHooks"/>).</summary>
+    public static string Root
+    {
+        get
+        {
+            var testRoot = TestHooks.Get(TestHooks.DataRootVariable);
+            return string.IsNullOrWhiteSpace(testRoot)
+                ? Path.Combine(LocalApplicationData(), ProductFolderName)
+                : Path.GetFullPath(testRoot);
+        }
+    }
 
     /// <summary><c>%LOCALAPPDATA%\DynamicIsland\data</c>: settings and database.</summary>
     public static string Data => Path.Combine(Root, DataFolderName);

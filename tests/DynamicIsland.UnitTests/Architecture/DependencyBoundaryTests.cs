@@ -6,7 +6,7 @@ namespace DynamicIsland.UnitTests.Architecture;
 
 /// <summary>
 /// Enforces the dependency direction from guide §3: Core knows no WPF/Windows APIs; Widgets, Platform.Windows and
-/// Infrastructure depend only on Core; App composes; Launcher and Updater stay independent processes.
+/// Infrastructure depend only on Core; App composes; Launcher and Updater stay separate processes without UI/OS-adapter dependencies.
 /// </summary>
 public sealed class DependencyBoundaryTests
 {
@@ -19,7 +19,8 @@ public sealed class DependencyBoundaryTests
         ["DynamicIsland.Platform.Windows"] = [Core],
         ["DynamicIsland.Infrastructure"] = [Core],
         ["DynamicIsland.App"] = [Core, "DynamicIsland.Widgets", "DynamicIsland.Platform.Windows", "DynamicIsland.Infrastructure"],
-        ["DynamicIsland.Launcher"] = [],
+        // Launcher reuses crash policy (Core) and crash store/logging (Infrastructure); never UI or OS adapters (ADR 0006).
+        ["DynamicIsland.Launcher"] = [Core, "DynamicIsland.Infrastructure"],
         ["DynamicIsland.Updater"] = [],
     };
 

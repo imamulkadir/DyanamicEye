@@ -6,8 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Build-order + copy of the app output only; tests drive it as an external process. -->
+    <!-- Build-order + copy of the app and launcher outputs only; tests drive them as external processes. -->
     <ProjectReference Include="..\..\src\DynamicIsland.App\DynamicIsland.App.csproj" />
+    <ProjectReference Include="..\..\src\DynamicIsland.Launcher\DynamicIsland.Launcher.csproj" />
   </ItemGroup>
 
 </Project>

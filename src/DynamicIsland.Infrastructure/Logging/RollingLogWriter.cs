@@ -50,6 +50,10 @@ internal sealed class RollingLogWriter : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Directory);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.QueueCapacity, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxFileBytes, 1024);
+        if (string.IsNullOrEmpty(options.FilePrefix) || !options.FilePrefix.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
+        {
+            throw new ArgumentException("Log file prefix may contain only ASCII letters, digits, '-' and '_'.", nameof(options));
+        }
 
         _options = options with { Directory = Path.GetFullPath(options.Directory) };
         _redactor = redactor;
@@ -157,7 +161,7 @@ internal sealed class RollingLogWriter : IDisposable
 
     private (string Path, long Bytes) SelectFile(DateOnly day, long nextBytes)
     {
-        var baseName = FileLoggerOptions.FilePrefix + day.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+        var baseName = _options.FilePrefix + day.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
         for (var index = 0; ; index++)
         {
             var suffix = index == 0 ? string.Empty : "." + index.ToString(CultureInfo.InvariantCulture);
@@ -179,7 +183,7 @@ internal sealed class RollingLogWriter : IDisposable
     {
         var cutoff = _timeProvider.GetUtcNow().UtcDateTime - _options.Retention;
         var files = new DirectoryInfo(_options.Directory)
-            .GetFiles(FileLoggerOptions.FilePrefix + "*" + FileLoggerOptions.FileExtension)
+            .GetFiles(_options.FilePrefix + "*" + FileLoggerOptions.FileExtension)
             .Where(f => !string.Equals(f.FullName, _currentPath, StringComparison.OrdinalIgnoreCase))
             .OrderBy(f => f.LastWriteTimeUtc)
             .ToList();

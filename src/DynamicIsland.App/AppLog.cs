@@ -39,6 +39,14 @@ internal static partial class AppLog
         Message = "Second-launch activation is unavailable ({ErrorType})")]
     public static partial void ActivationUnavailable(ILogger logger, string errorType);
 
+    [LoggerMessage(EventId = 1008, EventName = "SafeModeActive", Level = LogLevel.Warning,
+        Message = "Running in Safe Mode: optional components are not started")]
+    public static partial void SafeModeActive(ILogger logger);
+
+    [LoggerMessage(EventId = 1009, EventName = "ArgumentsIgnored", Level = LogLevel.Information,
+        Message = "{Count} unrecognized command-line argument(s) ignored")]
+    public static partial void ArgumentsIgnored(ILogger logger, int count);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

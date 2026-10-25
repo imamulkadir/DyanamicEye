@@ -18,6 +18,9 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RestoreLockedMode Condition="'$(CI)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">true</RestoreLockedMode>
 
+    <!-- Test-only fault injection and data-root override (TestHooks). Compiled into Debug builds only; inert in Release. -->
+    <DefineConstants Condition="'$(Configuration)' == 'Debug'">$(DefineConstants);DYNAMICISLAND_TEST_HOOKS</DefineConstants>
+
     <Company>Dynamic Island for Windows contributors</Company>
     <Product>Dynamic Island</Product>
     <Copyright>Copyright (c) 2026 Dynamic Island for Windows contributors</Copyright>

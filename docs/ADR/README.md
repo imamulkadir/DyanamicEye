@@ -35,5 +35,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0003 — Settings persistence, recovery and versioning](0003-settings-persistence.md) — Accepted (P01-01)
 - [0004 — Local logging sink and redaction](0004-local-logging.md) — Accepted (P01-02)
 - [0005 — App lifecycle, exit classification and single instance](0005-lifecycle-and-single-instance.md) — Accepted (P01-03)
+- [0006 — Crash supervision, Safe Mode and test-only hooks](0006-crash-supervision-and-safe-mode.md) — Accepted (P01-04)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

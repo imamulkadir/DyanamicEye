@@ -19,7 +19,8 @@ namespace DynamicIsland.App;
 public static class AppHost
 {
     /// <param name="dataRoot">Overrides <c>%LOCALAPPDATA%\DynamicIsland</c> (tests); <c>null</c> in the app.</param>
-    public static HostApplicationBuilder CreateBuilder(string? dataRoot = null)
+    /// <param name="launchArguments">Parsed command line; defaults to a normal (non-Safe-Mode) start.</param>
+    public static HostApplicationBuilder CreateBuilder(string? dataRoot = null, LaunchArguments? launchArguments = null)
     {
         var root = dataRoot ?? AppDataPaths.Root;
 
@@ -40,6 +41,7 @@ public static class AppHost
         builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
         builder.Logging.AddFilter("System", LogLevel.Warning);
 
+        builder.Services.AddSingleton(launchArguments ?? LaunchArguments.Default);
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton(_ => LogRedactor.ForCurrentEnvironment());
         builder.Services.AddSingleton(_ => new FileLoggerOptions(System.IO.Path.Combine(root, AppDataPaths.LogsFolderName)));

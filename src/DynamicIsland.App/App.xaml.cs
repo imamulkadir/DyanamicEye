@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Threading;
+using DynamicIsland.Core.Diagnostics;
 using DynamicIsland.Core.Lifecycle;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Platform.Windows.Instance;
@@ -41,7 +42,8 @@ public partial class App : Application
             return;
         }
 
-        _host = AppHost.CreateBuilder().Build();
+        var launch = LaunchArguments.Parse(e.Args);
+        _host = AppHost.CreateBuilder(launchArguments: launch).Build();
         _logger = _host.Services.GetRequiredService<ILogger<App>>();
         _lifecycle = _host.Services.GetRequiredService<LifecycleCoordinator>();
         _session = _host.Services.GetRequiredService<ISessionStateMarker>();
@@ -50,6 +52,16 @@ public partial class App : Application
         var version = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
         var architecture = RuntimeInformation.OSArchitecture.ToString();
         AppLog.Started(_logger, version, Environment.OSVersion.VersionString, architecture);
+        if (launch.SafeMode)
+        {
+            // Nothing optional exists yet (widgets arrive in P04); Safe Mode will skip them and their providers.
+            AppLog.SafeModeActive(_logger);
+        }
+
+        if (launch.IgnoredCount > 0)
+        {
+            AppLog.ArgumentsIgnored(_logger, launch.IgnoredCount);
+        }
 
         if (_session.BeginSession())
         {
@@ -65,10 +77,32 @@ public partial class App : Application
         AppLog.SettingsLoaded(_logger, settings.Outcome, settings.Corrections.Count, store.IsReadOnly);
 
         var window = _host.Services.GetRequiredService<MainWindow>();
+        if (launch.SafeMode)
+        {
+            window.Title += " (Safe Mode)";
+        }
+
         MainWindow = window;
         window.Show();
 
         _instance.StartListening(OnActivationRequested, OnActivationUnavailable);
+        ApplyTestCrashHook();
+    }
+
+    /// <summary>Debug-build fault injection for crash-recovery tests; <see cref="TestHooks"/> returns null in Release.</summary>
+    private void ApplyTestCrashHook()
+    {
+        switch (TestHooks.Get(TestHooks.CrashVariable))
+        {
+            case "ui":
+                Dispatcher.BeginInvoke(() => throw new InvalidOperationException("Injected test crash on the UI thread."));
+                break;
+            case "background":
+                new Thread(() => throw new InvalidOperationException("Injected test crash on a background thread.")) { IsBackground = true }.Start();
+                break;
+            case "startup":
+                throw new InvalidOperationException("Injected test crash during startup.");
+        }
     }
 
     protected override void OnSessionEnding(SessionEndingCancelEventArgs e)

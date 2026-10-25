@@ -396,6 +396,13 @@
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.13, )"
         }
       },
+      "dynamicisland.launcher": {
+        "type": "Project",
+        "dependencies": {
+          "DynamicIsland.Core": "[0.1.0, )",
+          "DynamicIsland.Infrastructure": "[0.1.0, )"
+        }
+      },
       "dynamicisland.platform.windows": {
         "type": "Project",
         "dependencies": {

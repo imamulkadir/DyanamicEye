@@ -5,8 +5,11 @@ namespace DynamicIsland.Infrastructure.Logging;
 /// <param name="Directory">Log folder; normally <see cref="AppDataPaths.Logs"/>.</param>
 public sealed record FileLoggerOptions(string Directory)
 {
-    public const string FilePrefix = "dynamicisland-";
+    public const string DefaultFilePrefix = "dynamicisland-";
     public const string FileExtension = ".log";
+
+    /// <summary>File name prefix; each process writing logs uses its own (app and launcher never share a file).</summary>
+    public string FilePrefix { get; init; } = DefaultFilePrefix;
 
     public LogLevel MinimumLevel { get; init; } = LogLevel.Information;
 

@@ -1,10 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Stable-path launcher / crash supervision (P01). Not a background service. -->
+  <!--
+    Crash supervisor (D03, guide §4.5): starts DynamicIsland.exe from its own folder, waits, applies CrashPolicy.
+    Lives exactly as long as the app; never a background service. WinExe so no console window appears at sign-in.
+  -->
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <AssemblyName>DynamicIsland.Launcher</AssemblyName>
+    <!-- Required by LibraryImport-generated P/Invoke stubs. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DynamicIsland.Core\DynamicIsland.Core.csproj" />
+    <ProjectReference Include="..\DynamicIsland.Infrastructure\DynamicIsland.Infrastructure.csproj" />
+  </ItemGroup>
 
 </Project>

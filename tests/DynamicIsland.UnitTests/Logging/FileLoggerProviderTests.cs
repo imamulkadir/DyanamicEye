@@ -210,7 +210,7 @@ public sealed class FileLoggerProviderTests : IDisposable
         new((configure ?? (o => o))(Options()), Redactor, _time);
 
     private string[] LogFiles() =>
-        Directory.GetFiles(_directory.Path, FileLoggerOptions.FilePrefix + "*" + FileLoggerOptions.FileExtension)
+        Directory.GetFiles(_directory.Path, FileLoggerOptions.DefaultFilePrefix + "*" + FileLoggerOptions.FileExtension)
             .Order(StringComparer.Ordinal)
             .ToArray();
 

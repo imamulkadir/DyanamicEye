@@ -2,6 +2,55 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-25 (P02-03, notch redesign, P02-02 evidence)
+
+### Verified changes
+- 2026-10-25 **Design change (owner request): the island is now a classic iPhone-12-Pro-style notch.** Uncommitted. See the ADR 0009 amendment.
+  - `IslandSurface` is a custom-drawn `Decorator`: flat top flush with the screen edge, 6 DIP concave shoulders, rounded bottom corners, black; geometry-based hit testing.
+  - `IslandWindow.xaml` adds the sensor housing (speaker slit, front-camera lens, sensor dot) in every state. Expanded content sits below it. The green status dot was removed.
+  - `IslandLayout`: collapsed 236×32 and peek 264×38 (expanded 420×180 unchanged).
+  - Defaults: `VerticalOffset` 0 and `Opacity` 1.0.
+  - New `IntegrationTests/NotchGeometryTests.cs` (9).
+  - `TEST_MATRIX.md` sizes and wording updated.
+- 2026-10-25 **P02-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). Decisions are in ADR 0009.
+  - **Core:**
+    - `Shell/IslandStates.cs`: `IslandState`, `IslandInput`, `IslandSnapshot`, the pure `IslandTransitions.Next`, `IslandLayout` sizes.
+    - `Shell/IslandStateMachine.cs`: `IIslandStateMachine` with a 250 ms hover debounce, posted to the UI thread.
+    - `Debouncer.Cancel()`.
+  - **Platform.Windows:** `IslandWindowInterop.IsVisible` and `TryActivate` (focus return without force); `IsWindow`, `IsWindowVisible` and `SetForegroundWindow` interop.
+  - **App:**
+    - New `IslandSurface.cs`: the pill with a UIA peer exposing ExpandCollapse and Toggle, AutomationId `IslandSurface`.
+    - `IslandWindow.xaml` rewritten: the window has the fixed expanded size; the animated pill holds the expanded placeholder panel and a pin toggle styled for the dark theme.
+    - `IslandWindow.xaml.cs`:
+      - wires pointer, click, keys (Enter/Space, Escape, Ctrl+P) and the pin into the state machine
+      - animates size per state (motion preference / Windows animation setting)
+      - hides the window in hidden states
+      - records `WM_ACTIVATE` for focus return
+      - aligns the pill per placement
+      - places the window at the max size
+    - `AppHost` registers `IIslandStateMachine`.
+  - **Tests:**
+    - `UnitTests/Shell/IslandStateMachineTests.cs`: 84-case exhaustive table, 9 scenarios, 4 hover/debounce tests with `ManualTimeProvider`.
+    - Smoke: new `IslandInteractionSmokeTests` (UIA expand → pin → collapse; pill size per state within ±3 px; window size unchanged).
+    - `IslandPlacementSmokeTests` updated for the fixed window (center hit; corner and area under the pill click-through).
+    - Smoke csproj gains `UseWPF` (UIA client) and a `System.IO` using.
+  - **Docs:** `TEST_MATRIX.md` rows H2–H9.
+- 2026-10-25 P02-02 pushed; CI run 40202761834 **success**.
+
+### Test evidence
+| UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
+|---|---|---|---|---|---|
+| 2026-10-25 | P02-03 notch | Windows 11 Pro 25H2 x64, one monitor at 100 % | Release and Debug build + `dotnet test --solution` | PASS | 0 warnings; Release 299/299, Debug 300/300 before the geometry tests; Integration 29/29 with `NotchGeometryTests` |
+| 2026-10-25 | P02-03 notch | same, real desktop | Real app screenshot (2× zoom) collapsed, then UIA Expand screenshot | PASS | Window `L=750 T=0 420×180`. The notch is flush with the top edge, with shoulders, speaker slit, camera lens and sensor dot. Expanded, it grows down with the title, placeholder and pin. |
+| 2026-10-25 | P02-03 | Windows 11 Pro 25H2 x64, one monitor at 100 % | `dotnet build` + `dotnet test --solution` for Release and Debug, `CI=true` | PASS | 0 warnings (an earlier attempt failed on IDE0005; fixed); Release 299/299, Debug 300/300; no stray processes |
+| 2026-10-25 | P02-03 | same, real desktop | Real app driven through UI Automation from PowerShell: Expand → Toggle (pin); screenshots of collapsed, expanded and pinned | PASS | Window stays 420×180; collapsed capsule with dot; expanded panel with title and placeholder; pinned shows a green pin. The first screenshot showed WPF's default light toggle; restyled for the dark theme. UIA name "Dynamic Island, expanded and pinned". |
+| — | P02-03 | real mouse, keyboard, Narrator, reduced motion | `docs/TEST_MATRIX.md` rows H2–H8 | PENDING_WINDOWS | Owner to run; agent avoids synthetic input on the user's desktop |
+| 2026-10-25 | P02-02 | Windows 11 Pro 25H2 x64, one monitor 1920 px at 100 % | `dotnet build` + `dotnet test --solution` for Release and Debug | PASS | 0 warnings (an earlier attempt failed on CA1001; fixed); Release 200/200, Debug 201/201 |
+| 2026-10-25 | P02-02 | same, real desktop | Smoke `Only_the_visible_pill_receives_clicks` | PASS | `WindowFromPoint`: pill center belongs to the island, top-left corner pixel does not (click-through) |
+| 2026-10-25 | P02-02 | same | Icon preview rendered at 16/24/32/48/64/256 px; `ExtractIconExW` count ≥ 1 for both exes | PASS | Crisp original dark tile, light capsule, centered green dot. The first generator run produced a 142-byte file (PowerShell unrolled the byte arrays); fixed. |
+| 2026-10-25 | P02-02 | same | Real app: `taskkill /IM DynamicIsland.exe` (no `/F`) | PASS | Clean exit, code 0; log shows `Island placed: primary monitor True, fallback False, scale 1, size 200x36 px` |
+| — | P02-02 | multi-DPI, multi-monitor, taskbar, sleep/wake | `docs/TEST_MATRIX.md` rows D2–D5, M1–M6, T1–T2, S1–S2, I1, A1 | PENDING_WINDOWS | Owner to run on real hardware; a single 100 % monitor is visible to the agent |
+
 ## Archived 2026-10-25 (P02-02)
 
 ### Verified changes

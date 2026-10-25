@@ -39,6 +39,7 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0007 — Component error boundaries, user notices and diagnostic export](0007-error-boundaries-notices-diagnostics.md) — Accepted (P01-05)
 - [0008 — Island window, monitor identity and placement](0008-island-window-and-placement.md) — Accepted (P02-01, amended P02-02)
 - [0009 — Island state machine, interaction and accessibility](0009-island-states-and-interaction.md) — Accepted (P02-03, amended: notch design)
-- [0010 — Fullscreen detection and auto-hide](0010-fullscreen-detection.md) — Accepted (P02-04)
+- [0010 — Fullscreen detection and auto-hide](0010-fullscreen-detection.md) — Accepted (P02-04, amended: cloaked windows)
+- [0011 — Activity budget, power-aware motion and visual regression](0011-activity-budget-motion-visual-qa.md) — Accepted (P02-05)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

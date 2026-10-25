@@ -101,6 +101,7 @@ internal static unsafe partial class NativeMethods
     public const uint EventSystemForeground = 0x0003;
     public const uint EventSystemMinimizeEnd = 0x0017;
     public const uint EventObjectLocationChange = 0x800B;
+    public const uint EventObjectUncloaked = 0x8018;
     public const uint WinEventOutOfContext = 0x0000;
     public const uint WinEventSkipOwnProcess = 0x0002;
     public const int ObjIdWindow = 0;
@@ -159,6 +160,22 @@ internal static unsafe partial class NativeMethods
     [LibraryImport("shell32.dll")]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     public static partial int SHQueryUserNotificationState(out int state);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SystemPowerStatus
+    {
+        public byte AcLineStatus;
+        public byte BatteryFlag;
+        public byte BatteryLifePercent;
+        public byte SystemStatusFlag;
+        public uint BatteryLifeTime;
+        public uint BatteryFullLifeTime;
+    }
+
+    [LibraryImport("kernel32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetSystemPowerStatus(out SystemPowerStatus status);
 
     [LibraryImport("user32.dll")]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]

@@ -30,10 +30,10 @@ You need Windows 11 x64 and the .NET 10 SDK. `global.json` pins the SDK version.
 ```powershell
 dotnet restore DynamicIsland.sln --locked-mode
 dotnet build DynamicIsland.sln -c Release --no-restore
-dotnet test --solution DynamicIsland.sln -c Release --no-build
+dotnet test --solution DynamicIsland.sln -c Release --no-build --max-parallel-test-modules 1
 ```
 
-The Windows smoke test briefly opens the app window, so run it from an interactive desktop session.
+The Windows smoke tests start the real app and briefly open windows, so run them from an interactive desktop session and do not use the mouse meanwhile. Debug builds (`-c Debug`) additionally run the crash-injection tests.
 
 ## Working with an AI agent
 Give the agent this instruction (also after any context reset):

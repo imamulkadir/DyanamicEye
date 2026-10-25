@@ -46,6 +46,7 @@ public sealed class FullscreenCoordinator : IDisposable
     public void Start()
     {
         _detector.Start();
+        AppLog.FullscreenDetectionStarted(_logger, _detector.ActiveHookCount);
         Apply();
     }
 

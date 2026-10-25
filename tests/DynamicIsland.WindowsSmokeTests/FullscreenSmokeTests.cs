@@ -43,10 +43,11 @@ public sealed class FullscreenSmokeTests : IDisposable
             var helperHandle = _ui.Invoke(() =>
             {
                 using var scope = DpiAwarenessScope.PerMonitorV2();
+                // Like a real fullscreen app: the window already covers the monitor when it is shown and activated.
                 helper = new Window { WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false, Title = "Fullscreen smoke test" };
-                helper.Show();
-                var hwnd = new WindowInteropHelper(helper).Handle;
+                var hwnd = new WindowInteropHelper(helper).EnsureHandle();
                 IslandWindowInterop.SetBounds(hwnd, primary.Bounds, topmost: false);
+                helper.Show();
                 helper.Activate();
                 return hwnd;
             });
@@ -56,7 +57,7 @@ public sealed class FullscreenSmokeTests : IDisposable
                 Assert.Skip("Windows did not allow the test window to become the foreground window on this host.");
             }
 
-            Assert.True(await WaitUntilAsync(() => !IslandWindowInterop.IsVisible(island)), "Island must hide behind a fullscreen app on its monitor.");
+            Assert.True(await WaitUntilAsync(() => !IslandWindowInterop.IsVisible(island)), "Island must hide behind a fullscreen app on its monitor. App log tail:\n" + AppLogTail());
 
             _ui.Invoke(() => helper!.Close());
             helper = null;
@@ -73,6 +74,25 @@ public sealed class FullscreenSmokeTests : IDisposable
 
             RealApp.KillIfRunning(app);
         }
+    }
+
+    /// <summary>Last app log messages (Release smoke runs log to the real profile; no personal data is logged).</summary>
+    private string AppLogTail()
+    {
+        var folders = new[] { Path.Combine(_dataRoot, "logs"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DynamicIsland", "logs") };
+        var file = folders.Where(Directory.Exists)
+            .SelectMany(f => Directory.GetFiles(f, "dynamicisland-*.log"))
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
+        if (file is null)
+        {
+            return "(no log found)";
+        }
+
+        using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        var lines = reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join('\n', lines.TakeLast(12));
     }
 
     private static T Measure<T>(Func<T> measure)

@@ -1,4 +1,3 @@
-using System.IO;
 using DynamicIsland.App;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Infrastructure.Logging;

@@ -5,8 +5,8 @@ using DynamicIsland.Core.Display;
 namespace DynamicIsland.Platform.Windows.Display;
 
 /// <summary>
-/// Event-driven fullscreen detection (D06, D10; no polling). Re-evaluates when the foreground window changes, is restored,
-/// or moves/resizes (out-of-context WinEvent hooks, delivered on the thread that called <see cref="Start"/> — it must pump
+/// Event-driven fullscreen detection (D06, D10; no polling). Re-evaluates when the foreground window changes (plus one
+/// follow-up check 0.5 s later), is restored, uncloaked, or moves/resizes (out-of-context WinEvent hooks, delivered on the thread that called <see cref="Start"/> — it must pump
 /// messages, i.e. the WPF UI thread).
 /// <para>A window is fullscreen when it covers its monitor's full bounds and is not simply a maximized captioned window
 /// (those leave the taskbar), and is not the shell/desktop, cloaked, minimized or one of this process's windows. Windows'
@@ -20,12 +20,25 @@ public sealed unsafe class Win32FullscreenDetector : IFullscreenDetector, IDispo
     // WinEvent callbacks are static (UnmanagedCallersOnly); one detector per process routes them.
     private static Win32FullscreenDetector? s_active;
 
+    /// <summary>
+    /// One follow-up evaluation after a foreground change: newly shown windows can still be DWM-cloaked (opening
+    /// animation) or resizing when the foreground event arrives. Bounded (one shot per change), not polling.
+    /// </summary>
+    private static readonly TimeSpan FollowUpDelay = TimeSpan.FromMilliseconds(500);
+
     private readonly List<IntPtr> _hooks = [];
+    private readonly Lock _gate = new();
+    private readonly Timer _followUp;
     private IntPtr _foreground;
+
+    public Win32FullscreenDetector() => _followUp = new Timer(_ => Refresh(), null, Timeout.Infinite, Timeout.Infinite);
 
     public event EventHandler<FullscreenSnapshot>? Changed;
 
     public FullscreenSnapshot Current { get; private set; } = FullscreenSnapshot.None;
+
+    /// <summary>Number of WinEvent hooks installed by <see cref="Start"/> (4 expected); logged for diagnostics.</summary>
+    public int ActiveHookCount => _hooks.Count;
 
 
     /// <summary>Installs the hooks on the calling (UI) thread and evaluates the current foreground window.</summary>
@@ -42,6 +55,7 @@ public sealed unsafe class Win32FullscreenDetector : IFullscreenDetector, IDispo
                      (NativeMethods.EventSystemForeground, NativeMethods.EventSystemForeground),
                      (NativeMethods.EventSystemMinimizeEnd, NativeMethods.EventSystemMinimizeEnd),
                      (NativeMethods.EventObjectLocationChange, NativeMethods.EventObjectLocationChange),
+                     (NativeMethods.EventObjectUncloaked, NativeMethods.EventObjectUncloaked),
                  })
         {
             var hook = NativeMethods.SetWinEventHook(min, max, IntPtr.Zero, &OnWinEvent, 0, 0, flags);
@@ -54,11 +68,14 @@ public sealed unsafe class Win32FullscreenDetector : IFullscreenDetector, IDispo
         Refresh();
     }
 
-    /// <summary>Re-evaluates now (e.g. after display changes).</summary>
+    /// <summary>Re-evaluates now (e.g. after display changes). Thread-safe.</summary>
     public void Refresh()
     {
-        _foreground = NativeMethods.GetForegroundWindow();
-        Publish(Evaluate(_foreground));
+        lock (_gate)
+        {
+            _foreground = NativeMethods.GetForegroundWindow();
+            Publish(Evaluate(_foreground));
+        }
     }
 
     public void Dispose()
@@ -69,6 +86,7 @@ public sealed unsafe class Win32FullscreenDetector : IFullscreenDetector, IDispo
         }
 
         _hooks.Clear();
+        _followUp.Dispose();
         Interlocked.CompareExchange(ref s_active, null, this);
     }
 
@@ -106,13 +124,17 @@ public sealed unsafe class Win32FullscreenDetector : IFullscreenDetector, IDispo
             return;
         }
 
-        if (eventType == NativeMethods.EventObjectLocationChange && window != detector._foreground)
+        if (eventType is NativeMethods.EventObjectLocationChange or NativeMethods.EventObjectUncloaked && window != detector._foreground)
         {
-            // Location changes fire for every window; only the foreground one matters.
+            // Location/cloak changes fire for every window; only the foreground one matters.
             return;
         }
 
         detector.Refresh();
+        if (eventType == NativeMethods.EventSystemForeground)
+        {
+            detector._followUp.Change(FollowUpDelay, Timeout.InfiniteTimeSpan);
+        }
     }
 
     private void Publish(FullscreenSnapshot snapshot)

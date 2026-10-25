@@ -31,6 +31,7 @@ public sealed partial class IslandWindow : Window, IDisposable
     private readonly AppSettingsSnapshot _settings;
     private readonly ILogger<IslandWindow> _logger;
     private readonly IIslandStateMachine _state;
+    private readonly IMotionGate _motion;
     private readonly IslandPlacementController _placement;
     private readonly Debouncer _displayChanges;
     private IntPtr _handle;
@@ -40,21 +41,24 @@ public sealed partial class IslandWindow : Window, IDisposable
         IMonitorService monitors,
         AppSettingsSnapshot settings,
         IIslandStateMachine state,
+        IMotionGate motion,
         TimeProvider timeProvider,
         ILogger<IslandWindow> logger)
     {
         _settings = settings;
         _logger = logger;
         _state = state;
+        _motion = motion;
         _placement = new IslandPlacementController(monitors, () => BuildRequest(_settings.Current));
         _displayChanges = new Debouncer(DisplayChangeQuietPeriod, timeProvider, () => Dispatcher.BeginInvoke(Reposition));
         InitializeComponent();
 
-        Pill.StateMachine = state;
-        Pill.MouseEnter += (_, _) => _state.Fire(IslandInput.PointerEnter);
-        Pill.MouseLeave += (_, _) => _state.Fire(IslandInput.PointerLeave);
-        Pill.MouseLeftButtonUp += (_, _) => _state.Fire(IslandInput.Click);
-        PinButton.Click += (_, _) => _state.Fire(IslandInput.TogglePin);
+        var surface = Notch.IslandSurface;
+        surface.StateMachine = state;
+        surface.MouseEnter += (_, _) => _state.Fire(IslandInput.PointerEnter);
+        surface.MouseLeave += (_, _) => _state.Fire(IslandInput.PointerLeave);
+        surface.MouseLeftButtonUp += (_, _) => _state.Fire(IslandInput.Click);
+        Notch.PinToggle.Click += (_, _) => _state.Fire(IslandInput.TogglePin);
         PreviewKeyDown += OnPreviewKeyDown;
         _state.StateChanged += (_, e) => ApplyState(e.Previous, e.Current, animate: true);
 
@@ -66,7 +70,7 @@ public sealed partial class IslandWindow : Window, IDisposable
     /// <summary>Last placement, for diagnostics and tests.</summary>
     public PlacementResult? LastPlacement => _placement.Current;
 
-    /// <summary>Window placement request: always the largest island size (the pill inside is aligned per placement).</summary>
+    /// <summary>Window placement request: always the largest island size (the notch inside is aligned per placement).</summary>
     public static PlacementRequest BuildRequest(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -96,7 +100,7 @@ public sealed partial class IslandWindow : Window, IDisposable
 
         var appearance = _settings.Current.Appearance;
         Opacity = appearance.Opacity;
-        Pill.HorizontalAlignment = appearance.Placement switch
+        Notch.HorizontalAlignment = appearance.Placement switch
         {
             IslandPlacement.TopLeft => HorizontalAlignment.Left,
             IslandPlacement.TopRight => HorizontalAlignment.Right,
@@ -133,16 +137,13 @@ public sealed partial class IslandWindow : Window, IDisposable
         var (width, height) = (size.Value.Width * scale, size.Value.Height * scale);
         var expanded = current is IslandState.Expanded or IslandState.Pinned;
 
-        Animate(Pill, WidthProperty, width, animate);
-        Animate(Pill, HeightProperty, height, animate);
-        Pill.BottomRadius = Math.Min(height / 2, 22 * scale);
-        ExpandedPanel.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
-        PinButton.IsChecked = current == IslandState.Pinned;
-        AutomationPropertiesHelper.SetStateName(Pill, current);
+        Animate(Notch, WidthProperty, width, animate);
+        Animate(Notch, HeightProperty, height, animate);
+        Notch.ApplyVisualState(current, height, scale);
 
         if (expanded && IsActive)
         {
-            Pill.Focus();
+            Notch.IslandSurface.Focus();
         }
         else if (current == IslandState.Collapsed && previous is IslandState.Expanded or IslandState.Pinned && IsActive)
         {
@@ -153,7 +154,7 @@ public sealed partial class IslandWindow : Window, IDisposable
 
     private void Animate(FrameworkElement element, DependencyProperty property, double to, bool animate)
     {
-        if (animate && MotionEnabled())
+        if (animate && _motion.AnimationsEnabled)
         {
             var animation = new DoubleAnimation(to, TransitionDuration) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
             element.BeginAnimation(property, animation, HandoffBehavior.SnapshotAndReplace);
@@ -165,14 +166,6 @@ public sealed partial class IslandWindow : Window, IDisposable
         }
     }
 
-    /// <summary>D08/D10: user preference first; "System" follows the Windows animation-effects setting.</summary>
-    private bool MotionEnabled() => _settings.Current.Appearance.Motion switch
-    {
-        MotionPreference.Full => true,
-        MotionPreference.Reduced or MotionPreference.Off => false,
-        _ => SystemParameters.ClientAreaAnimation,
-    };
-
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
         switch (e.Key)
@@ -181,7 +174,7 @@ public sealed partial class IslandWindow : Window, IDisposable
                 _state.Fire(IslandInput.Escape);
                 e.Handled = true;
                 break;
-            case Key.Enter or Key.Space when _state.State is IslandState.Collapsed or IslandState.Peek && Pill.IsKeyboardFocused:
+            case Key.Enter or Key.Space when _state.State is IslandState.Collapsed or IslandState.Peek && Notch.IslandSurface.IsKeyboardFocused:
                 _state.Fire(IslandInput.Click);
                 e.Handled = true;
                 break;
@@ -237,15 +230,4 @@ public sealed partial class IslandWindow : Window, IDisposable
         }
     }
 
-    private static class AutomationPropertiesHelper
-    {
-        public static void SetStateName(UIElement element, IslandState state) =>
-            System.Windows.Automation.AutomationProperties.SetName(element, state switch
-            {
-                IslandState.Peek => "Dynamic Island, preview",
-                IslandState.Expanded => "Dynamic Island, expanded",
-                IslandState.Pinned => "Dynamic Island, expanded and pinned",
-                _ => "Dynamic Island, collapsed",
-            });
-    }
 }

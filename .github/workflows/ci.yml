@@ -50,10 +50,11 @@ jobs:
       - name: Build (Release, warnings as errors)
         run: dotnet build DynamicIsland.sln -c Release --no-restore
 
-      # Includes the WindowsSmoke test that launches DynamicIsland.exe on the runner's desktop session.
+      # Includes WindowsSmoke tests that drive the real app on the runner's desktop. Test projects run one at a time
+      # because desktop UI tests share one screen (foreground, topmost windows).
       - name: Test
         run: >-
-          dotnet test --solution DynamicIsland.sln -c Release --no-build
+          dotnet test --solution DynamicIsland.sln -c Release --no-build --max-parallel-test-modules 1
           --results-directory "${{ github.workspace }}/TestResults"
           --report-xunit-trx
 
@@ -63,7 +64,7 @@ jobs:
 
       - name: Test (Debug, crash injection)
         run: >-
-          dotnet test --solution DynamicIsland.sln -c Debug --no-build
+          dotnet test --solution DynamicIsland.sln -c Debug --no-build --max-parallel-test-modules 1
           --results-directory "${{ github.workspace }}/TestResults"
           --report-xunit-trx
 
@@ -72,6 +73,8 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results
-          path: TestResults/**/*.trx
+          path: |
+            TestResults/**/*.trx
+            tests/**/bin/**/VisualDiffs/*.png
           if-no-files-found: warn
           retention-days: 14

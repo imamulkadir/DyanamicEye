@@ -10,6 +10,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- WPF implicit usings omit System.IO. -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Visual regression references: our own renderings (NotchVisualTests). -->
+    <None Include="References\*.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="..\Shared\StaDispatcherThread.cs" Link="TestSupport\StaDispatcherThread.cs" />
   </ItemGroup>
 

@@ -12,7 +12,18 @@ monitors (resolution @ scaling) and PASS/FAIL with a note. Status values: `NOT_R
 
 The island is drawn as a **notch attached to the top of the usable screen area** (flat top, small curved shoulders, rounded bottom corners, black), with a speaker slit and a front-camera lens inside. Collapsed size: **236 × 32 px × the monitor's scale**, for example 354 × 48 px at 150 %. It is centered horizontally with no gap at the top. The (transparent) window is always 420 × 180 px × scale.
 
-## G02 — Island shell (P02-02 adds these; P02-03..05 extend them)
+## G02 — Island shell: sign-off checklist
+
+**G02 PASS needs** (guide §5): 100/125/150/200 % DPI; 1 and 2 monitors; unplug/rotate; fullscreen; sleep/wake; normal mouse and keyboard control, all **verified on actual Windows**.
+Automated coverage (CI + dev host): placement, click-through, UIA expand/pin/collapse, fullscreen hide/return, the idle CPU budget and notch visual regression all PASS. **Every row below marked NOT_RUN needs the owner on real hardware.** When they all PASS (or are N/A with a reason), P02-02..P02-05 become DONE and G02 PASS is recorded in `AGENT_PROGRESS.md`.
+
+| # | Scenario | Steps | Expected | Status |
+|---|---|---|---|---|
+| P1 | Idle CPU | Automated smoke `Collapsed_idle_island_uses_almost_no_cpu` | Under 300 ms CPU in 10 s idle | PASS (agent: 0 ms, 94 MiB working set) |
+| P2 | Battery saver | Laptop: turn on Battery/Energy saver, expand and collapse the notch | No size animation (instant) while the saver is on; animations return when it is off | NOT_RUN |
+| V1 | Notch visual regression | Automated `NotchVisualTests` (4 states vs reference PNGs) | Within tolerance | PASS (agent) |
+
+### Detailed rows
 
 | # | Scenario | Steps | Expected | Status |
 |---|---|---|---|---|

@@ -34,6 +34,16 @@
    - The detection hooks are removed when the detector is disposed (with the host).
 5. **Honest limitation:** exclusive-fullscreen (D3D) games may draw above **any** topmost window, and secure desktops (UAC, lock screen) always do. The island never tries to force itself on top. It hides, and reappears when the game leaves fullscreen.
 
+## Amendment — cloaked windows (P02-05, 2026-10-25)
+- **Problem:** CI run 40205375218 failed "island must hide", and the failure later reproduced locally in Release. The detection hooks were installed (logged), yet fullscreen was never reported.
+- **Cause:** a newly shown window can still be **DWM-cloaked** (opening animation) when its foreground event arrives. It was skipped as a candidate, and no later event re-evaluated it.
+- **Fix:**
+  - Hook `EVENT_OBJECT_UNCLOAKED`, filtered to the foreground window.
+  - Run one bounded follow-up re-evaluation 0.5 s after each foreground change, as a one-shot timer, not polling.
+  - `Refresh` is now thread-safe.
+  - The startup log records the hook count (4 expected).
+- **Result:** Release smoke 3/3 and full suites green in both parallel and sequential mode.
+
 ## Testing
 - Unit: policy (monitor match, exceptions, unknown monitor, setting off) and exception validation.
 - Integration: real helper windows on the test host, both covering the monitor and smaller, plus a maximized captioned window and own-process windows.

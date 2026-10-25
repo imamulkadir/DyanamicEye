@@ -73,6 +73,7 @@ public static class AppHost
         builder.Services.AddSingleton<IIslandStateMachine>(sp => new IslandStateMachine(
             sp.GetRequiredService<TimeProvider>(),
             action => System.Windows.Application.Current.Dispatcher.BeginInvoke(action)));
+        builder.Services.AddSingleton<IMotionGate, MotionGate>();
         builder.Services.AddSingleton<IslandWindow>();
         builder.Services.AddSingleton<Win32FullscreenDetector>();
         builder.Services.AddSingleton<IFullscreenDetector>(sp => sp.GetRequiredService<Win32FullscreenDetector>());

@@ -20,4 +20,8 @@
     <ProjectReference Include="..\..\src\DynamicIsland.Launcher\DynamicIsland.Launcher.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\StaDispatcherThread.cs" Link="TestSupport\StaDispatcherThread.cs" />
+  </ItemGroup>
+
 </Project>

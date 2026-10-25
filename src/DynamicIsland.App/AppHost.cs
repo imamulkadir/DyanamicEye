@@ -74,6 +74,16 @@ public static class AppHost
             sp.GetRequiredService<TimeProvider>(),
             action => System.Windows.Application.Current.Dispatcher.BeginInvoke(action)));
         builder.Services.AddSingleton<IslandWindow>();
+        builder.Services.AddSingleton<Win32FullscreenDetector>();
+        builder.Services.AddSingleton<IFullscreenDetector>(sp => sp.GetRequiredService<Win32FullscreenDetector>());
+        builder.Services.AddSingleton(sp => new FullscreenCoordinator(
+            sp.GetRequiredService<Win32FullscreenDetector>(),
+            sp.GetRequiredService<IIslandStateMachine>(),
+            sp.GetRequiredService<AppSettingsSnapshot>(),
+            () => sp.GetRequiredService<IslandWindow>().LastPlacement?.Monitor.Id,
+            sp.GetRequiredService<TimeProvider>(),
+            System.Windows.Application.Current.Dispatcher,
+            sp.GetRequiredService<ILogger<FullscreenCoordinator>>()));
 
         return builder;
     }

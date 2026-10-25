@@ -62,6 +62,10 @@ internal static partial class AppLog
         Message = "Island placed: primary monitor {IsPrimary}, fallback {UsedFallback}, scale {DpiScale}, size {Width}x{Height} px")]
     public static partial void IslandPlaced(ILogger logger, bool isPrimary, bool usedFallback, double dpiScale, int width, int height);
 
+    [LoggerMessage(EventId = 1031, EventName = "FullscreenHide", Level = LogLevel.Information,
+        Message = "Fullscreen app on the island's monitor: island hidden {Hidden}")]
+    public static partial void FullscreenHide(ILogger logger, bool hidden);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

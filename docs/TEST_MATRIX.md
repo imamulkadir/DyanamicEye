@@ -40,6 +40,15 @@ The island is drawn as a **notch attached to the top of the usable screen area**
 | H7 | Narrator | Turn on Narrator (Ctrl+Win+Enter), Tab or click to the island | Narrator reads "Dynamic Island, collapsed" and offers expand; after expanding it reads "expanded"; the pin is announced as a toggle | NOT_RUN |
 | H8 | Reduced motion | Settings → Accessibility → Visual effects → Animation effects **off**; expand and collapse | Size changes instantly, with no animation | NOT_RUN |
 | H9 | Expanded screenshots | — | Notch design captured by the agent 2026-10-25: collapsed notch flush with the top edge (speaker slit, camera lens, sensor dot); expanded notch with title, placeholder and pin | PASS (agent, 100 %) |
+| F1 | Fullscreen video | Play a video fullscreen (browser or player) on the island's monitor | The island disappears within about 0.3 s and comes back the same way (pinned stays pinned) when you leave fullscreen | NOT_RUN |
+| F2 | Browser F11 | Press F11 in Edge or Chrome, then F11 again | Hides, then returns | NOT_RUN |
+| F3 | Borderless game | Run a game in borderless/windowed-fullscreen | Hides while the game is in front; returns when you alt-tab to the desktop | NOT_RUN |
+| F4 | Exclusive fullscreen game | Run a game in exclusive fullscreen | The island is hidden or simply not drawn over the game; it never flickers on top; it returns after quitting | NOT_RUN |
+| F5 | Presentation | PowerPoint slide show | Hides during the slide show | NOT_RUN |
+| F6 | Other monitor | Two monitors: fullscreen video on the monitor **without** the island | The island stays visible | NOT_RUN |
+| F7 | Maximized ≠ fullscreen | Maximize a normal window (also with the taskbar on auto-hide) | The island stays visible | NOT_RUN |
+| F8 | Exception | Add the player's exe (e.g. `vlc.exe`) to `behavior.fullscreenExceptions` in `%LOCALAPPDATA%\DynamicIsland\data\settings.json`, restart, play fullscreen | The island stays visible (the settings UI comes in P03) | NOT_RUN |
+| F9 | Automated end to end | Smoke `Island_hides_while_a_fullscreen_window_is_in_front_and_returns_afterwards` | Hide and return | PASS (agent, Release ×2); SKIPPED in Debug (Windows refused foreground to the test window) |
 | I1 | App icon | Explorer: view `DynamicIsland.exe` with small, medium, large and extra-large icons at 100 % and 200 % | The original dark-tile capsule icon, crisp at every size | NOT_RUN |
 | A1 | Not in taskbar / Alt+Tab | Start the app, look at the taskbar, press Alt+Tab | No taskbar button and no Alt+Tab entry (the automated smoke test checks the style) | NOT_RUN |
 

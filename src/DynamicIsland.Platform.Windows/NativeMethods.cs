@@ -18,6 +18,7 @@ internal static unsafe partial class NativeMethods
 
     public static readonly IntPtr HwndTopmost = new(-1);
     public const uint SwpNoActivate = 0x0010;
+    public const uint SwpNoZOrder = 0x0004;
     public const uint SwpNoOwnerZOrder = 0x0200;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -96,6 +97,68 @@ internal static unsafe partial class NativeMethods
     public static partial IntPtr GetAncestor(IntPtr window, uint flags);
 
     public const uint GaRoot = 2;
+
+    public const uint EventSystemForeground = 0x0003;
+    public const uint EventSystemMinimizeEnd = 0x0017;
+    public const uint EventObjectLocationChange = 0x800B;
+    public const uint WinEventOutOfContext = 0x0000;
+    public const uint WinEventSkipOwnProcess = 0x0002;
+    public const int ObjIdWindow = 0;
+    public const uint MonitorDefaultToNearest = 2;
+    public const int GwlStyle = -16;
+    public const nint WsCaption = 0x00C00000;
+    public const int DwmWindowAttributeCloaked = 14;
+    public const int QunsBusy = 2;
+    public const int QunsRunningD3DFullScreen = 3;
+    public const int QunsPresentationMode = 4;
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr module,
+        delegate* unmanaged<IntPtr, uint, IntPtr, int, int, uint, uint, void> callback, uint processId, uint threadId, uint flags);
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool UnhookWinEvent(IntPtr hook);
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr GetForegroundWindow();
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr GetShellWindow();
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial IntPtr MonitorFromWindow(IntPtr window, uint flags);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetClassNameW")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial int GetClassName(IntPtr window, char* className, int maxCount);
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsIconic(IntPtr window);
+
+    [LibraryImport("user32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsZoomed(IntPtr window);
+
+    [LibraryImport("dwmapi.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
+
+    [LibraryImport("shell32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    public static partial int SHQueryUserNotificationState(out int state);
 
     [LibraryImport("user32.dll")]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]

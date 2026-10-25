@@ -18,6 +18,8 @@ public static class SettingsValidator
     public const int MinHoverPreviewDelayMs = 100;
     public const int MaxHoverPreviewDelayMs = 2000;
     public const int MaxMonitorIdLength = 512;
+    public const int MaxFullscreenExceptions = 50;
+    public const int MaxExecutableNameLength = 260;
     public const double MaxHorizontalOffset = 4000;
     public const double MaxVerticalOffset = 1000;
 
@@ -102,7 +104,44 @@ public static class SettingsValidator
             delay = Math.Clamp(delay, MinHoverPreviewDelayMs, MaxHoverPreviewDelayMs);
         }
 
-        return behavior with { HoverPreviewDelayMs = delay };
+        return behavior with { HoverPreviewDelayMs = delay, FullscreenExceptions = NormalizeExceptions(behavior.FullscreenExceptions, corrections) };
+    }
+
+    /// <summary>Executable file names only (no paths), trimmed, lower-cased, unique, at most <see cref="MaxFullscreenExceptions"/>.</summary>
+    private static string[] NormalizeExceptions(IReadOnlyList<string?>? exceptions, List<string> corrections)
+    {
+        if (exceptions is null)
+        {
+            return [];
+        }
+
+        var invalid = Path.GetInvalidFileNameChars();
+        var valid = new List<string>();
+        foreach (var raw in exceptions)
+        {
+            var name = raw?.Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(name) || name.Length > MaxExecutableNameLength || name.IndexOfAny(invalid) >= 0 || !name.EndsWith(".exe", StringComparison.Ordinal))
+            {
+                corrections.Add("behavior.fullscreenExceptions: invalid entry removed");
+                continue;
+            }
+
+            if (valid.Contains(name, StringComparer.Ordinal))
+            {
+                corrections.Add("behavior.fullscreenExceptions: duplicate entry removed");
+                continue;
+            }
+
+            if (valid.Count == MaxFullscreenExceptions)
+            {
+                corrections.Add("behavior.fullscreenExceptions: too many entries, extra removed");
+                break;
+            }
+
+            valid.Add(name);
+        }
+
+        return [.. valid];
     }
 
     private static UpdateSettings NormalizeUpdates(UpdateSettings? updates, List<string> corrections)

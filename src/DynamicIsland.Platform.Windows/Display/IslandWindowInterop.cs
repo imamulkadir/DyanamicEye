@@ -43,6 +43,8 @@ public static class IslandWindowInterop
 
     public static bool IsVisible(IntPtr window) => NativeMethods.IsWindowVisible(window);
 
+    public static bool IsForeground(IntPtr window) => window != IntPtr.Zero && NativeMethods.GetForegroundWindow() == window;
+
     /// <summary>
     /// Gives focus back to <paramref name="window"/> (the window that was active before the island) when it still exists.
     /// Only works while the island is foreground; Windows refuses otherwise, which is the intended "no force" behaviour.
@@ -53,11 +55,11 @@ public static class IslandWindowInterop
     public static bool IsTopmost(IntPtr window) =>
         (NativeMethods.GetWindowLongPtr(window, NativeMethods.GwlExStyle) & NativeMethods.WsExTopmost) != 0;
 
-    /// <summary>Moves/sizes in physical pixels, keeps topmost, never activates the window.</summary>
-    public static void SetBounds(IntPtr window, PixelRect rect)
+    /// <summary>Moves/sizes in physical pixels without activating the window; makes it topmost unless told otherwise.</summary>
+    public static void SetBounds(IntPtr window, PixelRect rect, bool topmost = true)
     {
-        if (!NativeMethods.SetWindowPos(window, NativeMethods.HwndTopmost, rect.Left, rect.Top, rect.Width, rect.Height,
-                NativeMethods.SwpNoActivate | NativeMethods.SwpNoOwnerZOrder))
+        var flags = NativeMethods.SwpNoActivate | NativeMethods.SwpNoOwnerZOrder | (topmost ? 0 : NativeMethods.SwpNoZOrder);
+        if (!NativeMethods.SetWindowPos(window, topmost ? NativeMethods.HwndTopmost : IntPtr.Zero, rect.Left, rect.Top, rect.Width, rect.Height, flags))
         {
             throw new System.ComponentModel.Win32Exception();
         }

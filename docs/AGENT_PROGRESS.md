@@ -3,9 +3,9 @@
 > **Keep this file accurate on every session.** This is the durable checkpoint that lets a new agent resume after a context reset. Update it alongside source changes, and never mark anything DONE without evidence. Move older detail to `docs/WORK_LOG.md` so this file stays short.
 
 ## CURRENT STATUS (read first)
-- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02 and P02-03 are implemented and awaiting the owner's manual matrix; P02-04 is next.
-- **Active task:** P02-04: fullscreen detection, game-safe hide/restore, exceptions.
-- **Active task status:** NOT_STARTED. P02-03 is IMPLEMENTED_AWAITING_VALIDATION: automated tests pass and it is uncommitted. The owner runs matrix rows H2–H8. P02-02 was pushed and CI 40202761834 is green; its matrix rows D2–D5, M1–M6, T1–T2, S1–S2, I1 and A1 are still pending.
+- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02, P02-03 and P02-04 are implemented and awaiting the owner's manual matrix; P02-05 is next.
+- **Active task:** P02-05: activity budget, power-aware motion, visual QA, G02 sign-off prep.
+- **Active task status:** NOT_STARTED. P02-04 is IMPLEMENTED_AWAITING_VALIDATION: automated tests pass and it is uncommitted; the owner runs matrix rows F1–F8. P02-03 + notch were pushed and CI 40204446036 is green.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,28 +23,19 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-25 (P02-03 implemented; manual matrix pending)
+- **Last updated:** 2026-10-25 (P02-04 implemented; manual matrix pending)
 
 ## NEXT ACTION (ONE task only)
-**P02-04 — Fullscreen detection with game-safe hide/restore; configurable exceptions; never assume an overlay works above exclusive-fullscreen apps.** (guide §5 P02-04, D06, §4.1; ADR 0009 feeds `FullscreenStarted`/`FullscreenEnded`)
-1. **Platform.Windows `Win32FullscreenDetector` (guide §3 `IFullscreenDetector`, event-driven per D10):**
-   - Sources:
-     - `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)`, plus location changes of the foreground window (`EVENT_OBJECT_LOCATIONCHANGE` filtered to that window, or a re-check on foreground change and on the display changes from ADR 0008)
-     - `SHQueryUserNotificationState`: `QUNS_RUNNING_D3D_FULL_SCREEN`, `QUNS_PRESENTATION_MODE`, `QUNS_BUSY`
-   - Fullscreen means the foreground window covers its monitor's full bounds and is not the shell or desktop (`Progman`, `WorkerW`, `Shell_TrayWnd`), not the island itself and not cloaked; or the notification state says D3D-fullscreen or presentation mode.
-   - Per-monitor: hide only when the fullscreen window is on **the island's monitor**.
-   - No polling loop. If a short re-check is needed, it is bounded and stops when idle.
-2. **Core:** pure `FullscreenPolicy` — given the detector snapshot, the island's monitor, the `Behavior.AutoHideInFullscreen` setting and the exceptions, decide hide or show.
-   - Exceptions are a setting `Behavior.FullscreenExceptions`: a list of process **executable names** (e.g. `vlc.exe`), stored locally and **never logged** (ADR 0004), validated (file-name characters only, ≤ 50 entries).
-   - A new property with a default, so no schema bump is needed.
-3. **App wiring:** detector events → `IIslandStateMachine.Fire(FullscreenStarted|FullscreenEnded)` on the UI thread, debounced at about 300 ms to avoid flicker while the user alt-tabs. Log state changes only as "fullscreen on/off"; never log window titles or process names.
-4. **Docs:** state honestly in ADR/README that **exclusive-fullscreen games may draw above any overlay**. The island hides itself in that case; it never tries to force itself on top.
-5. **Tests:**
-   - Unit: policy (monitor match, exceptions, setting off) and the exception-list validator.
-   - Integration: detector on the real desktop with a helper borderless window sized to the monitor bounds (a child process or test window) → `FullscreenStarted`; close it → `FullscreenEnded`.
-   - Smoke: open the helper fullscreen window → island window hidden (`IsWindowVisible` false); close it → visible again in the previous state.
-   - Manual matrix rows: a video player in fullscreen, a borderless game, an exclusive-fullscreen game, PowerPoint presentation mode, F11 in a browser, and a fullscreen window on the other monitor (the island stays visible).
-6. **Verify:** Release + Debug builds with 0 warnings and all tests green; CI green after the owner pushes. Do not commit.
+**P02-05 — Adaptive frame/activity budget, reduced motion, power-aware control, basic visual QA against a screenshot reference (original artwork only).** (guide §5 P02-05, D08, D10; then the G02 sign-off)
+1. **Activity budget:**
+   - The island draws nothing while idle: no running animations or timers in Collapsed, Hidden or Paused. Verify with the WPF render-tier/`CompositionTarget.Rendering` subscriber count, and measure idle CPU and working set of the real app over 30 s (target: about 0 % CPU when idle, a stable working set).
+   - Record the numbers in TEST EVIDENCE.
+   - No `DispatcherTimer` or `Task.Delay` loops while collapsed.
+2. **Power awareness:** use `SystemEvents.PowerModeChanged` and `SystemParameters.PowerLineStatus` / Energy Saver (`PowerManager.EnergySaverStatus` if WinRT is available, otherwise `SYSTEM_POWER_STATUS.SystemStatusFlag` battery saver). On battery saver, turn off size animations as if `Motion=Reduced`. Expose this as `IMotionPolicy` (Core, pure: user preference + OS animation setting + battery saver → animate yes/no) with unit tests. Replace `IslandWindow.MotionEnabled` with it.
+3. **Reduced motion:** already honoured (ADR 0009); add unit coverage through `IMotionPolicy`.
+4. **Visual QA:** a smoke test captures the collapsed and expanded notch (`PrintWindow`/`CopyFromScreen` of the window rectangle at 100 %) and compares it to committed **reference PNGs** of our own rendering (`tests/DynamicIsland.WindowsSmokeTests/References/`) with a tolerance (per-pixel delta and a maximum differing-pixel ratio). The comparison runs **only at 100 % scale with the default theme**; it is skipped with a reason otherwise. Write a diff image on failure for review. References are generated by our app, never copied from other products.
+5. **G02 sign-off prep:** update `docs/TEST_MATRIX.md` with the complete G02 checklist status. G02 needs the owner's real-hardware rows (D2–D5, M1–M6, T1–T2, S1–S2, H2–H8, F1–F8, I1, A1). Mark P02-02..P02-05 DONE only after those pass.
+6. **Verify:** Release + Debug builds with 0 warnings and all tests green (skips reported); CI green after the owner pushes. Do not commit.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -52,7 +43,7 @@
 |---|---|---|---|
 | P00 — Environment and baseline | P00-01…P00-04 | DONE | **G00 PASS** 2026-10-25, run 40196393380 (`963b01c`) |
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
-| P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02, 03 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
+| P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02, 03, 04 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | NOT_STARTED | G03 pending |
 | P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
@@ -69,6 +60,25 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-25 **P02-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). Decisions are in ADR 0010.
+  - **Core:**
+    - `Display/Fullscreen.cs`: `FullscreenSource`, `FullscreenSnapshot`, `IFullscreenDetector`, pure `FullscreenPolicy`.
+    - Settings `Behavior.FullscreenExceptions` (validated exe names, ≤ 50, never logged) with value equality.
+  - **Platform.Windows:**
+    - `Display/Win32FullscreenDetector.cs`: WinEvent hooks for foreground, minimize-end and foreground location change; covers-monitor and not-maximized-with-caption check; shell, cloaked and own process excluded; D3D/presentation notification state.
+    - `Win32MonitorService.IdFor`/`BoundsOf`.
+    - `IslandWindowInterop.IsForeground` and `SetBounds(..., topmost)`.
+    - New interop.
+  - **App:**
+    - `FullscreenCoordinator.cs`: 300 ms debounce → policy → state machine; logs hidden true/false only.
+    - `AppHost` registrations; `App.xaml.cs` starts it after the window. `AppLog.FullscreenHide`.
+  - **Tests:**
+    - `UnitTests/Display/FullscreenPolicyTests.cs` (policy ×9, validation ×8)
+    - `IntegrationTests/Win32FullscreenDetectorTests.cs` (5, real helper windows)
+    - smoke `FullscreenSmokeTests.cs` (end to end; skipped if Windows refuses foreground)
+    - shared `tests/Shared/StaDispatcherThread.cs`, linked into both Windows test projects
+  - **Debugging note:** the first full run failed 2 smoke tests. Integration helper windows were topmost and covered the screen while the smoke tests ran in parallel. Helpers are now non-topmost; temporary diagnostics were added and removed.
+- 2026-10-25 Notch design + P02-03 pushed; CI run 40204446036 **success**.
 - 2026-10-25 **Design change (owner request): the island is now a classic iPhone-12-Pro-style notch.** Uncommitted. See the ADR 0009 amendment.
   - `IslandSurface` is a custom-drawn `Decorator`: flat top flush with the screen edge, 6 DIP concave shoulders, rounded bottom corners, black; geometry-based hit testing.
   - `IslandWindow.xaml` adds the sensor housing (speaker slit, front-camera lens, sensor dot) in every state. Expanded content sits below it. The green status dot was removed.
@@ -100,24 +110,7 @@
     - Smoke csproj gains `UseWPF` (UIA client) and a `System.IO` using.
   - **Docs:** `TEST_MATRIX.md` rows H2–H9.
 - 2026-10-25 P02-02 pushed; CI run 40202761834 **success**.
-- 2026-10-25 **P02-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). See the ADR 0008 amendment.
-  - **Core:**
-    - `Display/Debouncer.cs`: TimeProvider timer that coalesces bursts.
-    - `Display/IslandPlacementController.cs`: re-evaluates each pass, falls back while the preferred monitor is gone and restores it when it returns, reports `Changed`/`MonitorChanged`.
-  - **Platform.Windows:**
-    - `Display/DpiAwarenessScope.cs`: thread per-monitor-v2 scope for measuring.
-    - `IslandWindowInterop.ReceivesClickAt` (`WindowFromPoint` + `GetAncestor`).
-    - New interop: `SetThreadDpiAwarenessContext`, `WindowFromPoint`, `GetAncestor`.
-  - **App:**
-    - `IslandWindow` is now sealed and `IDisposable`. It uses the controller and a 250 ms debouncer over `WM_DISPLAYCHANGE`, the `SPI_SETWORKAREA` setting change, `SystemEvents.DisplaySettingsChanged` and resume from sleep. A DPI change re-places immediately, and `SystemEvents` are unsubscribed on close.
-    - `AppLog.IslandPlaced` (no monitor id).
-    - App and Launcher csproj gain `ApplicationIcon`.
-  - **Assets:** `assets/DynamicIsland.ico` (original, 16–256 px), generated by `tools/New-AppIcon.ps1`. `THIRD_PARTY_NOTICES.md` notes it as original work.
-  - **Docs:** new `docs/TEST_MATRIX.md` (G02 manual rows, G01 summary).
-  - **Tests:**
-    - `UnitTests/Display/DisplayChangeTests.cs`: debouncer ×4, controller ×4.
-    - `TestSupport/ManualTimeProvider.cs`: deterministic timers.
-    - Smoke `IslandPlacementSmokeTests`: placement now measured under the DPI scope; new click-through test (center hits, corner passes through); icon present in both exes. The smoke csproj gains `AllowUnsafeBlocks`.
+- 2026-10-25 P02-02 IMPLEMENTED_AWAITING_VALIDATION: display-change debounce, placement controller, click-through, DPI scope, original icon (ADR 0008 amendment). Details are in WORK_LOG.
 - 2026-10-25 P02-01 pushed; CI run 40201946771 **success**, including the placement smoke test on the runner.
 - 2026-10-25 P02-01 DONE: island window, Win32 monitor service, placement calculator, PerMonitorV2 manifest (ADR 0008). Details are in WORK_LOG.
 - 2026-10-25 P01-05 pushed; CI run 40201274900 **success**. **G01 confirmed on CI.**
@@ -131,6 +124,11 @@
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
 |---|---|---|---|---|---|
+| 2026-10-25 | P02-03 notch | GitHub Actions `windows-2025` | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40204446036 |
+| 2026-10-25 | P02-04 | Windows 11 Pro 25H2 x64, one monitor at 100 % | `dotnet test --solution` (first run) | FAIL → fixed | Release: the fullscreen smoke test did not hide; Debug: the corner click-through failed. Cause: integration helper windows were topmost and covered the screen in parallel. Fixed with `topmost: false`. |
+| 2026-10-25 | P02-04 | same | `dotnet build` + `dotnet test --solution` for Release and Debug, twice each | PASS | 0 warnings. Release 330/330 ×2 (end-to-end fullscreen hide and return **passed**). Debug 330 passed + 1 **skipped** ×2: Windows refused foreground to the test window, reported as a skip. |
+| 2026-10-25 | P02-04 | same | Integration `Win32FullscreenDetectorTests` on real windows | PASS | Covering window → fullscreen on the primary monitor with the exe name; half-size, maximized-with-caption and own-process windows → not fullscreen |
+| — | P02-04 | real video, game, browser F11, presentation, 2 monitors | `docs/TEST_MATRIX.md` rows F1–F8 | PENDING_WINDOWS | Owner to run |
 | 2026-10-25 | P02-03 notch | Windows 11 Pro 25H2 x64, one monitor at 100 % | Release and Debug build + `dotnet test --solution` | PASS | 0 warnings; Release 299/299, Debug 300/300 before the geometry tests; Integration 29/29 with `NotchGeometryTests` |
 | 2026-10-25 | P02-03 notch | same, real desktop | Real app screenshot (2× zoom) collapsed, then UIA Expand screenshot | PASS | Window `L=750 T=0 420×180`. The notch is flush with the top edge, with shoulders, speaker slit, camera lens and sensor dot. Expanded, it grows down with the title, placeholder and pin. |
 | 2026-10-25 | P02-02 | GitHub Actions `windows-2025` | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40202761834 |
@@ -154,10 +152,10 @@
 
 ## ARCHITECTURE DECISIONS / ADRS
 - Frozen D01–D15: see guide §0. No deviations approved.
-- 0001 supported Windows versions · 0002 solution/build/test platform · 0003 settings persistence (consent defaults `NotAsked`; schema-bump rule for new enum values) · 0004 local logging and redaction · 0005 lifecycle, exit codes 0/1/3, single instance with acknowledged pipe · 0006 crash supervision, Safe Mode, Debug-only test hooks, launcher as the entry point · 0007 component error boundaries, notices (keys only), user-reviewed diagnostic export · 0008 island window (tool window + PerMonitorV2), monitor identity (device interface path, never logged), placement calculator, display-change debounce · 0009 state machine (exhaustive table), fixed-size window with animated island, motion preference, keyboard/focus return, UI Automation patterns; amended: notch design (flush top, shoulders, sensor housing).
+- 0001 supported Windows versions · 0002 solution/build/test platform · 0003 settings persistence (consent defaults `NotAsked`; schema-bump rule for new enum values) · 0004 local logging and redaction · 0005 lifecycle, exit codes 0/1/3, single instance with acknowledged pipe · 0006 crash supervision, Safe Mode, Debug-only test hooks, launcher as the entry point · 0007 component error boundaries, notices (keys only), user-reviewed diagnostic export · 0008 island window (tool window + PerMonitorV2), monitor identity (device interface path, never logged), placement calculator, display-change debounce · 0009 state machine (exhaustive table), fixed-size window with animated island, motion preference, keyboard/focus return, UI Automation patterns; amended: notch design (flush top, shoulders, sensor housing) · 0010 fullscreen detection (WinEvent hooks, covers-monitor rule, per-monitor policy, exe-name exceptions, honest exclusive-fullscreen limit).
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P02-04**.
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P02-05**.
 - Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

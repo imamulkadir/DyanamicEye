@@ -59,6 +59,20 @@ public sealed unsafe class Win32MonitorService : IMonitorService
             (info.Flags & NativeMethods.MonitorInfoPrimary) != 0);
     }
 
+    /// <summary>Id of a monitor handle using the same scheme as <see cref="GetMonitors"/>, or <c>null</c>.</summary>
+    internal static string? IdFor(IntPtr monitor)
+    {
+        var info = new NativeMethods.MonitorInfoEx { Size = (uint)sizeof(NativeMethods.MonitorInfoEx) };
+        return NativeMethods.GetMonitorInfo(monitor, &info) ? StableId(new string(info.Device)) : null;
+    }
+
+    /// <summary>Full bounds of a monitor handle in physical pixels.</summary>
+    internal static PixelRect? BoundsOf(IntPtr monitor)
+    {
+        var info = new NativeMethods.MonitorInfoEx { Size = (uint)sizeof(NativeMethods.MonitorInfoEx) };
+        return NativeMethods.GetMonitorInfo(monitor, &info) ? ToPixelRect(info.Monitor) : null;
+    }
+
     private static string StableId(string adapterDeviceName)
     {
         var device = new NativeMethods.DisplayDevice { Size = (uint)sizeof(NativeMethods.DisplayDevice) };

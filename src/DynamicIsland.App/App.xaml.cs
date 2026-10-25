@@ -89,6 +89,7 @@ public partial class App : Application
         window.Show();
 
         _instance.StartListening(OnActivationRequested, OnActivationUnavailable);
+        _host.Services.GetRequiredService<FullscreenCoordinator>().Start();
 
         // Optional components (widgets/providers, P04) run isolated; failures surface as status changes and notices.
         var logger = _logger;

@@ -58,6 +58,22 @@ public sealed record BehaviorSettings
 
     /// <summary>Auto-hide while a fullscreen app is in the foreground (D06).</summary>
     public bool AutoHideInFullscreen { get; init; } = true;
+
+    /// <summary>
+    /// Executable file names (e.g. <c>vlc.exe</c>) whose fullscreen windows do not hide the island (D06 manual override).
+    /// Personal data: stored locally only, never logged or exported.
+    /// </summary>
+    public IReadOnlyList<string> FullscreenExceptions { get; init; } = [];
+
+    /// <summary>Value equality including the exceptions list (records compare lists by reference otherwise).</summary>
+    public bool Equals(BehaviorSettings? other) =>
+        other is not null
+        && HoverPreviewEnabled == other.HoverPreviewEnabled
+        && HoverPreviewDelayMs == other.HoverPreviewDelayMs
+        && AutoHideInFullscreen == other.AutoHideInFullscreen
+        && (FullscreenExceptions ?? []).SequenceEqual(other.FullscreenExceptions ?? [], StringComparer.OrdinalIgnoreCase);
+
+    public override int GetHashCode() => HashCode.Combine(HoverPreviewEnabled, HoverPreviewDelayMs, AutoHideInFullscreen, FullscreenExceptions?.Count ?? 0);
 }
 
 public sealed record UpdateSettings

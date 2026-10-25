@@ -42,3 +42,6 @@ dotnet_naming_style.underscore_camel.capitalization = camel_case
 [tests/**.cs]
 # Test method names use underscores for readability.
 dotnet_diagnostic.CA1707.severity = none
+# Logging performance rules (LoggerMessage delegates, argument cost) do not apply to test code.
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none

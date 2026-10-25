@@ -4,42 +4,45 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS — Phase P00 complete; gate G00 PASS. Starting P01 (reliability kernel).
-- **Active task:** P01-02 — Rolling local logs with redaction.
-- **Active task status:** NOT_STARTED (P01-01 DONE, uncommitted, awaiting owner review)
+- **Active task:** P01-03 — Lifecycle coordinator, single instance, activation IPC.
+- **Active task status:** NOT_STARTED (P01-02 DONE, uncommitted, awaiting owner review; P01-01 pushed, CI green)
 - **Last passed gate:** G00 (2026-10-25, CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40196393380)
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public). CI status for any run can be read without auth: `Invoke-RestMethod https://api.github.com/repos/imamulkadir/DyanamicEye/actions/workflows/ci.yml/runs?per_page=1`.
 - **Current branch / commit:** Repo created by owner (2026-10-25); default branch `master`. **Owner reviews and makes all commits. Agents must NOT commit.** Report changed files and the owner commits them.
 - **Host (P00-02, verified):** Windows 11 Pro 25H2, build 26200.9711, x64 (RID `win-x64`). .NET SDK 10.0.401 (pinned) + 8.0.425; runtimes NETCore/WindowsDesktop/AspNetCore 10.0.12 + 8.0.31; x86 dotnet also present.
 - **Supported OS policy:** see `docs/ADR/0001-supported-windows-versions.md` (tested target Win11 24H2/25H2 x64; Win10 22H2 Home/Pro NOT supported by .NET 10).
 - **Build/test commands:** `dotnet restore DynamicIsland.sln --locked-mode`; `dotnet build DynamicIsland.sln -c Release --no-restore`; `dotnet test --solution DynamicIsland.sln -c Release` (Microsoft.Testing.Platform runner via `global.json`; legacy VSTest-style `dotnet test` fails by design). The smoke test opens the real app window on the desktop.
-- **Last updated:** 2026-10-25 (P01-01 DONE)
+- **Last updated:** 2026-10-25 (P01-02 DONE)
 
 ## NEXT ACTION (ONE task only)
-**P01-02 — Rolling structured local logs: retention/size cap, privacy redaction, logger initialized before UI.** (guide §5 P01-02, §2 Logging, §4.3 Logs, §4.5)
-1. **Choose the sink, with an ADR:**
-   - (a) a small in-house `ILoggerProvider` file sink in Infrastructure, with no new package; or
-   - (b) Serilog (`Serilog.Extensions.Logging` + `Serilog.Sinks.File`, Apache-2.0).
-   Verify the license and current version before choosing (b), then add pins and `THIRD_PARTY_NOTICES.md` entries. Prefer (a) unless it needs substantial code.
-2. **Behavior:**
-   - writes to `%LOCALAPPDATA%\DynamicIsland\logs\` (`AppDataPaths`; add `Logs`)
-   - one structured line per event (UTC timestamp, level, category, event id, message, exception type + stack)
-   - daily file plus size roll (e.g. 5 MiB per file)
-   - deletes files older than **14 days** and caps total size (e.g. 50 MiB)
-   - writes on a background queue with a bounded channel, so the UI never blocks and the oldest entries drop with a counted notice
-   - flushes on dispose
-3. **Redaction (`Core` or `Infrastructure`, unit-tested):** before writing, scrub the user profile path / user name, emails, `token=`/`Bearer`/`password=` patterns and GitHub tokens (`gh[pousr]_…`). Never log settings values that could be personal, note/task text, window titles or clipboard. Document what is redacted.
-4. **Wire up:** register through `builder.Logging` in `AppHost` (default providers stay disabled). Set it up before the first window: `App.OnStartup` builds the host before showing `MainWindow`. Log startup/shutdown and the `SettingsLoadResult.Outcome` (names only). Logging itself must never crash the app; on I/O failure, disable the file sink and continue.
-5. **Tests:** redaction cases; rolling by size; retention deletes old files and keeps recent ones (inject `TimeProvider`); queue overflow drops and counts; dispose flushes; no file is created when the logs folder is unwritable (sink disabled, no throw).
-6. **Verify:** Release build with 0 warnings; `dotnet test --solution DynamicIsland.sln -c Release` all green; check that CI is green after the owner pushes (read it through the GitHub API). List changed files; do not commit.
+**P01-03 — App lifecycle coordinator: explicit shutdown vs. session end vs. crash, cancellation/disposal, single instance + activation IPC.** (guide §5 P01-03, §4.4, §4.5)
+1. **Core (`Core/Lifecycle/`, pure, unit-tested):**
+   - an `ExitReason` enum (`UserExit`, `SessionEnding`, `Restart`, `Fatal`)
+   - `ILifecycleCoordinator`: one-shot `RequestShutdown(reason)`, an app-wide `CancellationToken` cancelled on shutdown, and an ordered async shutdown of registered components with a time budget (e.g. 5 s) that logs any component exceeding it
+   - a clean-shutdown marker contract for P01-04: a clean exit clears the "session unhealthy" flag, a fatal exit leaves it set
+2. **Single instance (`Platform.Windows`):**
+   - a per-user named mutex `Local\DynamicIsland.{UserSid}`
+   - a named pipe `DynamicIsland.{UserSid}.activate`, created with `NamedPipeServerStreamAcl.Create` and a `PipeSecurity` that allows only the current user SID (plus `PipeOptions.CurrentUserOnly`)
+   - the protocol is one fixed short command (`activate`), with a length limit and timeout; reject anything else
+   - a second instance sends `activate`, then exits with code 0 and **no** window; the first instance receives it and brings its window forward without forcing focus. Note that the shell is still the dev window until P02.
+3. **App wiring (`App.xaml.cs` → thin; logic in the coordinator):**
+   - startup order: acquire single instance, build host, load settings (`ISettingsStore.LoadAsync`; log the `Outcome` and the correction count only), show the window
+   - `SessionEnding` → `ExitReason.SessionEnding`, which shuts down promptly
+   - unhandled exceptions: `DispatcherUnhandledException`, `AppDomain.UnhandledException` and `TaskScheduler.UnobservedTaskException` are logged as Critical, the session is marked unhealthy and the app exits with a non-zero code. **Never set `Handled = true` unconditionally** (guide §0.2).
+4. **Tests:**
+   - Unit: coordinator ordering, timeout, the one-shot request, the cancellation token, the marker set/clear contract
+   - Integration (Windows): mutex contention between two processes or handles; pipe round-trip (`activate`); invalid messages rejected; the ACL denies other users (assert the security descriptor owner/rules)
+   - Smoke: launching the exe twice leaves one process, the second exits 0; closing leaves no process
+5. **Verify:** Release build with 0 warnings; full test suite green; manual check that a double launch shows one window. Update this file; list changed files; do not commit.
 
-**Expected verification:** all logging tests pass; a manual app launch writes a log file under `%LOCALAPPDATA%\DynamicIsland\logs` that contains no user name or path.
+**Expected verification:** the G01 items "no duplicate app" and "deliberate Exit is distinguishable from a crash" are proven by tests.
 
 ## TASK BOARD (compact; detailed definitions live in guide)
 
 | Phase | Task IDs | Status | Gate evidence |
 |---|---|---|---|
 | P00 — Environment and baseline | P00-01…P00-04 | DONE | **G00 PASS** 2026-10-25, run 40196393380 (`963b01c`) |
-| P01 — Reliability kernel | P01-01…P01-05 | IN_PROGRESS (P01-01 DONE) | G01 pending (corrupt-settings recovery covered by P01-01 tests) |
+| P01 — Reliability kernel | P01-01…P01-05 | IN_PROGRESS (P01-01, P01-02 DONE) | G01 pending (corrupt-settings recovery covered by P01-01 tests) |
 | P02 — Island shell | P02-01…P02-05 | NOT_STARTED | G02 pending |
 | P03 — Tray/settings/startup | P03-01…P03-05 | NOT_STARTED | G03 pending |
 | P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
@@ -48,6 +51,23 @@
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10)
+- 2026-10-25 P01-02 DONE (uncommitted; owner commits). Decisions are in ADR 0004.
+  - **Core:** `Diagnostics/LogRedactor.cs`. Redacts profile path, user/machine/domain names (whole words), GitHub/bearer tokens, secret assignments and emails; fails closed on regex timeout.
+  - **Infrastructure:**
+    - `Logging/FileLoggerOptions.cs`
+    - `Logging/FileLoggerProvider.cs`
+    - `Logging/RollingLogWriter.cs`: JSON lines, UTC daily + 5 MiB roll, 14-day retention, 50 MiB cap, bounded queue that drops the oldest entries with a count, disables itself on I/O errors.
+    - `AppDataPaths` gained `Logs` and folder-name constants.
+    - csproj: added `Microsoft.Extensions.Logging.Abstractions` and `InternalsVisibleTo` UnitTests.
+  - **App:**
+    - `AppHost.CreateBuilder(string? dataRoot)` registers the redactor and file logger (the only provider), sets the level to Information with Microsoft/System raised to Warning, and roots settings in the data root.
+    - New `AppLog.cs` (`[LoggerMessage]` started/exiting events).
+    - `App.xaml.cs` logs startup (version, OS, architecture) before the window, and logs exit.
+  - **Build:** `Directory.Packages.props` pins Logging.Abstractions 10.0.13. `.editorconfig` turns off CA1848/CA1873 in tests only. Lock files updated.
+  - **Tests:** `UnitTests/Diagnostics/LogRedactorTests.cs`, `UnitTests/Logging/FileLoggerProviderTests.cs`, `IntegrationTests/AppHostTests.cs` (rewritten to use a temp data root). `TestSupport/FixedTimeProvider` is now settable.
+  - **Bug found by tests and fixed:** `FileInfo.Length` read after `Delete()` threw and disabled the sink during the size-cap pass.
+  - **Docs:** `THIRD_PARTY_NOTICES.md` usage updated; ADR 0004.
+- 2026-10-25 P01-01 pushed by owner (`e4a32ba`); CI run 40197494204 **success**.
 - 2026-10-25 P01-01 DONE (uncommitted; owner commits). Decisions are in ADR 0003.
   - **Core `Settings/`:** `AppSettings.cs` (records and enums), `WidgetIds.cs`, `SettingsValidator.cs`, `ISettingsStore.cs` (load result, outcomes, save result).
   - **Infrastructure:**
@@ -99,6 +119,11 @@
 | 2026-10-25 | P01-01 | Windows 11 Pro 25H2 26200.9711 x64, SDK 10.0.401 | `dotnet build DynamicIsland.sln -c Release` | PASS | 0 warnings, 0 errors |
 | 2026-10-25 | P01-01 | same | `dotnet test --project tests/DynamicIsland.UnitTests -c Release` (first run) | FAIL → fixed | 2 failures showed that source-generated STJ drops init-property defaults. Switched to reflection-based STJ (ADR 0003 §8). |
 | 2026-10-25 | P01-01 | same | `dotnet restore --locked-mode`; `dotnet test --solution DynamicIsland.sln -c Release --no-build` | PASS | 59/59: Unit 55 (settings 45 + architecture 10), Integration 3, Smoke 1. No files left in `%LOCALAPPDATA%\DynamicIsland` or temp. |
+| 2026-10-25 | P01-01 | GitHub Actions `windows-2025`, commit `e4a32ba` | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40197494204 |
+| 2026-10-25 | P01-02 | Windows 11 Pro 25H2 26200.9711 x64, SDK 10.0.401 | `dotnet restore`; `dotnet build DynamicIsland.sln -c Release --no-restore` | PASS | 0 warnings. Earlier attempts failed on CS1573, CA1873 and missing `System.IO` in WPF projects; all fixed. |
+| 2026-10-25 | P01-02 | same | `dotnet test --solution DynamicIsland.sln -c Release --no-build` | FAIL → fixed | Size-cap test exposed the FileInfo.Length-after-Delete bug |
+| 2026-10-25 | P01-02 | same | `dotnet test --solution DynamicIsland.sln -c Release --no-build`, 4 consecutive runs | PASS | 92/92 each run, no flakiness |
+| 2026-10-25 | P01-02 | same, real desktop | The smoke-test launch of `DynamicIsland.exe` wrote `%LOCALAPPDATA%\DynamicIsland\logs\dynamicisland-20261025.log`; contents inspected | PASS | JSON lines with AppStarted/AppExiting; checked that user name and machine name are absent |
 
 ## BLOCKERS / RISKS
 - No target Windows development/testing host verified yet. Do not assert WPF UI tests passed.
@@ -110,12 +135,13 @@
 - Frozen D01–D15: see guide §0. No deviations approved.
 - ADR 0001 (Accepted): supported Windows versions. It clarifies guide §0 and does not deviate from it.
 - ADR 0002 (Accepted): `.sln` format, per-project TFMs, build/lock policy, xUnit v3 on Microsoft.Testing.Platform, host without default sources.
+- ADR 0004 (Accepted): in-house JSON-lines file logger (no Serilog), retention/caps, non-blocking queue, fail-safe, redaction scope; callers must never log free text.
 - ADR 0003 (Accepted): settings model and consent defaults (startup and update checks are `NotAsked` and asked in P03), atomic save + `.bak`, quarantine, read-only for newer schemas, migrations, **schema-bump rule for new enum values**, reflection-based STJ.
 - Pending ADRs: concrete per-user installer technology and updater trust/provenance model when P06 begins.
 
 ## HANDOFF NOTES
 - Read `AGENTS.md` first; guide §5 holds task-by-task definitions.
-- Current next task: **P01-02**. P01 builds on `AppHost` and the empty Core/Infrastructure projects. Do not jump to UI implementation.
+- Current next task: **P01-03**. P01 builds on `AppHost` and the empty Core/Infrastructure projects. Do not jump to UI implementation.
 - Owner handles git repo creation and all commits (owner instruction 2026-10-25). The owner pushed P00-03 on 2026-10-25. `gh` is not installed, but the repo is public, so CI run status can be read through the GitHub REST API without auth (see CURRENT STATUS).
 - If a fresh agent finds code already present, inspect git + tests and reconcile this file before editing anything.
 

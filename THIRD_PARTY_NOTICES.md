@@ -24,7 +24,9 @@ Versions are pinned in `Directory.Packages.props`. Resolved transitive packages 
 ### Microsoft.Extensions.Hosting 10.0.13 and its Microsoft.Extensions.* dependencies (10.0.13)
 - Source: https://github.com/dotnet/runtime
 - License: MIT (https://licenses.nuget.org/MIT). Taken from the package nuspec, 2026-10-25.
-- Used by: DynamicIsland.App (Generic Host, dependency injection, configuration, logging abstractions)
+- Used by:
+  - DynamicIsland.App: Generic Host, dependency injection, configuration, logging
+  - DynamicIsland.Infrastructure: `Microsoft.Extensions.Logging.Abstractions`, referenced directly for the file log sink
 - Redistributed: yes
 - Notice:
 

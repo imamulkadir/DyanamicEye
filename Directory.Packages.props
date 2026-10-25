@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup Label="Runtime">
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
   </ItemGroup>
   <ItemGroup Label="Test only (not redistributed)">
     <!-- xunit.v3 runs on Microsoft.Testing.Platform (opted in via global.json "test.runner"); no VSTest packages. -->

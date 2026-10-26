@@ -16,6 +16,9 @@ public interface IIslandStateMachine
 
     IslandState State { get; }
 
+    /// <summary>The user's pin is on, also while the island is hidden for a while (see <see cref="IslandSnapshot.IsPinned"/>).</summary>
+    bool IsPinned => State == IslandState.Pinned;
+
     /// <summary>Applies an input. Call on the UI thread.</summary>
     void Fire(IslandInput input);
 }
@@ -44,6 +47,8 @@ public sealed class IslandStateMachine : IIslandStateMachine, IDisposable
     public IslandState State => _snapshot.State;
 
     public IslandSnapshot Snapshot => _snapshot;
+
+    public bool IsPinned => _snapshot.IsPinned;
 
     public void Fire(IslandInput input)
     {

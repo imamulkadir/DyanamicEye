@@ -95,6 +95,19 @@ public sealed class WidgetPresenter : IDisposable
         }
     }
 
+    /// <summary>"Try again" on a failed widget's tab (ADR 0027).</summary>
+    public async void Retry(string widgetId)
+    {
+        try
+        {
+            await _registry.RetryAsync(widgetId, _lifecycle.ApplicationStopping).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutting down.
+        }
+    }
+
     public void Start()
     {
         _applied = _settings.Current.Widgets;
@@ -107,6 +120,7 @@ public sealed class WidgetPresenter : IDisposable
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         _registry.SetActive(IsOnScreen(_state.State));
         _view.SelectedWidgetChanged += OnSelectedWidgetChanged;
+        _view.RetryRequested += OnRetryRequested;
         Render();
         UpdateExpanded();
     }
@@ -115,6 +129,7 @@ public sealed class WidgetPresenter : IDisposable
     {
         _registry.Changed -= OnRegistryChanged;
         _view.SelectedWidgetChanged -= OnSelectedWidgetChanged;
+        _view.RetryRequested -= OnRetryRequested;
         AlbumArt.Decoded -= OnRegistryChanged;
         _settings.Changed -= OnSettingsChanged;
         _state.StateChanged -= OnStateChanged;
@@ -143,6 +158,8 @@ public sealed class WidgetPresenter : IDisposable
     private void UpdateExpanded() => _registry.SetExpanded(IsExpanded(_state.State) ? _view.SelectedWidgetId : null);
 
     private void OnSelectedWidgetChanged(object? sender, EventArgs e) => UpdateExpanded();
+
+    private void OnRetryRequested(object? sender, string widgetId) => Retry(widgetId);
 
 
     private void OnRegistryChanged(object? sender, EventArgs e)

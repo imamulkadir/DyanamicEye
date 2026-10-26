@@ -265,20 +265,40 @@ public partial class NotchView : UserControl
     private void UpdateClockVisibility() =>
         ClockText.Visibility = string.IsNullOrEmpty(ClockText.Text) || (_expanded && _clockInPanel) ? Visibility.Collapsed : Visibility.Visible;
 
-    private readonly Dictionary<string, TextBlock> _notes = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, StackPanel> _notes = new(StringComparer.Ordinal);
 
-    /// <summary>One cached note per widget, so an unchanged failure does not re-parent the panel.</summary>
-    private TextBlock UnavailableNote(WidgetSlot slot)
+    /// <summary>Raised with a widget id when the user asks to start a failed widget again (ADR 0027).</summary>
+    public event EventHandler<string>? RetryRequested;
+
+    /// <summary>
+    /// One cached note per widget, so an unchanged failure does not re-parent the panel: a short message and a
+    /// "Try again" button (ADR 0027).
+    /// </summary>
+    private StackPanel UnavailableNote(WidgetSlot slot)
     {
         if (!_notes.TryGetValue(slot.Id, out var note))
         {
-            note = new TextBlock
+            note = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
+            note.Children.Add(new TextBlock
             {
                 Text = $"{slot.Label} isn't available right now.",
                 FontSize = 12,
-                Margin = new Thickness(0, 2, 0, 2),
+                VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-            }.Themed(TextBlock.ForegroundProperty, ThemeResources.TextSecondary);
+            }.Themed(TextBlock.ForegroundProperty, ThemeResources.TextSecondary));
+            var retry = new Button
+            {
+                Content = "Try again",
+                FontSize = 12,
+                Height = 26,
+                Padding = new Thickness(8, 0, 8, 0),
+                Margin = new Thickness(8, 0, 0, 0),
+                Style = MediaView.IconButtonStyle,
+            };
+            AutomationProperties.SetAutomationId(retry, "Retry." + slot.Id);
+            var id = slot.Id;
+            retry.Click += (_, _) => RetryRequested?.Invoke(this, id);
+            note.Children.Add(retry);
             _notes.Add(slot.Id, note);
         }
 

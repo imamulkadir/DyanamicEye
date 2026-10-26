@@ -78,6 +78,24 @@ public sealed class WidgetPanelTests : IDisposable
     }
 
     [Fact]
+    public void A_failed_widgets_tab_offers_try_again()
+    {
+        var requested = _ui.Invoke(() =>
+        {
+            var view = new NotchView();
+            var ids = new List<string>();
+            view.RetryRequested += (_, id) => ids.Add(id);
+            view.ShowWidgets([Slot("system", "System stats", ComponentState.Failed, null)], Render);
+
+            var retry = ((Panel)view.WidgetElements.Single()).Children.OfType<Button>().Single();
+            retry.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            return (AutomationProperties.GetAutomationId(retry), (string)retry.Content, ids.Single());
+        });
+
+        Assert.Equal(("Retry.system", "Try again", "system"), requested);
+    }
+
+    [Fact]
     public void A_single_widget_needs_no_tab_strip()
     {
         var visibility = _ui.Invoke(() =>
@@ -95,7 +113,12 @@ public sealed class WidgetPanelTests : IDisposable
     private static string[] Tabs(NotchView view) =>
         [.. ((Panel)view.FindName("TabStrip")).Children.OfType<UIElement>().Select(AutomationProperties.GetAutomationId)];
 
-    private static string Shown(NotchView view) => view.WidgetElements.OfType<TextBlock>().Single().Text;
+    private static string Shown(NotchView view) => view.WidgetElements.Single() switch
+    {
+        TextBlock text => text.Text,
+        Panel note => note.Children.OfType<TextBlock>().First().Text, // A failed widget's note (ADR 0027).
+        var other => other.ToString()!,
+    };
 
     [Fact]
     public void Without_content_the_hint_stays()

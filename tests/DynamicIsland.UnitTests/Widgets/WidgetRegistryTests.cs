@@ -111,6 +111,55 @@ public sealed class WidgetRegistryTests : IDisposable
     }
 
     [Fact]
+    public async Task Try_again_restarts_only_a_failed_enabled_widget()
+    {
+        var broken = new FakeWidget(WidgetIds.Media) { Failure = new InvalidOperationException("bug") };
+        var clock = new FakeWidget(WidgetIds.Clock);
+        using var host = CreateHost();
+        var registry = new WidgetRegistry(host, [broken, clock], FastRetries);
+        registry.Register(Settings((WidgetIds.Media, true), (WidgetIds.Clock, true)));
+        host.StartAll();
+        await WaitUntilAsync(() => registry.Slots[0].IsUnavailable && clock.IsRunning);
+
+        Assert.False(await registry.RetryAsync(WidgetIds.Clock, Ct)); // Running fine: nothing to do.
+
+        broken.Failure = null; // Whatever broke it is gone (device back, file fixed).
+        Assert.True(await registry.RetryAsync(WidgetIds.Media, Ct));
+        await WaitUntilAsync(() => broken.IsRunning && registry.Slots[0].Status.State == ComponentState.Healthy);
+        Assert.Equal(1, clock.Runs);
+        Assert.False(await registry.RetryAsync(WidgetIds.Media, Ct));
+    }
+
+    [Fact]
+    public async Task Try_again_does_nothing_while_disabled_paused_or_in_safe_mode()
+    {
+        var broken = new FakeWidget(WidgetIds.Media) { Failure = new InvalidOperationException("bug") };
+        using var host = CreateHost();
+        var registry = new WidgetRegistry(host, [broken], FastRetries);
+        registry.Register(Settings((WidgetIds.Media, true)));
+        host.StartAll();
+        await WaitUntilAsync(() => registry.Slots.Single().IsUnavailable);
+        var runs = broken.Runs;
+
+        await host.SetPausedAsync(true, Ct);
+        Assert.False(await registry.RetryAsync(WidgetIds.Media, Ct));
+        await host.SetPausedAsync(false, Ct);
+        await WaitUntilAsync(() => registry.Slots.Single().IsUnavailable);
+
+        await registry.ApplyAsync(Settings((WidgetIds.Media, false)), Ct);
+        Assert.False(await registry.RetryAsync(WidgetIds.Media, Ct));
+
+        var safe = new FakeWidget(WidgetIds.Clock) { Failure = new InvalidOperationException("bug") };
+        using var safeHost = CreateHost(new LaunchArguments(SafeMode: true, IgnoredCount: 0));
+        var safeRegistry = new WidgetRegistry(safeHost, [safe], FastRetries);
+        safeRegistry.Register(Settings((WidgetIds.Clock, true)));
+        safeHost.StartAll();
+        Assert.False(await safeRegistry.RetryAsync(WidgetIds.Clock, Ct));
+        Assert.Equal(0, safe.Runs);
+        Assert.True(broken.Runs >= runs);
+    }
+
+    [Fact]
     public async Task Pause_stops_widgets_resume_restarts_only_enabled_ones()
     {
         var clock = new FakeWidget(WidgetIds.Clock);
@@ -201,7 +250,7 @@ public sealed class WidgetRegistryTests : IDisposable
 
         public object? Snapshot => Volatile.Read(ref _snapshot);
 
-        public Exception? Failure { get; init; }
+        public Exception? Failure { get; set; }
 
         public int Runs { get; private set; }
 

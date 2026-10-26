@@ -98,6 +98,7 @@ public static class AppHost
             sp.GetRequiredService<TimeProvider>(),
             action => System.Windows.Application.Current.Dispatcher.BeginInvoke(action)));
         builder.Services.AddSingleton<IMotionGate, MotionGate>();
+        builder.Services.AddSingleton<PinMemory>();
         builder.Services.AddSingleton<IslandWindow>();
         builder.Services.AddSingleton<RestartService>();
         builder.Services.AddSingleton(sp => new ShortcutController(

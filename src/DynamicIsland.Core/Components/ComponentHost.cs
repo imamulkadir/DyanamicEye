@@ -196,6 +196,42 @@ public sealed class ComponentHost(
         }
     }
 
+    /// <summary>
+    /// Starts a component again after it <see cref="ComponentState.Failed"/> (the user's "Try again", ADR 0027). Ignored
+    /// unless it is enabled and failed, and the host is running and not paused.
+    /// </summary>
+    /// <returns><c>true</c> when it was restarted.</returns>
+    public async Task<bool> RetryAsync(string name, CancellationToken cancellationToken)
+    {
+        await _transitions.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            Entry? entry;
+            lock (_gate)
+            {
+                entry = _components.FirstOrDefault(c => c.Boundary.Name == name);
+                if (entry is null || !entry.Enabled || !_started || (_paused && entry.Optional))
+                {
+                    return false;
+                }
+            }
+
+            if (IsSkipped(entry) || entry.Boundary.Status.State != ComponentState.Failed)
+            {
+                return false;
+            }
+
+            // Failed is reported just before the run loop ends: let it finish, then start again.
+            await entry.Boundary.StopAsync(cancellationToken).ConfigureAwait(false);
+            entry.Boundary.Start();
+            return true;
+        }
+        finally
+        {
+            _transitions.Release();
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate)

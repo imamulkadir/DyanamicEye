@@ -14,12 +14,13 @@ internal static class TrayMenuDriver
     private const string TrayWindowTitle = "DynamicIsland.Tray";
     private const uint TrayIconId = 1;
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan ReopenAfter = TimeSpan.FromSeconds(2);
 
     /// <param name="path">AutomationIds from the top menu down; all but the last are submenus to expand.</param>
     public static async Task InvokeAsync(Process app, params string[] path)
     {
         var owner = await WaitForAsync(() => IslandWindowInterop.FindTopLevelWindow(app.Id, TrayWindowTitle), h => h != IntPtr.Zero, "tray owner window");
-        Win32TrayIcon.RequestContextMenu(owner, TrayIconId);
+        await OpenMenuAsync(app.Id, owner, path[0]);
 
         for (var i = 0; i < path.Length; i++)
         {
@@ -32,6 +33,29 @@ internal static class TrayMenuDriver
             else
             {
                 ((InvokePattern)item!.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Asks for the menu until its first item shows: a popup menu closes itself when the foreground changes (for example
+    /// the first-run window closing just before), which would otherwise leave the test waiting for a menu that is gone.
+    /// </summary>
+    private static async Task OpenMenuAsync(int processId, IntPtr owner, string firstItem)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < Timeout)
+        {
+            Win32TrayIcon.RequestContextMenu(owner, TrayIconId);
+            var attempt = Stopwatch.StartNew();
+            while (attempt.Elapsed < ReopenAfter)
+            {
+                if (Find(processId, firstItem) is not null)
+                {
+                    return;
+                }
+
+                await Task.Delay(100, TestContext.Current.CancellationToken);
             }
         }
     }

@@ -154,6 +154,10 @@ internal static partial class AppLog
         Message = "Backup export or restore failed in the settings window ({ErrorType})")]
     public static partial void BackupFailed(ILogger logger, string errorType);
 
+    [LoggerMessage(EventId = 1061, EventName = "PinNotSaved", Level = LogLevel.Warning,
+        Message = "The island's pin could not be saved ({ErrorType})")]
+    public static partial void PinNotSaved(ILogger logger, string errorType);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

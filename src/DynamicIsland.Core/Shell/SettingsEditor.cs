@@ -430,6 +430,9 @@ public sealed class SettingsEditor : INotifyPropertyChanged
                     Enabled = Pick(latest.Behavior.Shortcut.Enabled, saved.Behavior.Shortcut.Enabled, draft.Behavior.Shortcut.Enabled),
                     Keys = Pick(latest.Behavior.Shortcut.Keys, saved.Behavior.Shortcut.Keys, draft.Behavior.Shortcut.Keys),
                 },
+
+                // Not edited on a page: the island's pin button owns it.
+                Pinned = latest.Behavior.Pinned,
             },
             Widgets = SameList(draft.Widgets, saved.Widgets, EqualityComparer<WidgetSetting>.Default) ? latest.Widgets : draft.Widgets,
         };

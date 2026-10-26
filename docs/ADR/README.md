@@ -56,5 +56,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0024 — Backup, export and import](0024-backup-export-import.md) — Accepted (P04-07)
 - [0025 — Tabbed expanded island](0025-tabbed-expanded-island.md) — Accepted (owner request; amends 0018 §6, 0022 §5)
 - [0026 — Theme tokens, light/dark island and safe size](0026-theme-tokens-and-safe-size.md) — Accepted (P05-01)
+- [0027 — Remembered pin and "Try again" for failed widgets](0027-pin-memory-and-widget-retry.md) — Accepted (P05-02)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

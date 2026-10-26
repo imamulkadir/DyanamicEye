@@ -46,6 +46,10 @@ public readonly record struct IslandSnapshot(IslandState State, IslandState Rest
 {
     public static IslandSnapshot Initial { get; } = new(IslandState.Collapsed, IslandState.Collapsed, PointerInside: false, FullscreenActive: false);
 
+    /// <summary>Pinned, or hidden for a while (fullscreen, pause, hide) and returning pinned.</summary>
+    public bool IsPinned => State == IslandState.Pinned
+        || (State is IslandState.Hidden or IslandState.Paused or IslandState.SuspendedFullscreen && RestoreState == IslandState.Pinned);
+
     public bool IsVisible => State is IslandState.Collapsed or IslandState.Peek or IslandState.Expanded or IslandState.Pinned;
 }
 

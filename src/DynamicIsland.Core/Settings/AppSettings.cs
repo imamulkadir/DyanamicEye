@@ -80,6 +80,9 @@ public sealed record BehaviorSettings
     /// <summary>Optional global shortcut (ADR 0017). Added without a schema bump (ADR 0003 §7).</summary>
     public ShortcutSettings Shortcut { get; init; } = new();
 
+    /// <summary>The island was pinned open when last used; restored at start (P05-02, ADR 0027). No schema bump.</summary>
+    public bool Pinned { get; init; }
+
     /// <summary>Value equality including the exceptions list (records compare lists by reference otherwise).</summary>
     public bool Equals(BehaviorSettings? other) =>
         other is not null
@@ -87,9 +90,10 @@ public sealed record BehaviorSettings
         && HoverPreviewDelayMs == other.HoverPreviewDelayMs
         && AutoHideInFullscreen == other.AutoHideInFullscreen
         && (FullscreenExceptions ?? []).SequenceEqual(other.FullscreenExceptions ?? [], StringComparer.OrdinalIgnoreCase)
-        && Equals(Shortcut, other.Shortcut);
+        && Equals(Shortcut, other.Shortcut)
+        && Pinned == other.Pinned;
 
-    public override int GetHashCode() => HashCode.Combine(HoverPreviewEnabled, HoverPreviewDelayMs, AutoHideInFullscreen, FullscreenExceptions?.Count ?? 0, Shortcut);
+    public override int GetHashCode() => HashCode.Combine(HoverPreviewEnabled, HoverPreviewDelayMs, AutoHideInFullscreen, FullscreenExceptions?.Count ?? 0, Shortcut, Pinned);
 }
 
 public sealed record ShortcutSettings

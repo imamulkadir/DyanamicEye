@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P05-01 (theme tokens, light/dark island, safe size) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. G04 automated evidence PASS on CI. G02/G03/P04 manual rows are still owed by the owner.
-- **Active task status:** P05-01 + stats fix committed as `6edc4a6`; CI run 40354693505 **success**. Uncommitted: title removal + scroll-flash fix (owner requests).
+- **Active task:** P05-02 (remembered pin, "Try again" for failed widgets) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. P05-01 committed. G02/G03/P04/P05 manual rows are still owed by the owner.
+- **Active task status:** P05-02 **uncommitted**. Title removal + scroll fix committed as `d5ba82b`; CI run 40356940917 **success** (650/650, 659/659, 0 skipped).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -26,8 +26,8 @@
 - **Last updated:** 2026-10-26 (P05-01 IMPLEMENTED_AWAITING_VALIDATION; next: owner commit, CI, then P05-02)
 
 ## NEXT ACTION (ONE task only)
-**Owner:** review and commit the title removal + scroll-flash fix (file list in the newest RECENT VERIFIED CHANGES entry), push, and check that CI is green. TH1–TH3 in `docs/TEST_MATRIX.md` are quick manual checks (Light/Dark, follow Windows, 200 % on a laptop).
-**Then agent:** **P05-02** (guide §5 P05: persist reorder/pin/preferences; widget configuration errors recover; update UI without full shell recreation). Start by checking what already persists (widget order/enabled in settings, ADR 0003/0018; pin is session-only) and list only the gaps.
+**Owner:** review and commit P05-02 (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. PN1–PN2 in `docs/TEST_MATRIX.md` are quick manual checks.
+**Then agent:** **P05-03** (guide §5 P05: keyboard-only flow, focus indicators, AutomationProperties, screen reader check, high contrast, reduced motion, minimum touch targets). Start with an audit of what exists (focus rings, UIA names, reduced motion are partly done; high contrast is open per ADR 0026 §6) and fix only the gaps.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -38,7 +38,7 @@
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
-| P05 — Customization/performance | P05-01…P05-04 | IN_PROGRESS (01 IMPLEMENTED_AWAITING_VALIDATION) | G05 pending |
+| P05 — Customization/performance | P05-01…P05-04 | IN_PROGRESS (01–02 IMPLEMENTED_AWAITING_VALIDATION) | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
@@ -52,6 +52,19 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **P05-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0027**.
+  - Audit: widget order/on-off, appearance and behavior already persist and apply without recreating the island; widget settings errors already recover on load (`NormalizeWidgets`). Gaps fixed: the pin was session-only; a Failed widget needed Settings off/on or a restart.
+  - **Core:** `BehaviorSettings.Pinned` (+ equality); `SettingsEditor` merge keeps the latest pin; `IslandSnapshot.IsPinned` (pinned, or hidden and returning pinned); `IIslandStateMachine.IsPinned` (default member; the real machine uses the snapshot); `ComponentHost.RetryAsync` (only enabled + Failed + not running + started + not paused + not Safe Mode); `WidgetRegistry.RetryAsync`.
+  - **App:** new `PinMemory` (restores at start, saves pin/unpin in order, logs `PinNotSaved` 1061 by type); registered in `AppHost`, started in `App.xaml.cs` after the presenter. `NotchView`: failed tab note has a **Try again** button (`Retry.<id>`) raising `RetryRequested`; `WidgetPresenter.Retry`.
+  - **Tests:** unit `IslandStateMachineTests.Pin_survives_hiding_but_not_unpinning_or_escape` (8 cases), `WidgetRegistryTests.Try_again_restarts_only_a_failed_enabled_widget` and `..._does_nothing_while_disabled_paused_or_in_safe_mode`, `SettingsEditorTests` merge keeps the pin; integration `PinMemoryTests` (restore, save/no save on hide and fullscreen, Escape, failed save then retry; found and fixed out-of-order saves), `WidgetPanelTests.A_failed_widgets_tab_offers_try_again`; smoke `PinSmokeTests` (real app starts pinned from settings, UIA Toggle unpins, `settings.json` saved `pinned: false`, exit 0).
+  - **First full run found 2 failures (Debug, one per run):**
+    - `Try_again_restarts_only_a_failed_enabled_widget`: `RetryAsync` returned false because Failed is reported just before the run loop ends (`IsRunning` still true). Product race too (a very quick click). Fix: `ComponentHost.RetryAsync` waits for the failed loop to end (`StopAsync`) and then starts it. Then 8/8 repeats green.
+    - `TrayActionSmokeTests.Pause_hides_the_island_and_resume_brings_it_back`: "Timed out waiting for menu item Tray.TogglePause" (cleanup then hit a locked `islands.db-shm` because the app was still running). Not reproduced in 3 repeats. Likely cause: a popup menu closes itself when the foreground changes (the first-run window closing just before). Test-driver fix: `TrayMenuDriver` asks for the menu again if its first item has not appeared within 2 s (up to 10 s). Tray smoke 7/7 ×2 after.
+  - **Changed files:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (PN1–PN2), `docs/WORK_LOG.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Components/ComponentHost.cs`, `src/DynamicIsland.Core/Settings/AppSettings.cs`, `src/DynamicIsland.Core/Shell/{IslandStateMachine.cs, IslandStates.cs, SettingsEditor.cs}`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `tests/DynamicIsland.IntegrationTests/WidgetPanelTests.cs`, `tests/DynamicIsland.UnitTests/Shell/{IslandStateMachineTests.cs, SettingsEditorTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/WidgetRegistryTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/TrayMenuDriver.cs`
+    - new: `docs/ADR/0027-pin-memory-and-widget-retry.md`, `src/DynamicIsland.App/PinMemory.cs`, `tests/DynamicIsland.IntegrationTests/PinMemoryTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/PinSmokeTests.cs`
+    - Suggested commit message: `feat: remember the pin and retry failed widgets (P05-02, ADR 0027)`
+- 2026-10-26 Title removal + scroll fix committed by the owner as `d5ba82b`; CI run 40356940917 **success**: Release 650/650, Debug 659/659, 0 skipped.
 - 2026-10-26 P05-01 + system-stats tab fix committed by the owner as `6edc4a6`; CI run 40354693505 **success**: Release 648/648, Debug 657/657, 0 skipped.
 - 2026-10-26 **Owner requests: no "Dynamic Island" title; scroll bar flashed when switching to the Clock tab — fixed** (uncommitted, with P05-01).
   - Title removed: `NotchView.xaml` expanded panel is one row (tabs left, pin right; pin 30×30 to match the tabs), then the selected widget. With one widget the tabs hide and the pin stays.
@@ -103,41 +116,6 @@
     - modified: `docs/ADR/{0018-widget-registry.md, 0022-volume-widget-and-content-sized-island.md, README.md}`, `docs/TEST_MATRIX.md` (TB1–TB3), `src/DynamicIsland.App/{IslandWindow.xaml.cs, NotchView.xaml, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `tests/DynamicIsland.IntegrationTests/{VolumeAndLayoutTests.cs, WidgetPanelTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/WidgetRegistryTests.cs`
     - new: `docs/ADR/0025-tabbed-expanded-island.md`
     - Suggested combined commit message: `feat: backup and restore (P04-07, ADR 0024); one widget per tab in the island (ADR 0025)`
-- 2026-10-26 **P04-07 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0024**.
-  - **Core:** new `PersonalData/DataBackup.cs` (`IDataBackupService` (guide §3), `BackupPreview`, `BackupProblem`, `BackupExportResult`).
-  - **Infrastructure:** new `PersonalData/DataBackupService.cs`.
-    - **Export:** a ZIP containing `manifest.json` (format, version, createdUtc, appVersion, schemas, counts, size and SHA-256 per file), `settings.json`, and `islands.db` made with the SQLite **online backup API** (busy timeout plus retry). Written to a temporary file, then moved; never overwrites.
-    - **Preview** (dry run into `data\restore-staging\<id>`) refuses with a reason:
-      - not a ZIP;
-      - manifest problems;
-      - unknown, duplicate or missing entries (e.g. `../evil.dll`);
-      - an entry over 64 MB or a total over 256 MB (counted while unpacking, so a lying header cannot fool it);
-      - a size or SHA-256 mismatch;
-      - bad settings JSON or a database failing `quick_check`;
-      - a newer settings or data schema.
-    - **Schedule** → `data\restore-pending`.
-    - **`ApplyPendingRestore`** at startup: current files move to `rollback-<UTC>` (newest 3 kept), then the restored files move in. On failure everything is moved back and the pending folder is kept.
-    - Logs 3110–3114 carry no text or paths.
-  - **App:**
-    - `App.xaml.cs` applies a pending restore before settings or the database are opened.
-    - `AppHost` registers `IDataBackupService`.
-    - Settings → Privacy → "Back up and restore": Export backup… (save dialog), Restore from backup… (open dialog → preview summary → OK → restart through `RestartService`), and a status line.
-    - `AppLog` 1060 BackupFailed. `SettingsWindowContext` gains `Backup` and `Restart`.
-  - **Bugs found by the tests:**
-    - (1) A non-ZIP file stayed **locked** after a refused preview, because the FileStream leaked. Fixed.
-    - (2) Export intermittently failed with "database is locked": the backup step only waits with a busy handler. Fixed with `busy_timeout` and a retry; unit tests passed 4×.
-  - **Tests:**
-    - Unit: `PersonalData/DataBackupServiceTests.cs` (12):
-      - export contents and checksums while the store is open; no overwrite;
-      - full round trip with a rollback copy; a failed apply keeps the previous data;
-      - tampering, a newer version and five broken-archive kinds;
-      - a 65 MB ZIP bomb is refused without unpacking.
-    - Smoke (Debug): `RestoreSmokeTests` (the real app applies a pending restore at startup and keeps the old database in the rollback folder).
-  - **Changed files for the owner:**
-    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (BK1–BK5), `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs}`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`
-    - new: `docs/ADR/0024-backup-export-import.md`, `src/DynamicIsland.Core/PersonalData/DataBackup.cs`, `src/DynamicIsland.Infrastructure/PersonalData/DataBackupService.cs`, `tests/DynamicIsland.UnitTests/PersonalData/DataBackupServiceTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/RestoreSmokeTests.cs`
-    - Suggested commit message: `feat(data): backup export and verified restore with rollback (P04-07, ADR 0024)`
-- 2026-10-26 P04-06 committed by the owner as `c2bb883`; CI run 40325111433 **success**: Release 607/607, Debug 614/614, 0 skipped (covers the Debug and smoke runs owed for P04-06).
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -146,6 +124,9 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | P05-02 | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | **2 FAILs → fixed** | Release 664/664 ×2; Debug 673/674 ×2: `Try_again_restarts_only_a_failed_enabled_widget` (retry race, product fix) and `TrayActionSmokeTests.Pause…` (menu closed early, driver fix) |
+| 2026-10-26 | P05-02 fixes | same | Rebuild, then the full suite Release ×2 and Debug ×2 | PASS | Release 664/664 ×2, Debug 674/674 ×2, **0 skipped** |
+| 2026-10-26 | title + scroll fix | GitHub Actions `windows-2025` (`d5ba82b`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40356940917; 650/650 and 659/659, 0 skipped |
 | 2026-10-26 | title + scroll fix | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 650/650 ×2, Debug 659/659 ×2, **0 skipped** |
 | 2026-10-26 | P05-01 + stats fix | GitHub Actions `windows-2025` (`6edc4a6`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40354693505 |
 | 2026-10-26 | stats tab fix | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 648/648 ×2, Debug 657/657 ×2, **0 skipped** (P05-01 + stats fix together) |

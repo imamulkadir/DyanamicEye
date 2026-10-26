@@ -178,9 +178,11 @@ public sealed class SettingsEditorTests
         {
             General = new GeneralSettings { PreferredMonitorId = "left-id", StartWithWindows = ConsentState.Granted },
             Appearance = new AppearanceSettings { VerticalOffset = 8 },
+            Behavior = new BehaviorSettings { Pinned = true }, // ...and the user pinned the island (ADR 0027).
         };
 
         var result = editor.ApplyTo(latest);
+        Assert.True(result.Behavior.Pinned);
 
         Assert.Equal(ThemeMode.Light, result.Appearance.Theme);
         Assert.Equal("left-id", result.General.PreferredMonitorId);

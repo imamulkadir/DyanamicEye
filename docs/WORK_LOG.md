@@ -2,6 +2,43 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-26 (P04-06 commit, P04-07 implementation)
+- 2026-10-26 **P04-07 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0024**.
+  - **Core:** new `PersonalData/DataBackup.cs` (`IDataBackupService` (guide §3), `BackupPreview`, `BackupProblem`, `BackupExportResult`).
+  - **Infrastructure:** new `PersonalData/DataBackupService.cs`.
+    - **Export:** a ZIP containing `manifest.json` (format, version, createdUtc, appVersion, schemas, counts, size and SHA-256 per file), `settings.json`, and `islands.db` made with the SQLite **online backup API** (busy timeout plus retry). Written to a temporary file, then moved; never overwrites.
+    - **Preview** (dry run into `data\restore-staging\<id>`) refuses with a reason:
+      - not a ZIP;
+      - manifest problems;
+      - unknown, duplicate or missing entries (e.g. `../evil.dll`);
+      - an entry over 64 MB or a total over 256 MB (counted while unpacking, so a lying header cannot fool it);
+      - a size or SHA-256 mismatch;
+      - bad settings JSON or a database failing `quick_check`;
+      - a newer settings or data schema.
+    - **Schedule** → `data\restore-pending`.
+    - **`ApplyPendingRestore`** at startup: current files move to `rollback-<UTC>` (newest 3 kept), then the restored files move in. On failure everything is moved back and the pending folder is kept.
+    - Logs 3110–3114 carry no text or paths.
+  - **App:**
+    - `App.xaml.cs` applies a pending restore before settings or the database are opened.
+    - `AppHost` registers `IDataBackupService`.
+    - Settings → Privacy → "Back up and restore": Export backup… (save dialog), Restore from backup… (open dialog → preview summary → OK → restart through `RestartService`), and a status line.
+    - `AppLog` 1060 BackupFailed. `SettingsWindowContext` gains `Backup` and `Restart`.
+  - **Bugs found by the tests:**
+    - (1) A non-ZIP file stayed **locked** after a refused preview, because the FileStream leaked. Fixed.
+    - (2) Export intermittently failed with "database is locked": the backup step only waits with a busy handler. Fixed with `busy_timeout` and a retry; unit tests passed 4×.
+  - **Tests:**
+    - Unit: `PersonalData/DataBackupServiceTests.cs` (12):
+      - export contents and checksums while the store is open; no overwrite;
+      - full round trip with a rollback copy; a failed apply keeps the previous data;
+      - tampering, a newer version and five broken-archive kinds;
+      - a 65 MB ZIP bomb is refused without unpacking.
+    - Smoke (Debug): `RestoreSmokeTests` (the real app applies a pending restore at startup and keeps the old database in the rollback folder).
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (BK1–BK5), `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs}`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`
+    - new: `docs/ADR/0024-backup-export-import.md`, `src/DynamicIsland.Core/PersonalData/DataBackup.cs`, `src/DynamicIsland.Infrastructure/PersonalData/DataBackupService.cs`, `tests/DynamicIsland.UnitTests/PersonalData/DataBackupServiceTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/RestoreSmokeTests.cs`
+    - Suggested commit message: `feat(data): backup export and verified restore with rollback (P04-07, ADR 0024)`
+- 2026-10-26 P04-06 committed by the owner as `c2bb883`; CI run 40325111433 **success**: Release 607/607, Debug 614/614, 0 skipped (covers the Debug and smoke runs owed for P04-06).
+
 ## Archived 2026-10-26 (Microsoft.Data.Sqlite approval)
 - 2026-10-26 **Owner approval:** `Microsoft.Data.Sqlite` was proposed with "Do you approve adding it?"; the reply "pushed, continue" is recorded as **approval of that dependency** (ADR 0023 §1).
 

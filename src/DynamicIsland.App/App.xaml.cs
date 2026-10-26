@@ -133,6 +133,7 @@ public partial class App : Application
         _host.Services.GetRequiredService<Core.Widgets.WidgetRegistry>().Register(settingsService.Current.Widgets);
         components.StartAll();
         _host.Services.GetRequiredService<WidgetPresenter>().Start();
+        _host.Services.GetRequiredService<PinMemory>().Start(); // Restores the pin from the last session (ADR 0027).
 
         // Tray "Pause" also pauses optional background work (ADR 0013).
         _host.Services.GetRequiredService<IIslandStateMachine>().StateChanged += async (_, e) =>

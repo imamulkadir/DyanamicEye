@@ -122,6 +122,18 @@ public sealed class IslandTransitionScenarioTests
         Assert.Equal(Pinned, Run(TogglePin, Hide, Show).State);
     }
 
+    [Theory]
+    [InlineData(new[] { TogglePin }, true)]
+    [InlineData(new[] { TogglePin, Hide }, true)] // Hidden for a while: still pinned.
+    [InlineData(new[] { TogglePin, FullscreenStarted }, true)]
+    [InlineData(new[] { TogglePin, Pause }, true)]
+    [InlineData(new[] { TogglePin, TogglePin }, false)]
+    [InlineData(new[] { TogglePin, Escape }, false)]
+    [InlineData(new[] { Click }, false)]
+    [InlineData(new[] { Click, Hide }, false)]
+    public void Pin_survives_hiding_but_not_unpinning_or_escape(IslandInput[] inputs, bool pinned) =>
+        Assert.Equal(pinned, Run(inputs).IsPinned);
+
     private static IslandSnapshot Run(params IslandInput[] inputs) =>
         inputs.Aggregate(IslandSnapshot.Initial, IslandTransitions.Next);
 }

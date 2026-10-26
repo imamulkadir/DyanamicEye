@@ -134,6 +134,18 @@ public sealed class WidgetRegistry : IDisposable
 
     public static string ComponentName(string widgetId) => "widget-" + widgetId;
 
+    /// <summary>Restarts a widget that failed (the user's "Try again" on its tab, ADR 0027).</summary>
+    public async Task<bool> RetryAsync(string widgetId, CancellationToken cancellationToken)
+    {
+        var restarted = await _host.RetryAsync(ComponentName(widgetId), cancellationToken).ConfigureAwait(false);
+        if (restarted)
+        {
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+
+        return restarted;
+    }
+
     /// <summary>Registers every widget as an optional component (call before <see cref="ComponentHost.StartAll"/>).</summary>
     public void Register(IReadOnlyList<WidgetSetting> settings)
     {

@@ -19,7 +19,7 @@ public sealed partial class SqlitePersonalDataStore : IPersonalDataStore, IDispo
     private const int SqliteCorrupt = 11;
     private const int SqliteNotADatabase = 26;
 
-    private static readonly string[] Migrations =
+    internal static readonly string[] DefaultMigrations =
     [
         // v0 → v1
         """
@@ -40,6 +40,7 @@ public sealed partial class SqlitePersonalDataStore : IPersonalDataStore, IDispo
     ];
 
     private readonly string _directory;
+    private readonly IReadOnlyList<string> _migrations;
     private readonly TimeProvider _time;
     private readonly ILogger<SqlitePersonalDataStore> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -47,9 +48,17 @@ public sealed partial class SqlitePersonalDataStore : IPersonalDataStore, IDispo
     private bool _readOnly;
 
     public SqlitePersonalDataStore(string dataDirectory, TimeProvider time, ILogger<SqlitePersonalDataStore> logger)
+        : this(dataDirectory, time, logger, DefaultMigrations)
+    {
+    }
+
+    /// <summary>Tests rehearse a future schema with extra migrations (entry <c>v</c> upgrades version v to v + 1).</summary>
+    internal SqlitePersonalDataStore(string dataDirectory, TimeProvider time, ILogger<SqlitePersonalDataStore> logger, IReadOnlyList<string> migrations)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
+        ArgumentOutOfRangeException.ThrowIfLessThan(migrations.Count, CurrentSchemaVersion);
         _directory = dataDirectory;
+        _migrations = migrations;
         _time = time;
         _logger = logger;
     }
@@ -299,11 +308,12 @@ public sealed partial class SqlitePersonalDataStore : IPersonalDataStore, IDispo
             }
 
             var version = Count(connection, "PRAGMA user_version;");
-            if (version > CurrentSchemaVersion)
+            var target = _migrations.Count;
+            if (version > target)
             {
                 // Written by a newer version: never downgrade or overwrite (like settings, ADR 0003).
                 Volatile.Write(ref _readOnly, true);
-                StoreLog.NewerSchemaReadOnly(_logger, version, CurrentSchemaVersion);
+                StoreLog.NewerSchemaReadOnly(_logger, version, target);
                 builder.Mode = SqliteOpenMode.ReadOnly;
             }
             else
@@ -314,10 +324,10 @@ public sealed partial class SqlitePersonalDataStore : IPersonalDataStore, IDispo
                     wal.ExecuteNonQuery();
                 }
 
-                for (var v = version; v < CurrentSchemaVersion; v++)
+                for (var v = version; v < target; v++)
                 {
                     using var transaction = connection.BeginTransaction();
-                    using (var migrate = Command(connection, transaction, Migrations[v]))
+                    using (var migrate = Command(connection, transaction, _migrations[v]))
                     {
                         migrate.ExecuteNonQuery();
                     }

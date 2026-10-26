@@ -134,13 +134,22 @@ Automated coverage (CI + dev host): placement, click-through, UIA expand/pin/col
 | BK3 | Cancel and refusals | Restore → Cancel; then pick a random ZIP, a renamed text file, and a backup edited in a ZIP tool | Cancel changes nothing; the others are refused with a short reason and nothing changes | NOT_RUN (automated) |
 | BK4 | Newer version | Restore a backup made by a newer Dynamic Island (or ask the developer for one) | Refused: "made by a newer version"; nothing changes | NOT_RUN (automated) |
 | BK5 | Privacy | Open the backup ZIP | Only `manifest.json`, `settings.json`, `islands.db`; the manifest has counts and checksums but no note or task text and no paths | NOT_RUN (automated) |
-| TB1 | Widget tabs (ADR 0025) | Expand the island; click each icon tab | One widget at a time; the selected tab is green; the island grows or shrinks to fit that widget; the small top time hides only on the clock tab | NOT_RUN (automated) |
+| TB1 | Widget tabs (ADR 0025) | Start the app, expand the island; click each icon tab | The first tab in your widget order is shown first (not whichever widget loaded first); one widget at a time; the selected tab is green; the island grows or shrinks to fit that widget; the small top time hides only on the clock tab | NOT_RUN (automated) |
 | TB2 | Keyboard | Expand, Tab to the tab row, use Left/Right; then Ctrl+Tab and Ctrl+Shift+Tab from inside a widget | Arrow keys move between tabs; Ctrl+Tab cycles forward and wraps; focus rings visible; Narrator reads each tab's name | NOT_RUN (cycling automated) |
 | TB3 | Turning widgets off | Select the Stats tab; Settings → Widgets: untick System stats, Save; then turn off all but one widget | The selection moves to the first tab; with one widget left the tab row disappears | NOT_RUN (automated) |
 | SC1 | Global shortcut (P03-05) | Settings → Behavior → tick "Open and close the island with a global shortcut", keep Ctrl+Alt+I, Save; in another app press Ctrl+Alt+I twice | The status says On; the first press opens the island with keyboard focus on it (Tab reaches the pin button); the second closes it and returns focus to the app | NOT_RUN (automated with a posted WM_HOTKEY) |
 | SC2 | Conflict | Pick a shortcut another running app already registered (or one Windows owns, e.g. Ctrl+Alt+Del is refused as invalid; try Shift+Win+S), Save | The status explains the shortcut is used by another app or Windows; nothing else changes | NOT_RUN (automated with a second registration) |
 | SC3 | Validation and off | Type `Ctrl+C`, then `Alt+F`, then clear the box; then untick the option and Save | Each shows a message and Save is greyed out; when turned off, the status says Off and Ctrl+Alt+I does nothing | NOT_RUN (automated in unit tests) |
 | SC4 | Hidden, paused, fullscreen | Hide the island from the tray and press the shortcut; Pause and press it; start a fullscreen video and press it | Hidden and paused: the island comes back expanded. Fullscreen: nothing appears over the video | NOT_RUN (action unit-tested) |
+
+## G04 — Core widgets and data (automated evidence)
+| # | Guide G04 requirement | Evidence | Status |
+|---|---|---|---|
+| G4-1 | All core widgets work without internet | No widget or store uses the network (ADRs 0019–0024); all widget tests run offline with local fakes or local Windows APIs | PASS (automated) |
+| G4-2 | Survive 100 restarts | `RestartSmokeTests` (Debug): 100 start/exit cycles of the real app on one data folder; each exits 0, notes/tasks and `settings.json` byte-identical, no corrupt or temp files; logs show no Failed widget, no error and no unclean session | PASS (automated) |
+| G4-3 | Update-shaped migrations | Settings: `Legacy_v0_fixture_is_backed_up_migrated_and_saved`, failed migration read-only. Data: `Update_shaped_migration_keeps_notes_and_tasks` (v1 → rehearsal v2, then the older build opens it read-only) and `Failed_update_migration_rolls_back_and_keeps_data` | PASS (automated) |
+| G4-4 | One failing widget never crashes others | `WidgetRegistryTests` failure isolation; failed widget's tab shows a note (`WidgetPanelTests`) | PASS (automated) |
+| G4-5 | Real hardware | Rows MD, SM, VO, NT, BK, TB above | Owed by the owner |
 
 ## G01 — Reliability (all automated; recorded for completeness)
 | # | Scenario | Status |

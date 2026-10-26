@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P04-01…P04-07 are all IMPLEMENTED_AWAITING_VALIDATION. Next is the **G04 gate evidence** (a 100-restart test and an update-shaped migration test), then the owner's manual rows. G02/G03 manual rows are still owed by the owner.
-- **Active task status:** P04-07 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-06 is committed as `c2bb883`; CI 40325111433 is green with 0 skipped and covered the Debug and smoke runs owed for P04-06.
+- **Active task:** G04 gate evidence done locally (100-restart smoke test, update-shaped migration tests) plus a tab-selection race fix; awaiting the owner's commit and CI. Then P05-01. G02/G03/P04 manual rows are still owed by the owner.
+- **Active task status:** G04 evidence **uncommitted** (the owner commits). P04-07 + tabs are committed as `b1165d1`; its CI run 40335768082 **failed** (1 integration test, a tab-selection race), fixed in this change.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,24 +23,11 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P04-07 IMPLEMENTED_AWAITING_VALIDATION; next: G04 evidence)
+- **Last updated:** 2026-10-26 (G04 evidence + tab race fix; next: owner commit, CI, then P05-01)
 
 ## NEXT ACTION (ONE task only)
-**Owner:** review and commit P04-07 and the tabbed island (both file lists in RECENT VERIFIED CHANGES; one commit is fine), push, and check that CI is green. TB1–TB3 are quick manual checks.
-**Then agent: G04 gate evidence** (guide §5 G04: "all core widgets work without internet, survive 100 restarts and update-shaped migrations in tests; one failing widget never crashes others"). Two pieces are missing:
-1. A **100-restart** test: in Debug smoke, start and exit the real app 100 times on one isolated data folder, asserting each time that:
-   - the exit code is 0;
-   - notes and tasks are unchanged;
-   - settings are intact;
-   - no corrupt files appeared;
-   - widget status is Healthy or Degraded, never Failed.
-   Keep it fast (no fixed sleeps) and consider gating it to CI/nightly if it takes over about 3 minutes.
-2. An **update-shaped migration** test: a v0 database or an older settings file, the current build migrates it, and data is preserved. Add a schema-v2 rehearsal migration only in tests if needed.
-3. Already covered:
-   - "Without internet": no widget uses the network (documented by tests and the ADRs).
-   - "One failing widget never crashes others": the registry tests.
-
-Record G04 as automated PASS, with real-hardware rows owed to the owner (MD, SM, VO, NT, BK).
+**Owner:** review and commit the G04 evidence + tab-selection fix (file list in RECENT VERIFIED CHANGES), push, and check that CI is green (CI run 40335768082 on `b1165d1` **failed** on the tab race this fixes). Note the new 100-restart smoke test adds about 2–4 minutes to the Debug CI job.
+**Then agent:** if CI is green, record **G04 automated PASS** with the CI run, then start **P05-01** (guide §5 P05: theme tokens/colors, radius/size/opacity/placement, visual hierarchy; min/max safe dimensions). Real-hardware rows MD, SM, VO, NT, BK, TB (and G02/G03) stay owed by the owner.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -50,7 +37,7 @@ Record G04 as automated PASS, with real-hardware rows owed to the owner (MD, SM,
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
-| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–07 IMPLEMENTED_AWAITING_VALIDATION; G04 evidence next; started with owner approval while G02/G03 are open) | G04 pending |
+| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–07 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02/G03 are open) | **G04 automated evidence PASS locally** (2026-10-26; `TEST_MATRIX.md` G04); awaiting CI; hardware rows owed |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
@@ -65,6 +52,16 @@ Record G04 as automated PASS, with real-hardware rows owed to the owner (MD, SM,
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **G04 gate evidence + tab-selection fix** (uncommitted; the owner commits).
+  - **Tab race (CI run 40335768082 failure):** `ClockWidgetPresenterTests` failed on CI with "Sequence contains no elements": another widget published before the clock, became the automatic selection and kept it, so the clock view was not shown. Product bug too: the island could open on whichever widget loaded first. Fix in `NotchView`: only a tab the **user** picks (click, arrows, Ctrl+Tab, `SelectWidget`) sticks; otherwise the first tab in the user's order is shown; a pick is forgotten when its widget disappears. ADR 0025 §3 amended. New test `Until_the_user_picks_a_tab_the_first_tab_in_order_is_shown` (fails on the old code: the automatic pick stayed on "system").
+  - **100 restarts:** new `tests/DynamicIsland.WindowsSmokeTests/RestartSmokeTests.cs` (Debug only, isolated data folder): seeds settings (consents answered, so no first-run window) and notes/tasks, then starts and closes the real app 100 times. Each run: exit 0, notes/tasks unchanged, `settings.json` byte-identical, no `*corrupt*` or temp files. Afterwards the logs must show no Failed widget, no Error/Critical entry and no `PreviousSessionUnclean`, and the clock widget reported Healthy. 1 m 45 s locally.
+  - **Update-shaped migrations:** `SqlitePersonalDataStore` has an internal constructor taking the migration list (`DefaultMigrations` is internal); ADR 0023 consequence added. New unit tests: `Update_shaped_migration_keeps_notes_and_tasks` (v1 data → rehearsal v2 adds a column and table, data kept, writable; then the current build opens it read-only) and `Failed_update_migration_rolls_back_and_keeps_data` (user_version stays 1, no partial column, a fixed release then migrates). Settings migrations were already covered (`JsonSettingsStoreTests` legacy v0 fixture, failed migration read-only).
+  - `docs/TEST_MATRIX.md`: new **G04** section (G4-1…G4-5); TB1 expects the first tab in order on first open.
+  - **Changed files:**
+    - modified: `docs/ADR/0023-notes-and-tasks-storage.md`, `docs/ADR/0025-tabbed-expanded-island.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `docs/WORK_LOG.md`, `src/DynamicIsland.App/NotchView.xaml.cs`, `src/DynamicIsland.Infrastructure/PersonalData/SqlitePersonalDataStore.cs`, `tests/DynamicIsland.IntegrationTests/WidgetPanelTests.cs`, `tests/DynamicIsland.UnitTests/PersonalData/SqlitePersonalDataStoreTests.cs`
+    - new: `tests/DynamicIsland.WindowsSmokeTests/RestartSmokeTests.cs`
+    - Suggested commit message: `test: G04 evidence (100 restarts, update-shaped migrations); fix first tab selection race`
+- 2026-10-26 P04-07 + tabs committed by the owner as `b1165d1`; CI run 40335768082 **failure**: 1 integration test (`ClockWidgetPresenterTests.Notch_and_expanded_panel_show_the_clock_and_disabling_clears_them`, tab-selection race), unit and smoke passed. Fixed in the entry above.
 - 2026-10-26 **Owner request: tabbed expanded island — IMPLEMENTED_AWAITING_VALIDATION** (uncommitted). Decisions are in **ADR 0025**; ADR 0018 §6 and ADR 0022 §5 are amended.
   - The owner asked "why everything is shown at once? wasnt the plan to show in individual tabs?". The guide only says "click-to-expand dashboard"; the stacked layout was my reading of that (ADR 0018). Asked with 3 options, the owner chose **one widget per tab**.
   - **App:**
@@ -182,30 +179,6 @@ Record G04 as automated PASS, with real-hardware rows owed to the owner (MD, SM,
     - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (VO1–VO5), `src/DynamicIsland.App/{AppHost.cs, IslandWindow.xaml.cs, MediaView.cs, MetricsView.cs, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, MediaWidgetIntegrationTests.cs, MetricsIntegrationTests.cs, References/notch-expanded.png, References/notch-pinned.png}`, `tests/DynamicIsland.WindowsSmokeTests/IslandInteractionSmokeTests.cs`
     - new: `docs/ADR/0022-volume-widget-and-content-sized-island.md`, `src/DynamicIsland.App/{ClockView.cs, VolumeView.cs, WidgetView.cs}`, `src/DynamicIsland.Core/Audio/AudioContracts.cs`, `src/DynamicIsland.Platform.Windows/Audio/{CoreAudioInterop.cs, CoreAudioService.cs}`, `src/DynamicIsland.Widgets/VolumeWidget.cs`, `tests/DynamicIsland.IntegrationTests/{AssemblyInfo.cs, VolumeAndLayoutTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/VolumeWidgetTests.cs`
     - Suggested commit message: `feat(widgets): volume widget, persistent widget views and content-sized island (P04-05, ADR 0022)`
-- 2026-10-26 P04-04 committed by the owner as `5f13f25`; CI run 40310973120 **success**: Release 562/562, Debug 569/569, 0 skipped.
-- 2026-10-26 **P04-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0021**.
-  - **Core:**
-    - New `Metrics/SystemMetrics.cs`: `ISystemMetricsService`, `CpuTimes`, `MemoryStatus`, `BatteryStatus`, plus the pure helpers `CpuUsage.Between` and `MetricsFormat`.
-    - `IWidget.SetExpanded` (default no-op); `WidgetRegistry.SetExpanded`.
-    - `IslandLayout.Expanded` → 420×**252**.
-  - **Platform.Windows:** new `Metrics/Win32SystemMetrics.cs` (`GetSystemTimes`, `GlobalMemoryStatusEx`, `GetSystemPowerStatus` with no-battery/unknown handling, `Environment.TickCount64`); `NativeMethods` imports.
-  - **Widgets:** new `MetricsWidget` + `MetricsSnapshot`.
-    - Samples every 2 s **only while expanded and on screen**; none while collapsed, hidden or paused.
-    - On expanding it takes a baseline and shows CPU after 0.5 s ("—" before that).
-    - Resume resets the baseline; failed readings leave that value out.
-    - `BuiltInWidgets.Create(..., metrics)`.
-  - **App:**
-    - New `MetricsView` (tiles: CPU, memory used/total GB, battery with ⚡ only when a battery exists, up time; UIA names).
-    - Presenter forwards `SetExpanded` from the island state and registers the view; `AppHost` wiring.
-  - **Tests:**
-    - Unit: `Widgets/MetricsWidgetTests.cs` (math and format: 9 cases; cadence: 5).
-    - Integration: `MetricsIntegrationTests` (real Win32 readings are plausible; tiles with and without a battery).
-    - Visual references notch-expanded/pinned **regenerated** at 252 px; a 3-widget rendering was checked by eye.
-  - **Changed files for the owner:**
-    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (SM1–SM4), `docs/WORK_LOG.md` (older entries archived), `src/DynamicIsland.App/{AppHost.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Platform.Windows/NativeMethods.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, References/notch-expanded.png, References/notch-pinned.png}`
-    - new: `docs/ADR/0021-metrics-widget.md`, `src/DynamicIsland.App/MetricsView.cs`, `src/DynamicIsland.Core/Metrics/SystemMetrics.cs`, `src/DynamicIsland.Platform.Windows/Metrics/Win32SystemMetrics.cs`, `src/DynamicIsland.Widgets/MetricsWidget.cs`, `tests/DynamicIsland.IntegrationTests/MetricsIntegrationTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/MetricsWidgetTests.cs`
-    - Suggested commit message: `feat(widgets): system metrics widget sampling only while expanded (P04-04, ADR 0021)`
-- 2026-10-26 P04-03 committed by the owner as `179cef8`; CI run 40309259229 **success**: Release 545/545, Debug 552/552, 0 skipped.
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -214,6 +187,9 @@ Record G04 as automated PASS, with real-hardware rows owed to the owner (MD, SM,
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | G04 + tab fix | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 624/624 ×2, Debug 633/633 ×2, **0 skipped** (Debug includes the 100-restart smoke test) |
+| 2026-10-26 | G04 | same | `RestartSmokeTests` alone, Debug | PASS | 100 restarts in 1 m 45 s |
+| 2026-10-26 | P04-07 + tabs | GitHub Actions `windows-2025` (`b1165d1`) | CI workflow | **FAIL** | https://github.com/imamulkadir/DyanamicEye/actions/runs/40335768082: `ClockWidgetPresenterTests` (tab-selection race); fixed above |
 | 2026-10-26 | tabs | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 621/621 ×2, Debug 629/629 ×2, **0 skipped** |
 | 2026-10-26 | P04-07 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS (1 skipped) | Debug 627/627 ×2. Release 619/619 once, and 618 + **1 skipped** once (the fullscreen smoke test: Windows refused the helper window foreground; a skip, not a pass). |
 | 2026-10-26 | P04-06 | GitHub Actions `windows-2025` (`c2bb883`) | CI workflow (Release + Debug, including smoke) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40325111433; 607/607 and 614/614, 0 skipped. Closes the "NOT RUN" row below. |

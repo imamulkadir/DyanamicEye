@@ -18,8 +18,10 @@
    widget name as tooltip and UIA name, AutomationIds `Tab.<id>`. Radio semantics: the selected tab is highlighted
    (green, like the pin); Tab reaches the row once, arrow keys move between tabs; **Ctrl+Tab / Ctrl+Shift+Tab** switch
    tabs from anywhere in the expanded island, wrapping around.
-3. **Selection:** kept while that widget stays available (updates never change it); if its widget disappears (turned
-   off or no content), the first tab is selected. It is remembered for the session only (not saved).
+3. **Selection:** until the user picks a tab, the first tab in the user's order is shown, even when another widget
+   published content first (widgets start in any order; CI run 40335768082 showed an automatic pick sticking). A tab
+   the user picked (click, arrow keys, Ctrl+Tab) stays selected across updates while its widget exists; if that widget
+   disappears (turned off or no content), the pick is forgotten and the first tab is shown. Session only (not saved).
 4. **Work only for the visible tab:** `WidgetRegistry.SetExpanded(visibleWidgetId)` tells only the selected widget that
    its expanded view is on screen, so the system stats widget samples only while its tab is shown (ADR 0021).
 5. **Clock:** the notch's top-row time is hidden only while the clock tab is shown (ADR 0016/0019 "never twice").

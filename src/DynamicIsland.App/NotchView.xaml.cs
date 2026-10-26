@@ -20,6 +20,8 @@ public partial class NotchView : UserControl
     private bool _expanded;
     private bool _clockInPanel;
     private string? _selectedId;
+    private string? _chosenId; // The user's pick; an automatic pick never sticks.
+    private bool _selecting;
 
     public NotchView() => InitializeComponent();
 
@@ -41,7 +43,7 @@ public partial class NotchView : UserControl
     /// <summary>
     /// Shows one icon tab per enabled widget that has something to show (a failed widget's tab shows a short note), in
     /// the user's order, and the selected widget's view below them (ADR 0025). Tabs, views and notes are reused, so focus
-    /// and drags survive updates; the selection stays on the same widget while it exists.
+    /// and drags survive updates. A tab the user picked stays selected while its widget exists; otherwise the first tab is.
     /// </summary>
     public void ShowWidgets(IReadOnlyList<WidgetSlot> slots, Func<WidgetSlot, UIElement?> view)
     {
@@ -74,7 +76,12 @@ public partial class NotchView : UserControl
 
         // A single widget needs no tab strip.
         TabStrip.Visibility = ids.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
-        Select(_selectedId is not null && ids.Contains(_selectedId) ? _selectedId : ids.FirstOrDefault(), force: true);
+        if (_chosenId is not null && !ids.Contains(_chosenId))
+        {
+            _chosenId = null;
+        }
+
+        Select(_chosenId ?? ids.FirstOrDefault(), force: true);
     }
 
     /// <summary>The widget whose view is shown, or <c>null</c> when none has content.</summary>
@@ -88,7 +95,7 @@ public partial class NotchView : UserControl
     {
         if (_elements.ContainsKey(id))
         {
-            Select(id, force: false);
+            Choose(id);
         }
     }
 
@@ -102,8 +109,14 @@ public partial class NotchView : UserControl
         }
 
         var next = ids[(ids.IndexOf(_selectedId) + direction + ids.Count) % ids.Count];
-        Select(next, force: false);
+        Choose(next);
         _tabs[next].Focus();
+    }
+
+    private void Choose(string id)
+    {
+        _chosenId = id;
+        Select(id, force: false);
     }
 
     private void Select(string? id, bool force)
@@ -125,9 +138,17 @@ public partial class NotchView : UserControl
             }
         }
 
-        foreach (var (tabId, tab) in _tabs)
+        _selecting = true;
+        try
         {
-            tab.IsChecked = tabId == id;
+            foreach (var (tabId, tab) in _tabs)
+            {
+                tab.IsChecked = tabId == id;
+            }
+        }
+        finally
+        {
+            _selecting = false;
         }
 
         WidgetPlaceholder.Visibility = element is null ? Visibility.Visible : Visibility.Collapsed;
@@ -165,7 +186,13 @@ public partial class NotchView : UserControl
         };
         AutomationProperties.SetName(tab, label);
         AutomationProperties.SetAutomationId(tab, "Tab." + id);
-        tab.Checked += (_, _) => Select(id, force: false);
+        tab.Checked += (_, _) =>
+        {
+            if (!_selecting)
+            {
+                Choose(id);
+            }
+        };
         _tabs.Add(id, tab);
         return tab;
     }

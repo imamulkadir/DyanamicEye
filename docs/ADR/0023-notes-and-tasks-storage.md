@@ -48,3 +48,5 @@
 - P04-07 adds backup/export/import with checksums over this database.
 - Diagnostic reports never include the database (ADR 0007 already excludes the data folder contents).
 - Manual rows NT1–NT6 in `docs/TEST_MATRIX.md`.
+- G04: an internal constructor takes the migration list, so unit tests rehearse a future v1 → v2 update (and a failing
+  one that must roll back) without shipping a v2 schema.

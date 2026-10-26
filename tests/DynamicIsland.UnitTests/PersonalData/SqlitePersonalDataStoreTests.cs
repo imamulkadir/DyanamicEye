@@ -176,6 +176,52 @@ public sealed class SqlitePersonalDataStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Update_shaped_migration_keeps_notes_and_tasks()
+    {
+        await SeedCurrentVersionAsync();
+
+        // A later release adds a column and a table (rehearsal only: v2 does not exist in the product).
+        using (var updated = Create([.. SqlitePersonalDataStore.DefaultMigrations, RehearsalV2]))
+        {
+            Assert.Equal(["second note", "first note"], (await updated.GetNotesAsync(10, Ct)).Select(n => n.Text));
+            var tasks = await updated.GetTasksAsync(10, Ct);
+            Assert.Equal(["open task", "done task"], tasks.Select(t => t.Text));
+            Assert.NotNull(tasks[1].CompletedUtc);
+            Assert.Equal(PersonalDataResult.Saved, await updated.AddNoteAsync("after update", Ct));
+            Assert.False(updated.IsReadOnly);
+        }
+
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(2, await UserVersionAsync());
+        Assert.Equal(0, await ScalarAsync("SELECT COUNT(*) FROM tasks WHERE priority <> 0;"));
+
+        // Going back to this build after the update: readable, never overwritten.
+        using var rolledBack = Create();
+        Assert.Equal(3, await rolledBack.CountNotesAsync(Ct));
+        Assert.True(rolledBack.IsReadOnly);
+    }
+
+    [Fact]
+    public async Task Failed_update_migration_rolls_back_and_keeps_data()
+    {
+        await SeedCurrentVersionAsync();
+
+        using (var broken = Create([.. SqlitePersonalDataStore.DefaultMigrations, "ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0; INSERT INTO missing_table VALUES (1);"]))
+        {
+            await Assert.ThrowsAsync<SqliteException>(() => broken.CountNotesAsync(Ct));
+        }
+
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(1, await UserVersionAsync());
+        Assert.Equal(0, await ScalarAsync("SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name = 'priority';"));
+
+        // The fixed release then migrates the untouched data.
+        using var fixedRelease = Create([.. SqlitePersonalDataStore.DefaultMigrations, RehearsalV2]);
+        Assert.Equal(2, await fixedRelease.CountNotesAsync(Ct));
+        Assert.Equal((1, 1), await fixedRelease.CountTasksAsync(Ct));
+    }
+
+    [Fact]
     public async Task Bundled_sqlite_is_recent_enough()
     {
         using var store = Create();
@@ -188,7 +234,41 @@ public sealed class SqlitePersonalDataStoreTests : IDisposable
         Assert.True(version >= new Version(3, 45), $"SQLite {version}");
     }
 
+    private const string RehearsalV2 = """
+        ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;
+        CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+        """;
+
     private SqlitePersonalDataStore Create() => new(_folder, _time, NullLogger<SqlitePersonalDataStore>.Instance);
+
+    private SqlitePersonalDataStore Create(string[] migrations) => new(_folder, _time, NullLogger<SqlitePersonalDataStore>.Instance, migrations);
+
+    /// <summary>Two notes and two tasks (one done) written by the current build.</summary>
+    private async Task SeedCurrentVersionAsync()
+    {
+        using (var store = Create())
+        {
+            await store.AddNoteAsync("first note", Ct);
+            await store.AddNoteAsync("second note", Ct);
+            await store.AddTaskAsync("done task", Ct);
+            await store.AddTaskAsync("open task", Ct);
+            var done = (await store.GetTasksAsync(10, Ct)).Single(t => t.Text == "done task");
+            await store.SetTaskDoneAsync(done.Id, true, Ct);
+        }
+
+        SqliteConnection.ClearAllPools();
+    }
+
+    private Task<long> UserVersionAsync() => ScalarAsync("PRAGMA user_version;");
+
+    private async Task<long> ScalarAsync(string sql)
+    {
+        await using var connection = new SqliteConnection($"Data Source={Path.Combine(_folder, SqlitePersonalDataStore.FileName)};Mode=ReadOnly;Pooling=False");
+        await connection.OpenAsync(Ct);
+        var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return (long)(await command.ExecuteScalarAsync(Ct))!;
+    }
 
     /// <summary>Each reading is one second later, so timestamps are distinct and ordered.</summary>
     private sealed class SteppingTime : TimeProvider

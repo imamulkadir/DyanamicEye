@@ -2,6 +2,32 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-26 (P04-04, P04-03 commit line)
+- 2026-10-26 P04-04 committed by the owner as `5f13f25`; CI run 40310973120 **success**: Release 562/562, Debug 569/569, 0 skipped.
+- 2026-10-26 **P04-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0021**.
+  - **Core:**
+    - New `Metrics/SystemMetrics.cs`: `ISystemMetricsService`, `CpuTimes`, `MemoryStatus`, `BatteryStatus`, plus the pure helpers `CpuUsage.Between` and `MetricsFormat`.
+    - `IWidget.SetExpanded` (default no-op); `WidgetRegistry.SetExpanded`.
+    - `IslandLayout.Expanded` → 420×**252**.
+  - **Platform.Windows:** new `Metrics/Win32SystemMetrics.cs` (`GetSystemTimes`, `GlobalMemoryStatusEx`, `GetSystemPowerStatus` with no-battery/unknown handling, `Environment.TickCount64`); `NativeMethods` imports.
+  - **Widgets:** new `MetricsWidget` + `MetricsSnapshot`.
+    - Samples every 2 s **only while expanded and on screen**; none while collapsed, hidden or paused.
+    - On expanding it takes a baseline and shows CPU after 0.5 s ("—" before that).
+    - Resume resets the baseline; failed readings leave that value out.
+    - `BuiltInWidgets.Create(..., metrics)`.
+  - **App:**
+    - New `MetricsView` (tiles: CPU, memory used/total GB, battery with ⚡ only when a battery exists, up time; UIA names).
+    - Presenter forwards `SetExpanded` from the island state and registers the view; `AppHost` wiring.
+  - **Tests:**
+    - Unit: `Widgets/MetricsWidgetTests.cs` (math and format: 9 cases; cadence: 5).
+    - Integration: `MetricsIntegrationTests` (real Win32 readings are plausible; tiles with and without a battery).
+    - Visual references notch-expanded/pinned **regenerated** at 252 px; a 3-widget rendering was checked by eye.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (SM1–SM4), `docs/WORK_LOG.md` (older entries archived), `src/DynamicIsland.App/{AppHost.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Platform.Windows/NativeMethods.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, References/notch-expanded.png, References/notch-pinned.png}`
+    - new: `docs/ADR/0021-metrics-widget.md`, `src/DynamicIsland.App/MetricsView.cs`, `src/DynamicIsland.Core/Metrics/SystemMetrics.cs`, `src/DynamicIsland.Platform.Windows/Metrics/Win32SystemMetrics.cs`, `src/DynamicIsland.Widgets/MetricsWidget.cs`, `tests/DynamicIsland.IntegrationTests/MetricsIntegrationTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/MetricsWidgetTests.cs`
+    - Suggested commit message: `feat(widgets): system metrics widget sampling only while expanded (P04-04, ADR 0021)`
+- 2026-10-26 P04-03 committed by the owner as `179cef8`; CI run 40309259229 **success**: Release 545/545, Debug 552/552, 0 skipped.
+
 ## Archived 2026-10-26 (P04-03, P04-04)
 
 ### Verified changes

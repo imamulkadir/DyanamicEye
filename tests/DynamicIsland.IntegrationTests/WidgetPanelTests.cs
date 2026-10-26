@@ -53,6 +53,31 @@ public sealed class WidgetPanelTests : IDisposable
     }
 
     [Fact]
+    public void Until_the_user_picks_a_tab_the_first_tab_in_order_is_shown()
+    {
+        var selected = _ui.Invoke(() =>
+        {
+            var view = new NotchView();
+            var media = Slot("media", "Media", ComponentState.Healthy, "Song");
+            var system = Slot("system", "System stats", ComponentState.Healthy, "CPU");
+
+            view.ShowWidgets([system], Render); // Stats publish before the media widget.
+            view.ShowWidgets([media, system], Render);
+            var automatic = view.SelectedWidgetId;
+
+            view.SelectWidget("system");
+            view.ShowWidgets([media, system], Render);
+            var chosen = view.SelectedWidgetId;
+
+            view.ShowWidgets([media], Render); // The chosen widget goes away: its choice is forgotten.
+            view.ShowWidgets([media, system], Render);
+            return (automatic, chosen, view.SelectedWidgetId);
+        });
+
+        Assert.Equal(("media", "system", "media"), selected);
+    }
+
+    [Fact]
     public void A_single_widget_needs_no_tab_strip()
     {
         var visibility = _ui.Invoke(() =>

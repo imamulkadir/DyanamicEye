@@ -6,7 +6,7 @@ monitors (resolution @ scaling) and PASS/FAIL with a note. Status values: `NOT_R
 
 ## How to run the app for a check
 1. Build: `dotnet build DynamicIsland.sln -c Release`.
-2. Start: `src\DynamicIsland.App\bin\Release\net10.0-windows\DynamicIsland.exe`. Use the Launcher next to it once packaging exists (P06).
+2. Start: `src\DynamicIsland.App\bin\Release\net10.0-windows10.0.19041.0\DynamicIsland.exe` (folder name since ADR 0020). Use the Launcher next to it once packaging exists (P06).
 3. Exit: run `taskkill /IM DynamicIsland.exe` (without `/F`). It sends a normal close request, so the app exits cleanly with code 0. Clicking the island and pressing Alt+F4 should also work but is not verified yet. The tray "Exit" arrives in P03.
 4. Logs are in `%LOCALAPPDATA%\DynamicIsland\logs\dynamicisland-YYYYMMDD.log`. Each placement writes an `IslandPlaced` entry: primary monitor yes/no, fallback yes/no, scale, size in px. Monitor ids are never logged.
 
@@ -109,6 +109,11 @@ Automated coverage (CI + dev host): placement, click-through, UIA expand/pin/col
 | CW1 | Clock widget (P04-02) | Click the island to expand it | Below the title: the time in large type and the full date (e.g. "Monday, October 26, 2026"); the notch line above keeps your clock options | NOT_RUN (automated with the real widget) |
 | CW2 | Hidden and Safe Mode | Hide the island from the tray for 2 minutes, then show it; then tray → Restart in Safe Mode | After showing, the time is correct at once. Safe Mode: the notch is plain black and the widget area shows the hint | NOT_RUN |
 | CW3 | Clock off/on | Widgets page: untick "Clock and date", Save; tick it again, Save | Off: notch black, no clock in the expanded panel. On: both come back within a second | NOT_RUN (automated) |
+| MD1 | Media widget (P04-03) | Play music in a browser tab (YouTube) or a player app (Spotify, VLC, Media Player); expand the island | Title, artist and album art appear within a second; the play/pause icon matches; changing tracks updates it | PARTIAL PASS 2026-10-26 (agent, Media Player 11, owner's file "Bat Country": title and album art shown after the art-cap fix; no artist tag in that file) |
+| MD2 | Buttons and keyboard | Click previous, pause, play, next; then Tab to each button and press Space | The player reacts to each; buttons the player turns off are dimmed with a "not available right now" tooltip (Media Player: no Previous on the first queued track, no Next on the last); focus ring visible | PARTIAL PASS 2026-10-26 (agent, Media Player queue of 3: Next and Previous changed tracks through the app's adapter; Previous dimmed on the first track; clicks by mouse/keyboard still owed) |
+| MD3 | Several players | Play in two apps, then close the current one | "· 1 more playing" shows; closing the player switches to the other or clears the widget without errors | NOT_RUN |
+| MD4 | Nothing playing | Close all players | The media row disappears; nothing else changes; the app log shows only "no-media", never a track name | NOT_RUN |
+| MD5 | Media off | Widgets page: untick Media, Save | The media row disappears; turning it back on brings it back for the current track | NOT_RUN |
 | SC1 | Global shortcut (P03-05) | Settings → Behavior → tick "Open and close the island with a global shortcut", keep Ctrl+Alt+I, Save; in another app press Ctrl+Alt+I twice | The status says On; the first press opens the island with keyboard focus on it (Tab reaches the pin button); the second closes it and returns focus to the app | NOT_RUN (automated with a posted WM_HOTKEY) |
 | SC2 | Conflict | Pick a shortcut another running app already registered (or one Windows owns, e.g. Ctrl+Alt+Del is refused as invalid; try Shift+Win+S), Save | The status explains the shortcut is used by another app or Windows; nothing else changes | NOT_RUN (automated with a second registration) |
 | SC3 | Validation and off | Type `Ctrl+C`, then `Alt+F`, then clear the box; then untick the option and Save | Each shows a message and Save is greyed out; when turned off, the status says Off and Ctrl+Alt+I does nothing | NOT_RUN (automated in unit tests) |

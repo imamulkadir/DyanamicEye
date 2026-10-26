@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** next is P04-03 (media widget). P04-02 (clock/date widget; ADR 0019) is IMPLEMENTED_AWAITING_VALIDATION. G02/G03 manual rows are still owed by the owner.
-- **Active task status:** P04-02 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-01 is committed as `294a8f0`, and CI 40301030072 is green with 0 skipped.
+- **Active task:** next is P04-04 (metrics widget). P04-03 (media widget; ADR 0020, which includes the TFM change to `net10.0-windows10.0.19041.0`) is IMPLEMENTED_AWAITING_VALIDATION. G02/G03 manual rows are still owed by the owner.
+- **Active task status:** P04-03 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-02 is committed as `abd5693`, and CI 40303146979 is green with 0 skipped.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,15 +23,18 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P04-02 IMPLEMENTED_AWAITING_VALIDATION; next P04-03)
+- **Last updated:** 2026-10-26 (P04-03 IMPLEMENTED_AWAITING_VALIDATION; next P04-04)
 
 ## NEXT ACTION (ONE task only)
-**Owner first:** review and commit the P04-02 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green.
-**Then agent: P04-03** (guide §5): the media widget.
-- Use the global Windows media sessions (`GlobalSystemMediaTransportControlsSessionManager`, WinRT) behind a Core `IMediaSessionService` (guide §3) implemented in Platform.Windows.
-- Handle no session, several players, stale sessions, and controls a player does not support.
-- Load album art safely: size cap, decode off the UI thread, no file paths in logs. Track titles are personal data: never log them.
-- Check the current official docs for the WinRT projection on .NET 10 (target framework `net10.0-windows10.0.x`) and its packaging impact before choosing. Write an ADR first.
+**Owner first:** review and commit the P04-03 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green.
+- CI must restore the new Windows SDK targeting pack (`Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57) in locked mode. If CI fails at restore, read the log first.
+- Manual MD1–MD5 with a real player are the most valuable checks.
+
+**Then agent: P04-04** (guide §5): the metrics widget (CPU, RAM, battery, uptime).
+- Use efficient APIs: `GetSystemTimes`, `GlobalMemoryStatusEx`, `GetSystemPowerStatus` and `Environment.TickCount64` behind a Core `ISystemMetricsService` (guide §3).
+- Handle no battery, sleep/resume (counter reset) and permission errors.
+- Adaptive cadence: about 2 s while the island is expanded, slower or paused while collapsed; nothing while inactive (`SetActive`).
+- Write an ADR first.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -41,7 +44,7 @@
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
-| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–02 IMPLEMENTED_AWAITING_VALIDATION; 03 next; started with owner approval while G02/G03 are open) | G04 pending |
+| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–03 IMPLEMENTED_AWAITING_VALIDATION; 04 next; started with owner approval while G02/G03 are open) | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
@@ -56,6 +59,51 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **Owner-requested real-player check (P04-03)** with `D:\Music\Music\Avenged Sevenfold - Bat Country ... (320 KBps).mp3` in Media Player (Microsoft.ZuneMusic). Temporary probes using the app's real adapter and view, deleted afterwards.
+  - **Bug 1 fixed: album art was missing.** Media Player hands out a **768×768 32-bit BMP of 2,359,446 bytes**; the 2 MB cap skipped it, and the placeholder showed. `MediaWidget.MaxArtBytes` is now 12 MB. Rendered by eye after the fix: the art shows.
+  - **Bug 2 fixed: a blank artist line.** The file has no artist tag, which left an empty second line. The view now leaves the line out and wraps the title to 2 lines.
+  - **Next/Previous:** a single opened file has only Pause (the player disables Next/Previous: correct, our buttons are dimmed).
+    - With a queue (Avash and Adele added via the shell verb "Add to Media Player play queue"), Next went Bat Country → Avash and Previous came back, through our adapter. Previous was dimmed on the first track.
+    - Media Player sometimes **refused** an advertised Next for a moment (seen right after track changes; once over 1 s). The adapter now retries a refused, enabled command up to 5×250 ms. Unsupported commands are not retried.
+  - **Side effects on the owner's PC:**
+    - Media Player is left playing, with 2 tracks added to its queue.
+    - A `.m3u` attempt opened a Windows "Pick an app" dialog. I closed it (the dialog process was stopped after it ignored the close request) and chose no app. No file associations were changed.
+  - New tests: the art cap admits that BMP size (unit); an untagged track has a single wrapped title and no empty line (integration).
+  - **Owner follow-up (screenshots):** "Previous (not supported by this player)" on Bat Country and the same for "Next" on Adele. The cause is the queue position: Media Player turns Previous off on the first queued track and Next off on the last. The tooltip wording was wrong, so it now reads "… (not available right now)" (`MediaView.cs`, ADR 0020, TEST_MATRIX MD2). The Debug build was locked by the owner's running Debug app (PID 6272), which was not touched, so this was verified on Release: unit 455/455, integration 75/75, 0 warnings.
+- 2026-10-26 **P04-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0020**. Verified against the official Microsoft Learn docs: "Call Windows Runtime APIs in desktop apps" (2026-10-03) and the GSMTC manager reference (1809+).
+  - **Build:**
+    - TFM `net10.0-windows10.0.19041.0` for Platform.Windows, App, IntegrationTests and WindowsSmokeTests; `packages.lock.json` of those 4 only renames the TFM key.
+    - The targeting pack `Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57 is selected by the pinned SDK. The output gains `Microsoft.Windows.SDK.NET.dll` (24 MB) and `WinRT.Runtime.dll`.
+    - Output folders are now `bin\<config>\net10.0-windows10.0.19041.0\`. TEST_MATRIX's run path and ADR 0002 are updated.
+  - **Core:**
+    - New `Media/MediaContracts.cs` (`IMediaSessionService`, `MediaInfo`, `MediaPlaybackState`, `MediaControls`, `MediaCommand`).
+    - `IWidget.ExecuteAsync` (default false); `WidgetRegistry.ExecuteAsync` (only for running widgets).
+    - `IslandLayout.Expanded` 420×180 → **420×212**.
+  - **Platform.Windows:** new `Media/WindowsMediaSessionService.cs`.
+    - Follows the current GSMTC session through events; no polling.
+    - Closed sessions and sessions without title/artist mean nothing playing.
+    - Counts sessions; maps the player's controls; art over 12 MB is refused (was 2 MB, see the real-player check below).
+    - WinRT errors mean no session or a refused command, never a throw.
+  - **Widgets:** new `MediaWidget` + `MediaSnapshot`.
+    - An event loop with a 60 ms settle; art is re-read only when the track changes.
+    - Degraded `no-media` or `media-unavailable` (idles, no retry loop); commands previous/play-pause/next.
+    - Registered in `BuiltInWidgets.Create(settings, time, media)`.
+  - **App:**
+    - New `MediaView` (art, title, artist, "· N more playing", 3 icon buttons that are disabled with a tooltip when unsupported; AutomationIds `Media.*`; focus ring).
+    - New `AlbumArtCache` (decodes off the UI thread at 96 px and freezes; keeps only the current image).
+    - `WidgetPresenter.Views` now receives the presenter (`Execute`, `AlbumArt`); `AppLog` 1059 WidgetCommandFailed.
+    - `NotchView` hides the top-row time while the expanded panel shows the large clock (no duplicate time).
+  - **Tests:**
+    - Unit: `Widgets/MediaWidgetTests.cs` (7).
+    - Integration: `MediaWidgetIntegrationTests` (2). One runs the **real Windows adapter read-only, with no commands sent to the user's player**. The other runs a scripted service through the real registry, presenter and view: the art decodes, the unsupported button is disabled, and the clicks reach the service.
+    - Clock presenter test adjusted for two widgets.
+    - Visual references **notch-expanded.png and notch-pinned.png regenerated** (new height) and checked by eye.
+    - Real Release app: widget-media went Starting → Degraded `no-media`; no track text in the log; exit 0.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/{0002-solution-layout-and-test-platform.md, README.md}`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `src/DynamicIsland.App/{AppHost.cs, AppLog.cs, DynamicIsland.App.csproj, NotchView.xaml.cs, WidgetPresenter.cs, packages.lock.json}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Platform.Windows/{DynamicIsland.Platform.Windows.csproj, packages.lock.json}`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, DynamicIsland.IntegrationTests.csproj, packages.lock.json, References/notch-expanded.png, References/notch-pinned.png}`, `tests/DynamicIsland.WindowsSmokeTests/{DynamicIsland.WindowsSmokeTests.csproj, packages.lock.json}`
+    - new: `docs/ADR/0020-media-widget.md`, `src/DynamicIsland.App/{AlbumArtCache.cs, MediaView.cs}`, `src/DynamicIsland.Core/Media/MediaContracts.cs`, `src/DynamicIsland.Platform.Windows/Media/WindowsMediaSessionService.cs`, `src/DynamicIsland.Widgets/MediaWidget.cs`, `tests/DynamicIsland.IntegrationTests/MediaWidgetIntegrationTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/MediaWidgetTests.cs`
+    - Suggested commit message: `feat(widgets): media widget over Windows media sessions (P04-03, ADR 0020)` (includes the real-player fixes)
+- 2026-10-26 P04-02 committed by the owner as `abd5693`; CI run 40303146979 **success**: Release 534/534, Debug 541/541, 0 skipped.
 - 2026-10-26 **P04-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0019**; ADR 0016 §4/§6 are amended. No countdown timers or stopwatch: they were offered to the owner, who did not ask for them (guide: "timers only if approved").
   - **Core:** `IWidget.SetActive`/`OnSystemChanged` (default no-ops); `WidgetRegistry.SetActive/NotifySystemChanged/Dispose`.
   - **Widgets:**
@@ -135,6 +183,11 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | P04-03 fixes | Windows 11 Pro 25H2 x64, `CI=true` | Full suite after the art-cap/retry/view fixes, Release ×1 and Debug ×1 | PASS | Release 545/545, Debug 552/552, 0 skipped |
+| 2026-10-26 | P04-03 | real Media Player, owner's mp3 | Probes via `WindowsMediaSessionService` + `MediaView` rendering | FAIL → fixed | Art missing (2.36 MB BMP over the cap) → fixed; Next/Previous work with a queue; transient refusals → retry added |
+| 2026-10-26 | P04-03 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet restore` (new TFM), `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 543/543 ×2, Debug 550/550 ×2, **0 skipped**; the real GSMTC adapter test included |
+| 2026-10-26 | P04-03 | same, real Release app 5 s | `DynamicIsland.exe` from `bin\Release\net10.0-windows10.0.19041.0`, then close | PASS | widget-media Degraded `no-media` (nothing playing); no track data logged; exit 0 |
+| 2026-10-26 | P04-02 | GitHub Actions `windows-2025` (`abd5693`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40303146979; 534/534 and 541/541, 0 skipped |
 | 2026-10-26 | P04-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS (2 skipped) | Debug 541/541 ×2. Release 533 passed + **1 skipped** ×2: the fullscreen smoke test, because Windows refused the helper window foreground; that is a skip, not a pass. Run alone afterwards it **passed 2/2** (`--filter-class FullscreenSmokeTests`). The desktop was in interactive use at the time; another DynamicIsland Debug process (not started by the tests) briefly locked the build output. |
 | 2026-10-26 | P04-01 | GitHub Actions `windows-2025` (`294a8f0`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40301030072; 533/533 and 540/540, 0 skipped |
 | 2026-10-26 | P04-01 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2; unit tests alone ×3 (the registry tests are timing-based) | PASS | Release 533/533 ×2, Debug 540/540 ×2, **0 skipped**; unit 441/441 ×3 |

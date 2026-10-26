@@ -50,15 +50,33 @@ public sealed class WidgetPresenter : IDisposable
     }
 
     /// <summary>Widget id → expanded view for its <see cref="WidgetSlot.Snapshot"/> (null: nothing to show yet).</summary>
-    public static IReadOnlyDictionary<string, Func<WidgetSlot, UIElement?>> Views { get; } = new Dictionary<string, Func<WidgetSlot, UIElement?>>(StringComparer.Ordinal)
+    public static IReadOnlyDictionary<string, Func<WidgetSlot, WidgetPresenter, UIElement?>> Views { get; } = new Dictionary<string, Func<WidgetSlot, WidgetPresenter, UIElement?>>(StringComparer.Ordinal)
     {
-        [WidgetIds.Clock] = slot => slot.Snapshot is ClockSnapshot clock ? ClockView(clock) : null,
+        [WidgetIds.Clock] = (slot, _) => slot.Snapshot is ClockSnapshot clock ? ClockView(clock) : null,
+        [WidgetIds.Media] = (slot, presenter) => slot.Snapshot is MediaSnapshot media ? MediaView.Create(media, presenter) : null,
     };
+
+    /// <summary>Decoded album art; decoding happens off the UI thread and triggers a redraw.</summary>
+    public AlbumArtCache AlbumArt { get; } = new();
+
+    /// <summary>Runs a widget command from a view (button). Failures are logged by type and never reach the UI thread.</summary>
+    public async void Execute(string widgetId, string command)
+    {
+        try
+        {
+            await _registry.ExecuteAsync(widgetId, command, _lifecycle.ApplicationStopping).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            AppLog.WidgetCommandFailed(_logger, widgetId, ex.GetType().Name);
+        }
+    }
 
     public void Start()
     {
         _applied = _settings.Current.Widgets;
         _registry.Changed += OnRegistryChanged;
+        AlbumArt.Decoded += OnRegistryChanged;
         _settings.Changed += OnSettingsChanged;
         _state.StateChanged += OnStateChanged;
         SystemEvents.TimeChanged += OnTimeChanged;
@@ -71,6 +89,7 @@ public sealed class WidgetPresenter : IDisposable
     public void Dispose()
     {
         _registry.Changed -= OnRegistryChanged;
+        AlbumArt.Decoded -= OnRegistryChanged;
         _settings.Changed -= OnSettingsChanged;
         _state.StateChanged -= OnStateChanged;
         SystemEvents.TimeChanged -= OnTimeChanged;
@@ -83,7 +102,7 @@ public sealed class WidgetPresenter : IDisposable
     public void Render()
     {
         var slots = _registry.Slots;
-        _view.ShowWidgets(slots, slot => Views.TryGetValue(slot.Id, out var view) && slot.Snapshot is not null ? view(slot) : null);
+        _view.ShowWidgets(slots, slot => Views.TryGetValue(slot.Id, out var view) && slot.Snapshot is not null ? view(slot, this) : null);
 
         // The notch shows the clock widget's compact text; nothing when it is off, failed or skipped (Safe Mode).
         var clock = slots.FirstOrDefault(s => s.Id == WidgetIds.Clock);

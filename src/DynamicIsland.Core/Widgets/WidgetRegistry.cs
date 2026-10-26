@@ -34,6 +34,9 @@ public interface IWidget : IIsolatedComponent
     void OnSystemChanged()
     {
     }
+
+    /// <summary>Runs a user command from the widget's view (e.g. "next"); <c>false</c> when unsupported or refused.</summary>
+    Task<bool> ExecuteAsync(string command, CancellationToken cancellationToken) => Task.FromResult(false);
 }
 
 /// <summary>What the island shows for one enabled widget, in the user's order.</summary>
@@ -170,6 +173,17 @@ public sealed class WidgetRegistry : IDisposable
         {
             widget.Dispose();
         }
+    }
+
+    /// <summary>Runs a command on an enabled, running widget; <c>false</c> otherwise.</summary>
+    public Task<bool> ExecuteAsync(string widgetId, string command, CancellationToken cancellationToken)
+    {
+        if (!_widgets.TryGetValue(widgetId, out var widget) || _host.StatusOf(widget.Name)?.State is not (ComponentState.Healthy or ComponentState.Degraded))
+        {
+            return Task.FromResult(false);
+        }
+
+        return widget.ExecuteAsync(command, cancellationToken);
     }
 
     /// <summary>Forwards the island's visibility to every widget (guide §4.2 Active/Inactive).</summary>

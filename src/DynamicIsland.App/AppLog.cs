@@ -146,6 +146,10 @@ internal static partial class AppLog
         Message = "Applying widget settings did not finish (a widget did not stop in time, or the app is exiting)")]
     public static partial void WidgetChangeIncomplete(ILogger logger);
 
+    [LoggerMessage(EventId = 1059, EventName = "WidgetCommandFailed", Level = LogLevel.Warning,
+        Message = "Widget {WidgetId} command failed ({ErrorType})")]
+    public static partial void WidgetCommandFailed(ILogger logger, string widgetId, string errorType);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

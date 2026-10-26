@@ -2,7 +2,7 @@
 
   <!-- Windows OS adapters (P/Invoke, WinRT) implementing Core abstractions. -->
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <!-- Required by LibraryImport-generated P/Invoke stubs. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>

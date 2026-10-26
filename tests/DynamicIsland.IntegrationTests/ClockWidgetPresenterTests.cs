@@ -33,7 +33,7 @@ public sealed class ClockWidgetPresenterTests : IDisposable
     public async Task Notch_and_expanded_panel_show_the_clock_and_disabling_clears_them()
     {
         using var host = new ComponentHost(_lifecycle, new InMemoryNotificationService(TimeProvider.System), new DefaultFailureClassifier(), LaunchArguments.Default, TimeProvider.System);
-        using var registry = new WidgetRegistry(host, BuiltInWidgets.Create(_settings, TimeProvider.System));
+        using var registry = new WidgetRegistry(host, BuiltInWidgets.Create(_settings, TimeProvider.System, new NoMedia()));
         var view = _ui.Invoke(() => new NotchView());
         using var presenter = new WidgetPresenter(registry, view, _settings, new States(), _lifecycle, NullLogger<WidgetPresenter>.Instance);
 
@@ -43,14 +43,14 @@ public sealed class ClockWidgetPresenterTests : IDisposable
 
         Assert.True(await WaitAsync(() => _ui.Invoke(() => view.ClockDisplay.Length > 0)), "The notch must show the time.");
         var (notch, panel) = _ui.Invoke(() => (view.ClockDisplay, view.WidgetElements.OfType<StackPanel>().Single()));
-        var snapshot = (ClockSnapshot)registry.Slots.Single().Snapshot!;
+        var snapshot = (ClockSnapshot)registry.Slots.Single(s => s.Id == WidgetIds.Clock).Snapshot!;
         Assert.Equal(snapshot.Compact, notch);
         Assert.Equal([snapshot.Time, snapshot.Date], _ui.Invoke(() => panel.Children.OfType<TextBlock>().Select(t => t.Text).ToArray()));
 
         await registry.ApplyAsync([.. WidgetIds.All.Select(id => new WidgetSetting(id, id != WidgetIds.Clock))], TestContext.Current.CancellationToken);
 
         Assert.True(await WaitAsync(() => _ui.Invoke(() => view.ClockDisplay.Length == 0 && view.WidgetElements.Count == 0)), "Turning the clock off must clear it.");
-        Assert.Empty(registry.Slots);
+        Assert.DoesNotContain(registry.Slots, s => s.Id == WidgetIds.Clock);
     }
 
     private static async Task<bool> WaitAsync(Func<bool> condition)
@@ -82,6 +82,27 @@ public sealed class ClockWidgetPresenterTests : IDisposable
         public bool IsReadOnly => false;
 
         public Task<SettingsSaveResult> UpdateAsync(Func<AppSettings, AppSettings> change, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class NoMedia : Core.Media.IMediaSessionService
+    {
+        public event EventHandler? Changed
+        {
+            add { }
+            remove { }
+        }
+
+        public Task<bool> StartAsync(CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task<Core.Media.MediaInfo?> GetCurrentAsync(CancellationToken cancellationToken) => Task.FromResult<Core.Media.MediaInfo?>(null);
+
+        public Task<byte[]?> GetThumbnailAsync(int maxBytes, CancellationToken cancellationToken) => Task.FromResult<byte[]?>(null);
+
+        public Task<bool> SendAsync(Core.Media.MediaCommand command, CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class States : IIslandStateMachine

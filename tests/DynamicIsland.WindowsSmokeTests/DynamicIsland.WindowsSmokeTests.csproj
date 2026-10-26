@@ -2,7 +2,7 @@
 
   <!-- Launches the real app on an interactive Windows desktop. Requires a desktop session (not Server Core/containers). -->
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <!-- Required by LibraryImport-generated P/Invoke stubs. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- UI Automation client (System.Windows.Automation) drives the island like a screen reader would. -->

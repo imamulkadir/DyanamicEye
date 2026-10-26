@@ -66,7 +66,10 @@ public static class AppHost
         builder.Services.AddSingleton<ComponentHost>();
         builder.Services.AddSingleton(sp => new WidgetRegistry(
             sp.GetRequiredService<ComponentHost>(),
-            BuiltInWidgets.Create(sp.GetRequiredService<ISettingsService>(), sp.GetRequiredService<TimeProvider>())));
+            BuiltInWidgets.Create(
+                sp.GetRequiredService<ISettingsService>(),
+                sp.GetRequiredService<TimeProvider>(),
+                new Platform.Windows.Media.WindowsMediaSessionService())));
         builder.Services.AddSingleton(sp => new DiagnosticBundleBuilder(
             System.IO.Path.Combine(root, AppDataPaths.LogsFolderName),
             dataDirectory,

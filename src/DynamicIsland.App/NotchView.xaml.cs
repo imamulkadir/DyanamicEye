@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Shell;
 using DynamicIsland.Core.Widgets;
 
@@ -13,6 +14,9 @@ namespace DynamicIsland.App;
 /// </summary>
 public partial class NotchView : UserControl
 {
+    private bool _expanded;
+    private bool _clockInPanel;
+
     public NotchView() => InitializeComponent();
 
     /// <summary>The interactive notch surface (input, focus, UI Automation).</summary>
@@ -27,7 +31,7 @@ public partial class NotchView : UserControl
     public void SetClock(string? text)
     {
         ClockText.Text = text ?? string.Empty;
-        ClockText.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+        UpdateClockVisibility();
     }
 
     /// <summary>
@@ -51,10 +55,16 @@ public partial class NotchView : UserControl
         }
 
         WidgetPlaceholder.Visibility = WidgetPanel.Children.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        _clockInPanel = WidgetPanel.Children.OfType<UIElement>().Any(e => AutomationProperties.GetAutomationId(e) == "Widget." + WidgetIds.Clock);
+        UpdateClockVisibility();
     }
 
     /// <summary>Widget elements currently shown (tests).</summary>
     public IReadOnlyList<UIElement> WidgetElements => [.. WidgetPanel.Children.OfType<UIElement>()];
+
+    /// <summary>The top-row time hides while the expanded panel shows the large clock, so the time is never shown twice.</summary>
+    private void UpdateClockVisibility() =>
+        ClockText.Visibility = string.IsNullOrEmpty(ClockText.Text) || (_expanded && _clockInPanel) ? Visibility.Collapsed : Visibility.Visible;
 
     private static TextBlock UnavailableNote(WidgetSlot slot) => new()
     {
@@ -66,7 +76,10 @@ public partial class NotchView : UserControl
     };
 
     /// <summary>The clock text as shown (tests).</summary>
-    public string ClockDisplay => ClockText.Visibility == Visibility.Visible ? ClockText.Text : string.Empty;
+    public string ClockDisplay => ClockText.Text;
+
+    /// <summary>True when the top-row time is drawn (tests).</summary>
+    public bool IsClockVisible => ClockText.Visibility == Visibility.Visible;
 
     /// <param name="height">Target height in DIPs (after the appearance scale).</param>
     /// <param name="scale">User appearance scale.</param>
@@ -75,6 +88,8 @@ public partial class NotchView : UserControl
         ClockRow.Height = new GridLength(IslandLayout.Collapsed.Height * scale);
         ClockText.FontSize = ClockFontSize * scale;
         var expanded = state is IslandState.Expanded or IslandState.Pinned;
+        _expanded = expanded;
+        UpdateClockVisibility();
         Surface.BottomRadius = Math.Min(height / 2, 22 * scale);
         ExpandedPanel.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
         PinButton.IsChecked = state == IslandState.Pinned;

@@ -2,6 +2,76 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-26 (P04-03, P04-04)
+
+### Verified changes
+- 2026-10-26 **Owner-requested real-player check (P04-03)** with `D:\Music\Music\Avenged Sevenfold - Bat Country ... (320 KBps).mp3` in Media Player (Microsoft.ZuneMusic). Temporary probes using the app's real adapter and view, deleted afterwards.
+  - **Bug 1 fixed: album art was missing.** Media Player hands out a **768×768 32-bit BMP of 2,359,446 bytes**; the 2 MB cap skipped it, and the placeholder showed. `MediaWidget.MaxArtBytes` is now 12 MB. Rendered by eye after the fix: the art shows.
+  - **Bug 2 fixed: a blank artist line.** The file has no artist tag, which left an empty second line. The view now leaves the line out and wraps the title to 2 lines.
+  - **Next/Previous:** a single opened file has only Pause (the player disables Next/Previous: correct, our buttons are dimmed).
+    - With a queue (Avash and Adele added via the shell verb "Add to Media Player play queue"), Next went Bat Country → Avash and Previous came back, through our adapter. Previous was dimmed on the first track.
+    - Media Player sometimes **refused** an advertised Next for a moment (seen right after track changes; once over 1 s). The adapter now retries a refused, enabled command up to 5×250 ms. Unsupported commands are not retried.
+  - **Side effects on the owner's PC:**
+    - Media Player is left playing, with 2 tracks added to its queue.
+    - A `.m3u` attempt opened a Windows "Pick an app" dialog. I closed it (the dialog process was stopped after it ignored the close request) and chose no app. No file associations were changed.
+  - New tests: the art cap admits that BMP size (unit); an untagged track has a single wrapped title and no empty line (integration).
+  - **Owner follow-up (screenshots):** "Previous (not supported by this player)" on Bat Country and the same for "Next" on Adele. The cause is the queue position: Media Player turns Previous off on the first queued track and Next off on the last. The tooltip wording was wrong, so it now reads "… (not available right now)" (`MediaView.cs`, ADR 0020, TEST_MATRIX MD2). The Debug build was locked by the owner's running Debug app (PID 6272), which was not touched, so this was verified on Release: unit 455/455, integration 75/75, 0 warnings.
+- 2026-10-26 **P04-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0020**. Verified against the official Microsoft Learn docs: "Call Windows Runtime APIs in desktop apps" (2026-10-03) and the GSMTC manager reference (1809+).
+  - **Build:**
+    - TFM `net10.0-windows10.0.19041.0` for Platform.Windows, App, IntegrationTests and WindowsSmokeTests; `packages.lock.json` of those 4 only renames the TFM key.
+    - The targeting pack `Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57 is selected by the pinned SDK. The output gains `Microsoft.Windows.SDK.NET.dll` (24 MB) and `WinRT.Runtime.dll`.
+    - Output folders are now `bin\<config>\net10.0-windows10.0.19041.0\`. TEST_MATRIX's run path and ADR 0002 are updated.
+  - **Core:**
+    - New `Media/MediaContracts.cs` (`IMediaSessionService`, `MediaInfo`, `MediaPlaybackState`, `MediaControls`, `MediaCommand`).
+    - `IWidget.ExecuteAsync` (default false); `WidgetRegistry.ExecuteAsync` (only for running widgets).
+    - `IslandLayout.Expanded` 420×180 → **420×212**.
+  - **Platform.Windows:** new `Media/WindowsMediaSessionService.cs`.
+    - Follows the current GSMTC session through events; no polling.
+    - Closed sessions and sessions without title/artist mean nothing playing.
+    - Counts sessions; maps the player's controls; art over 12 MB is refused (was 2 MB, see the real-player check below).
+    - WinRT errors mean no session or a refused command, never a throw.
+  - **Widgets:** new `MediaWidget` + `MediaSnapshot`.
+    - An event loop with a 60 ms settle; art is re-read only when the track changes.
+    - Degraded `no-media` or `media-unavailable` (idles, no retry loop); commands previous/play-pause/next.
+    - Registered in `BuiltInWidgets.Create(settings, time, media)`.
+  - **App:**
+    - New `MediaView` (art, title, artist, "· N more playing", 3 icon buttons that are disabled with a tooltip when unsupported; AutomationIds `Media.*`; focus ring).
+    - New `AlbumArtCache` (decodes off the UI thread at 96 px and freezes; keeps only the current image).
+    - `WidgetPresenter.Views` now receives the presenter (`Execute`, `AlbumArt`); `AppLog` 1059 WidgetCommandFailed.
+    - `NotchView` hides the top-row time while the expanded panel shows the large clock (no duplicate time).
+  - **Tests:**
+    - Unit: `Widgets/MediaWidgetTests.cs` (7).
+    - Integration: `MediaWidgetIntegrationTests` (2). One runs the **real Windows adapter read-only, with no commands sent to the user's player**. The other runs a scripted service through the real registry, presenter and view: the art decodes, the unsupported button is disabled, and the clicks reach the service.
+    - Clock presenter test adjusted for two widgets.
+    - Visual references **notch-expanded.png and notch-pinned.png regenerated** (new height) and checked by eye.
+    - Real Release app: widget-media went Starting → Degraded `no-media`; no track text in the log; exit 0.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/{0002-solution-layout-and-test-platform.md, README.md}`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `src/DynamicIsland.App/{AppHost.cs, AppLog.cs, DynamicIsland.App.csproj, NotchView.xaml.cs, WidgetPresenter.cs, packages.lock.json}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Platform.Windows/{DynamicIsland.Platform.Windows.csproj, packages.lock.json}`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, DynamicIsland.IntegrationTests.csproj, packages.lock.json, References/notch-expanded.png, References/notch-pinned.png}`, `tests/DynamicIsland.WindowsSmokeTests/{DynamicIsland.WindowsSmokeTests.csproj, packages.lock.json}`
+    - new: `docs/ADR/0020-media-widget.md`, `src/DynamicIsland.App/{AlbumArtCache.cs, MediaView.cs}`, `src/DynamicIsland.Core/Media/MediaContracts.cs`, `src/DynamicIsland.Platform.Windows/Media/WindowsMediaSessionService.cs`, `src/DynamicIsland.Widgets/MediaWidget.cs`, `tests/DynamicIsland.IntegrationTests/MediaWidgetIntegrationTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/MediaWidgetTests.cs`
+    - Suggested commit message: `feat(widgets): media widget over Windows media sessions (P04-03, ADR 0020)` (includes the real-player fixes)
+- 2026-10-26 P04-02 committed by the owner as `abd5693`; CI run 40303146979 **success**: Release 534/534, Debug 541/541, 0 skipped.
+- 2026-10-26 **P04-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0019**; ADR 0016 §4/§6 are amended. No countdown timers or stopwatch: they were offered to the owner, who did not ask for them (guide: "timers only if approved").
+  - **Core:** `IWidget.SetActive`/`OnSystemChanged` (default no-ops); `WidgetRegistry.SetActive/NotifySystemChanged/Dispose`.
+  - **Widgets:**
+    - New `ClockWidget` + `ClockSnapshot`: ticking on the `TimeProvider` aligned to the minute or second, waking on settings, activation and system changes; inactive means no ticks. Uses `ClockFormatter` (ADR 0016) and the long date.
+    - `BuiltInWidgets.Create(settings, time)` returns the clock.
+  - **App:**
+    - **`NotchClock.cs` deleted.** `WidgetPresenter` now sets the notch text from the clock slot (blank when off, failed or in Safe Mode) and renders the expanded clock view (34 px light time plus the long date).
+    - The presenter maps island visibility to `SetActive` and forwards `SystemEvents` (time, locale, resume).
+    - `AppHost`/`App.xaml.cs` wiring updated.
+  - **Tests:**
+    - **`NotchClockTests.cs` deleted.**
+    - Unit: `Widgets/ClockWidgetTests.cs` (6, real time, bounded): immediate publish with the options and date; at most 2 publishes in 1.5 s by default; 3–5 in 2.5 s with seconds; inactive means no ticks, then catch-up; settings and system changes refresh at once; stop and release.
+    - Integration: `ClockWidgetPresenterTests` (real registry, widget, presenter and NotchView): the notch shows the compact text, the panel shows the time and date, and disabling clears both.
+    - An expanded rendering was checked by eye.
+  - **Process note:** while removing the two files I ran `git rm`, which staged the deletions against the no-git-writes rule. I immediately unstaged them with `git reset -q -- <the two paths>`; the index again matches HEAD, and the files are only deleted in the working tree.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/{0016-notch-clock.md, README.md}`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (CW1–CW3), `docs/WORK_LOG.md` (older entries archived), `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`
+    - deleted: `src/DynamicIsland.App/NotchClock.cs`, `tests/DynamicIsland.IntegrationTests/NotchClockTests.cs`
+    - new: `docs/ADR/0019-clock-widget.md`, `src/DynamicIsland.Widgets/ClockWidget.cs`, `tests/DynamicIsland.IntegrationTests/ClockWidgetPresenterTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/ClockWidgetTests.cs`
+    - Suggested commit message: `feat(widgets): clock and date widget drives notch and expanded view (P04-02, ADR 0019)`
+- 2026-10-26 P04-01 committed by the owner as `294a8f0`; CI run 40301030072 **success**: Release 533/533, Debug 540/540, 0 skipped.
+
 ## Archived 2026-10-26 (P03-05, P04-01, P04-02)
 
 ### Verified changes

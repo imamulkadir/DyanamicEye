@@ -64,6 +64,10 @@ public static class AppHost
         builder.Services.AddSingleton<INotificationService, InMemoryNotificationService>();
         builder.Services.AddSingleton<IFailureClassifier, DefaultFailureClassifier>();
         builder.Services.AddSingleton<ComponentHost>();
+        builder.Services.AddSingleton(sp => new Infrastructure.PersonalData.SqlitePersonalDataStore(
+            dataDirectory,
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<Infrastructure.PersonalData.SqlitePersonalDataStore>>()));
         builder.Services.AddSingleton(sp => new WidgetRegistry(
             sp.GetRequiredService<ComponentHost>(),
             BuiltInWidgets.Create(
@@ -71,7 +75,8 @@ public static class AppHost
                 sp.GetRequiredService<TimeProvider>(),
                 new Platform.Windows.Media.WindowsMediaSessionService(),
                 new Platform.Windows.Metrics.Win32SystemMetrics(),
-                new Platform.Windows.Audio.CoreAudioService())));
+                new Platform.Windows.Audio.CoreAudioService(),
+                sp.GetRequiredService<Infrastructure.PersonalData.SqlitePersonalDataStore>())));
         builder.Services.AddSingleton(sp => new DiagnosticBundleBuilder(
             System.IO.Path.Combine(root, AppDataPaths.LogsFolderName),
             dataDirectory,

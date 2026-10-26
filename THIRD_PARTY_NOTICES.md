@@ -56,6 +56,29 @@ Versions are pinned in `Directory.Packages.props`. Resolved transitive packages 
   SOFTWARE.
   ```
 
+### Microsoft.Data.Sqlite 10.0.13 and Microsoft.Data.Sqlite.Core 10.0.13
+- Source: https://github.com/dotnet/efcore
+- License: MIT (https://licenses.nuget.org/MIT). Taken from nuget.org, 2026-10-26.
+- Used by: DynamicIsland.Infrastructure: notes and tasks database (ADR 0023)
+- Redistributed: yes
+- Notice: the MIT License text above, "Copyright (c) .NET Foundation and Contributors".
+
+### SQLitePCLRaw.bundle_e_sqlite3, SQLitePCLRaw.core, SQLitePCLRaw.lib.e_sqlite3, SQLitePCLRaw.provider.e_sqlite3 2.1.13
+- Source: https://github.com/ericsink/SQLitePCL.raw
+- License: Apache-2.0 (https://licenses.nuget.org/Apache-2.0). Taken from nuget.org, 2026-10-26. The project ships no
+  NOTICE file.
+- Used by: Microsoft.Data.Sqlite (native SQLite loading)
+- Redistributed: yes (managed assemblies and the native `e_sqlite3.dll`)
+- Notice: Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0). The full
+  license text must accompany binary distributions; the installer and portable ZIP include it (P06).
+
+### SQLite (native library `e_sqlite3`, bundled by SQLitePCLRaw.lib.e_sqlite3 2.1.13)
+- Source: https://sqlite.org
+- License: public domain (https://sqlite.org/copyright.html)
+- Used by: SQLitePCLRaw
+- Redistributed: yes
+- Notice: none required ("The author disclaims copyright to this source code.").
+
 ## Original artwork (not third-party)
 
 - `assets/DynamicIsland.ico`: the app icon. Original work by the Dynamic Island for Windows contributors (MIT), generated from simple shapes by `tools/New-AppIcon.ps1`. No external icon sets, fonts or images are used.

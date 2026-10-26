@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** next is P04-06 (SQLite notes and tasks). P04-05 (volume widget, persistent views, content-sized island; ADR 0022) is IMPLEMENTED_AWAITING_VALIDATION. G02/G03 manual rows are still owed by the owner.
-- **Active task status:** P04-05 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-04 is committed as `5f13f25`, and CI 40310973120 is green with 0 skipped.
+- **Active task:** next is P04-07 (backup/export/import). P04-06 (SQLite notes and tasks; ADR 0023) is IMPLEMENTED_AWAITING_VALIDATION, but its **smoke and Debug runs are still owed** (see TEST EVIDENCE). G02/G03 manual rows are still owed by the owner.
+- **Active task status:** P04-06 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-05 is committed as `6ab223e`, and CI 40313608497 is green with 0 skipped.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,16 +23,20 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P04-05 IMPLEMENTED_AWAITING_VALIDATION; next P04-06)
+- **Last updated:** 2026-10-26 (P04-06 IMPLEMENTED_AWAITING_VALIDATION; next P04-07)
 
 ## NEXT ACTION (ONE task only)
-**Owner first:** review and commit the P04-05 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. VO1–VO3 with real devices are the valuable manual rows.
-**Then agent: P04-06** (guide §5): SQLite notes and tasks.
-- CRUD, edits, completion, timestamps and validation; transactional changes; search is optional; no network.
-- Note/task text is personal data: never log it (ADR 0004).
-- This needs a dependency decision: `Microsoft.Data.Sqlite` (MIT, from Microsoft). Verify the current version, licence, native bundle (`SQLitePCLRaw.bundle_e_sqlite3`) and size, and record them in an ADR together with the schema, migrations, DB path (`%LOCALAPPDATA%\DynamicIsland\data\islands.db`) and corruption/backup behaviour.
-- **Ask the owner to approve the new package before adding it** (AGENTS.md: avoid dependency churn).
-- Views: compact note and task lists in the expanded island, plus editing. Keyboard: Enter to add, Space to complete.
+**First, owed for P04-06:** with no Dynamic Island running (the owner's Debug instance locked `bin\Debug` and the single-instance lock during this session), run:
+- `dotnet build DynamicIsland.sln -c Debug --no-restore`;
+- the full suite, Release ×2 and Debug ×2 (`--max-parallel-test-modules 1`).
+
+Record the results. CI also covers both configurations after the push.
+**Owner:** review and commit P04-06 (file list in RECENT VERIFIED CHANGES; includes the new package and lock files), push, and check that CI is green (locked restore of `Microsoft.Data.Sqlite`).
+**Then agent: P04-07** (guide §5): backup, export and import.
+- Versioned archive (zip with `manifest.json`: version, SHA-256 per file) containing `islands.db` (via the SQLite online backup API, consistent while open) and `settings.json`.
+- Dry-run preview (counts, versions); atomic restore that writes aside first and then swaps, keeping the previous files as a rollback copy.
+- Corrupt archive and version-mismatch tests; destination chosen by the user (save/open dialogs), never automatic.
+- Write an ADR first.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -42,7 +46,7 @@
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
-| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; 06 next; started with owner approval while G02/G03 are open) | G04 pending |
+| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–06 IMPLEMENTED_AWAITING_VALIDATION; 07 next; started with owner approval while G02/G03 are open) | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
@@ -57,6 +61,37 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **Owner approval:** `Microsoft.Data.Sqlite` was proposed with "Do you approve adding it?"; the reply "pushed, continue" is recorded as **approval of that dependency** (ADR 0023 §1).
+- 2026-10-26 **P04-06 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0023**.
+  - **Dependency:** `Microsoft.Data.Sqlite` **10.0.13** (MIT), which brings SQLitePCLRaw **2.1.13** (Apache-2.0) and native SQLite (public domain). Verified on nuget.org 2026-10-26.
+    - Pinned in `Directory.Packages.props` and referenced by Infrastructure only.
+    - `THIRD_PARTY_NOTICES.md` has 3 new entries.
+    - Lock files updated by `dotnet restore`.
+  - **Core:** new `PersonalData/PersonalData.cs` (`IPersonalDataStore`, `Note`, `TaskItem`, `PersonalDataResult`, `PersonalDataRules`: note 1–2000 / task 1–300 characters, no control characters except line breaks in notes, at most 1000 notes and 2000 tasks).
+  - **Infrastructure:** new `PersonalData/SqlitePersonalDataStore.cs`.
+    - Serialized and off-thread; every write is one transaction; limits are checked inside the transaction.
+    - `user_version` migrations; WAL; `quick_check`. A corrupt file becomes `islands.corrupt-<UTC>.db` (newest 5 kept) and a fresh database is created.
+    - A newer schema opens read-only without being modified.
+    - Logs 3100–3102 carry no text.
+  - **Widgets:** new `NotesAndTasksWidgets.cs`.
+    - `PersonalDataWidget` base with commands `add:`, `edit:<id>:`, `toggle:<id>` and `delete:<id>`, validated.
+    - `TasksWidget` shows 6, open first. `NotesWidget` shows the latest 3.
+    - Snapshots carry `LastResult` for refusal messages.
+  - **App:**
+    - New `PersonalDataViews.cs` (add field with a placeholder behind it, delete button, inline editor, messages), `TasksView` and `NotesView`. Rows are reused by id, focus is kept when a task moves, and an item being edited is never overwritten.
+    - `NotchView` widget panel inside a `ScrollViewer` (scrolls beyond 360 DIP).
+    - `IslandWindow`: Escape moved to bubbling `KeyDown`, so a text box clears or cancels first.
+    - The `MediaView.IconButtonStyle` template now honours content alignment and `Padding` (defaults centred), so note rows align left.
+    - `AppHost` registers the store at `data\islands.db`.
+  - **Tests:**
+    - Unit: `PersonalData/SqlitePersonalDataStoreTests.cs` (12: CRUD, ordering, validation, limit inside the transaction, restart persistence, corrupt quarantine, newer schema read-only, SQLite ≥ 3.45). `Widgets/NotesAndTasksWidgetTests.cs` (11).
+    - Integration: `NotesAndTasksViewTests` (3, real store, registry and views in an offscreen window: Enter adds, check box completes with the row reused, F2 edits, Esc clears without bubbling, too-long text shows a message and saves nothing).
+    - Renderings checked by eye.
+  - **Changed files for the owner:**
+    - modified: `Directory.Packages.props`, `THIRD_PARTY_NOTICES.md`, `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (NT1–NT6), `docs/WORK_LOG.md` (older entries archived), `src/DynamicIsland.App/{AppHost.cs, IslandWindow.xaml.cs, MediaView.cs, NotchView.xaml, WidgetPresenter.cs, packages.lock.json}`, `src/DynamicIsland.Infrastructure/{DynamicIsland.Infrastructure.csproj, packages.lock.json}`, `src/DynamicIsland.Launcher/packages.lock.json`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, packages.lock.json}`, `tests/DynamicIsland.UnitTests/packages.lock.json`, `tests/DynamicIsland.WindowsSmokeTests/packages.lock.json`
+    - new: `docs/ADR/0023-notes-and-tasks-storage.md`, `src/DynamicIsland.App/{NotesView.cs, PersonalDataViews.cs, TasksView.cs}`, `src/DynamicIsland.Core/PersonalData/PersonalData.cs`, `src/DynamicIsland.Infrastructure/PersonalData/SqlitePersonalDataStore.cs`, `src/DynamicIsland.Widgets/NotesAndTasksWidgets.cs`, `tests/DynamicIsland.IntegrationTests/NotesAndTasksViewTests.cs`, `tests/DynamicIsland.UnitTests/PersonalData/SqlitePersonalDataStoreTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/NotesAndTasksWidgetTests.cs`
+    - Suggested commit message: `feat(widgets): SQLite notes and tasks with transactional store (P04-06, ADR 0023)`
+- 2026-10-26 P04-05 committed by the owner as `6ab223e`; CI run 40313608497 **success**: Release 582/582, Debug 589/589, 0 skipped.
 - 2026-10-26 **P04-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0022**.
   - **Core:**
     - New `Audio/AudioContracts.cs` (`IAudioService`, `AudioState`).
@@ -113,72 +148,6 @@
     - new: `docs/ADR/0021-metrics-widget.md`, `src/DynamicIsland.App/MetricsView.cs`, `src/DynamicIsland.Core/Metrics/SystemMetrics.cs`, `src/DynamicIsland.Platform.Windows/Metrics/Win32SystemMetrics.cs`, `src/DynamicIsland.Widgets/MetricsWidget.cs`, `tests/DynamicIsland.IntegrationTests/MetricsIntegrationTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/MetricsWidgetTests.cs`
     - Suggested commit message: `feat(widgets): system metrics widget sampling only while expanded (P04-04, ADR 0021)`
 - 2026-10-26 P04-03 committed by the owner as `179cef8`; CI run 40309259229 **success**: Release 545/545, Debug 552/552, 0 skipped.
-- 2026-10-26 **Owner-requested real-player check (P04-03)** with `D:\Music\Music\Avenged Sevenfold - Bat Country ... (320 KBps).mp3` in Media Player (Microsoft.ZuneMusic). Temporary probes using the app's real adapter and view, deleted afterwards.
-  - **Bug 1 fixed: album art was missing.** Media Player hands out a **768×768 32-bit BMP of 2,359,446 bytes**; the 2 MB cap skipped it, and the placeholder showed. `MediaWidget.MaxArtBytes` is now 12 MB. Rendered by eye after the fix: the art shows.
-  - **Bug 2 fixed: a blank artist line.** The file has no artist tag, which left an empty second line. The view now leaves the line out and wraps the title to 2 lines.
-  - **Next/Previous:** a single opened file has only Pause (the player disables Next/Previous: correct, our buttons are dimmed).
-    - With a queue (Avash and Adele added via the shell verb "Add to Media Player play queue"), Next went Bat Country → Avash and Previous came back, through our adapter. Previous was dimmed on the first track.
-    - Media Player sometimes **refused** an advertised Next for a moment (seen right after track changes; once over 1 s). The adapter now retries a refused, enabled command up to 5×250 ms. Unsupported commands are not retried.
-  - **Side effects on the owner's PC:**
-    - Media Player is left playing, with 2 tracks added to its queue.
-    - A `.m3u` attempt opened a Windows "Pick an app" dialog. I closed it (the dialog process was stopped after it ignored the close request) and chose no app. No file associations were changed.
-  - New tests: the art cap admits that BMP size (unit); an untagged track has a single wrapped title and no empty line (integration).
-  - **Owner follow-up (screenshots):** "Previous (not supported by this player)" on Bat Country and the same for "Next" on Adele. The cause is the queue position: Media Player turns Previous off on the first queued track and Next off on the last. The tooltip wording was wrong, so it now reads "… (not available right now)" (`MediaView.cs`, ADR 0020, TEST_MATRIX MD2). The Debug build was locked by the owner's running Debug app (PID 6272), which was not touched, so this was verified on Release: unit 455/455, integration 75/75, 0 warnings.
-- 2026-10-26 **P04-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0020**. Verified against the official Microsoft Learn docs: "Call Windows Runtime APIs in desktop apps" (2026-10-03) and the GSMTC manager reference (1809+).
-  - **Build:**
-    - TFM `net10.0-windows10.0.19041.0` for Platform.Windows, App, IntegrationTests and WindowsSmokeTests; `packages.lock.json` of those 4 only renames the TFM key.
-    - The targeting pack `Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57 is selected by the pinned SDK. The output gains `Microsoft.Windows.SDK.NET.dll` (24 MB) and `WinRT.Runtime.dll`.
-    - Output folders are now `bin\<config>\net10.0-windows10.0.19041.0\`. TEST_MATRIX's run path and ADR 0002 are updated.
-  - **Core:**
-    - New `Media/MediaContracts.cs` (`IMediaSessionService`, `MediaInfo`, `MediaPlaybackState`, `MediaControls`, `MediaCommand`).
-    - `IWidget.ExecuteAsync` (default false); `WidgetRegistry.ExecuteAsync` (only for running widgets).
-    - `IslandLayout.Expanded` 420×180 → **420×212**.
-  - **Platform.Windows:** new `Media/WindowsMediaSessionService.cs`.
-    - Follows the current GSMTC session through events; no polling.
-    - Closed sessions and sessions without title/artist mean nothing playing.
-    - Counts sessions; maps the player's controls; art over 12 MB is refused (was 2 MB, see the real-player check below).
-    - WinRT errors mean no session or a refused command, never a throw.
-  - **Widgets:** new `MediaWidget` + `MediaSnapshot`.
-    - An event loop with a 60 ms settle; art is re-read only when the track changes.
-    - Degraded `no-media` or `media-unavailable` (idles, no retry loop); commands previous/play-pause/next.
-    - Registered in `BuiltInWidgets.Create(settings, time, media)`.
-  - **App:**
-    - New `MediaView` (art, title, artist, "· N more playing", 3 icon buttons that are disabled with a tooltip when unsupported; AutomationIds `Media.*`; focus ring).
-    - New `AlbumArtCache` (decodes off the UI thread at 96 px and freezes; keeps only the current image).
-    - `WidgetPresenter.Views` now receives the presenter (`Execute`, `AlbumArt`); `AppLog` 1059 WidgetCommandFailed.
-    - `NotchView` hides the top-row time while the expanded panel shows the large clock (no duplicate time).
-  - **Tests:**
-    - Unit: `Widgets/MediaWidgetTests.cs` (7).
-    - Integration: `MediaWidgetIntegrationTests` (2). One runs the **real Windows adapter read-only, with no commands sent to the user's player**. The other runs a scripted service through the real registry, presenter and view: the art decodes, the unsupported button is disabled, and the clicks reach the service.
-    - Clock presenter test adjusted for two widgets.
-    - Visual references **notch-expanded.png and notch-pinned.png regenerated** (new height) and checked by eye.
-    - Real Release app: widget-media went Starting → Degraded `no-media`; no track text in the log; exit 0.
-  - **Changed files for the owner:**
-    - modified: `docs/ADR/{0002-solution-layout-and-test-platform.md, README.md}`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `src/DynamicIsland.App/{AppHost.cs, AppLog.cs, DynamicIsland.App.csproj, NotchView.xaml.cs, WidgetPresenter.cs, packages.lock.json}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Platform.Windows/{DynamicIsland.Platform.Windows.csproj, packages.lock.json}`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, DynamicIsland.IntegrationTests.csproj, packages.lock.json, References/notch-expanded.png, References/notch-pinned.png}`, `tests/DynamicIsland.WindowsSmokeTests/{DynamicIsland.WindowsSmokeTests.csproj, packages.lock.json}`
-    - new: `docs/ADR/0020-media-widget.md`, `src/DynamicIsland.App/{AlbumArtCache.cs, MediaView.cs}`, `src/DynamicIsland.Core/Media/MediaContracts.cs`, `src/DynamicIsland.Platform.Windows/Media/WindowsMediaSessionService.cs`, `src/DynamicIsland.Widgets/MediaWidget.cs`, `tests/DynamicIsland.IntegrationTests/MediaWidgetIntegrationTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/MediaWidgetTests.cs`
-    - Suggested commit message: `feat(widgets): media widget over Windows media sessions (P04-03, ADR 0020)` (includes the real-player fixes)
-- 2026-10-26 P04-02 committed by the owner as `abd5693`; CI run 40303146979 **success**: Release 534/534, Debug 541/541, 0 skipped.
-- 2026-10-26 **P04-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0019**; ADR 0016 §4/§6 are amended. No countdown timers or stopwatch: they were offered to the owner, who did not ask for them (guide: "timers only if approved").
-  - **Core:** `IWidget.SetActive`/`OnSystemChanged` (default no-ops); `WidgetRegistry.SetActive/NotifySystemChanged/Dispose`.
-  - **Widgets:**
-    - New `ClockWidget` + `ClockSnapshot`: ticking on the `TimeProvider` aligned to the minute or second, waking on settings, activation and system changes; inactive means no ticks. Uses `ClockFormatter` (ADR 0016) and the long date.
-    - `BuiltInWidgets.Create(settings, time)` returns the clock.
-  - **App:**
-    - **`NotchClock.cs` deleted.** `WidgetPresenter` now sets the notch text from the clock slot (blank when off, failed or in Safe Mode) and renders the expanded clock view (34 px light time plus the long date).
-    - The presenter maps island visibility to `SetActive` and forwards `SystemEvents` (time, locale, resume).
-    - `AppHost`/`App.xaml.cs` wiring updated.
-  - **Tests:**
-    - **`NotchClockTests.cs` deleted.**
-    - Unit: `Widgets/ClockWidgetTests.cs` (6, real time, bounded): immediate publish with the options and date; at most 2 publishes in 1.5 s by default; 3–5 in 2.5 s with seconds; inactive means no ticks, then catch-up; settings and system changes refresh at once; stop and release.
-    - Integration: `ClockWidgetPresenterTests` (real registry, widget, presenter and NotchView): the notch shows the compact text, the panel shows the time and date, and disabling clears both.
-    - An expanded rendering was checked by eye.
-  - **Process note:** while removing the two files I ran `git rm`, which staged the deletions against the no-git-writes rule. I immediately unstaged them with `git reset -q -- <the two paths>`; the index again matches HEAD, and the files are only deleted in the working tree.
-  - **Changed files for the owner:**
-    - modified: `docs/ADR/{0016-notch-clock.md, README.md}`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (CW1–CW3), `docs/WORK_LOG.md` (older entries archived), `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`
-    - deleted: `src/DynamicIsland.App/NotchClock.cs`, `tests/DynamicIsland.IntegrationTests/NotchClockTests.cs`
-    - new: `docs/ADR/0019-clock-widget.md`, `src/DynamicIsland.Widgets/ClockWidget.cs`, `tests/DynamicIsland.IntegrationTests/ClockWidgetPresenterTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/ClockWidgetTests.cs`
-    - Suggested commit message: `feat(widgets): clock and date widget drives notch and expanded view (P04-02, ADR 0019)`
-- 2026-10-26 P04-01 committed by the owner as `294a8f0`; CI run 40301030072 **success**: Release 533/533, Debug 540/540, 0 skipped.
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -187,6 +156,9 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | P04-06 | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet restore`; `dotnet build -c Release` (0 warnings); Release unit and integration ×2 | PASS (partial) | Unit 507/507 ×2, integration 85/85 ×2, 0 skipped |
+| 2026-10-26 | P04-06 | same | Debug build and the smoke suite | **NOT RUN** | The owner's Debug DynamicIsland (PID 13416, started 17:13) was running: it locks `bin\Debug` and the single-instance lock the smoke tests need. It was not closed by the agent. Run when no instance is running; CI covers both. |
+| 2026-10-26 | P04-05 | GitHub Actions `windows-2025` (`6ab223e`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40313608497; 582/582 and 589/589, 0 skipped |
 | 2026-10-26 | P04-05 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2; integration alone ×2 | PASS | Release 582/582 ×2, Debug 589/589 ×2, **0 skipped**; integration 82/82 ×2 |
 | 2026-10-26 | P04-05 | same, real Release app 5 s | `DynamicIsland.exe`, then close | PASS | widget-volume Healthy (Core Audio connected); exit 0 |
 | 2026-10-26 | P04-04 | GitHub Actions `windows-2025` (`5f13f25`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40310973120; 562/562 and 569/569, 0 skipped |

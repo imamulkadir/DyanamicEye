@@ -51,6 +51,8 @@ public sealed class WidgetPresenter : IDisposable
         [WidgetIds.Media] = presenter => new MediaView(presenter),
         [WidgetIds.SystemStats] = _ => new MetricsView(),
         [WidgetIds.Volume] = presenter => new VolumeView(presenter),
+        [WidgetIds.Tasks] = presenter => new TasksView(presenter),
+        [WidgetIds.Notes] = presenter => new NotesView(presenter),
     };
 
     private readonly Dictionary<string, WidgetView> _views = new(StringComparer.Ordinal);

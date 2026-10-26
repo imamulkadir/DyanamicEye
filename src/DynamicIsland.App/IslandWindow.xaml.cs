@@ -65,6 +65,16 @@ public sealed partial class IslandWindow : Window, IDisposable
         Notch.PinToggle.Click += (_, _) => _state.Fire(IslandInput.TogglePin);
         Notch.ContentChanged += OnNotchContentChanged;
         PreviewKeyDown += OnPreviewKeyDown;
+
+        // Escape bubbles: a text box (add a note, edit a task) handles it first to clear or cancel (ADR 0023).
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape)
+            {
+                _state.Fire(IslandInput.Escape);
+                e.Handled = true;
+            }
+        };
         _state.StateChanged += (_, e) => ApplyState(e.Previous, e.Current, animate: true);
 
         _settings.Changed += (_, _) => Dispatcher.BeginInvoke(() =>
@@ -222,10 +232,6 @@ public sealed partial class IslandWindow : Window, IDisposable
     {
         switch (e.Key)
         {
-            case Key.Escape:
-                _state.Fire(IslandInput.Escape);
-                e.Handled = true;
-                break;
             case Key.Enter or Key.Space when _state.State is IslandState.Collapsed or IslandState.Peek && Notch.IslandSurface.IsKeyboardFocused:
                 _state.Fire(IslandInput.Click);
                 e.Handled = true;

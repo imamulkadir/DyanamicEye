@@ -148,8 +148,9 @@ internal sealed class MediaView : WidgetView
         chrome.SetValue(Border.BorderBrushProperty, Brushes.Transparent);
         chrome.SetValue(Border.BackgroundProperty, Brushes.Transparent);
         var content = new FrameworkElementFactory(typeof(ContentPresenter));
-        content.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-        content.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        content.SetValue(FrameworkElement.HorizontalAlignmentProperty, new TemplateBindingExtension(Control.HorizontalContentAlignmentProperty));
+        content.SetValue(FrameworkElement.VerticalAlignmentProperty, new TemplateBindingExtension(Control.VerticalContentAlignmentProperty));
+        content.SetValue(FrameworkElement.MarginProperty, new TemplateBindingExtension(Control.PaddingProperty));
         chrome.AppendChild(content);
 
         var template = new ControlTemplate(typeof(ButtonBase)) { VisualTree = chrome };
@@ -165,6 +166,9 @@ internal sealed class MediaView : WidgetView
 
         var style = new Style(typeof(ButtonBase));
         style.Setters.Add(new Setter(Control.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0xF2, 0xF3, 0xF5))));
+        style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+        style.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+        style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
         style.Setters.Add(new Setter(FrameworkElement.FocusVisualStyleProperty, null));
         style.Setters.Add(new Setter(Control.TemplateProperty, template));
         style.Seal();

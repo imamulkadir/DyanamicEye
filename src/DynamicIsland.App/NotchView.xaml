@@ -95,8 +95,12 @@
                                Text="Widgets will appear here."
                                Foreground="#B3F2F3F5" FontSize="12"
                                VerticalAlignment="Center" HorizontalAlignment="Center" />
-                    <StackPanel x:Name="WidgetPanel" VerticalAlignment="Center"
-                                AutomationProperties.Name="Widgets" />
+                    <!-- Scrolls only when the content is taller than the expanded maximum (ADR 0022/0023). -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  Focusable="False" PanningMode="VerticalOnly">
+                        <StackPanel x:Name="WidgetPanel" VerticalAlignment="Center"
+                                    AutomationProperties.Name="Widgets" />
+                    </ScrollViewer>
                 </Grid>
             </Grid>
         </Grid>

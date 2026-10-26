@@ -75,15 +75,21 @@ public sealed class TrayMenuModelTests
     }
 
     [Fact]
-    public void Features_from_later_tasks_are_disabled_with_an_explanation()
+    public void Update_check_is_disabled_with_an_explanation_until_it_exists_and_settings_is_available()
     {
         var menu = TrayMenuModel.Build(IslandState.Collapsed, safeMode: false, [Primary], null);
 
-        foreach (var command in new[] { TrayCommand.Settings, TrayCommand.CheckForUpdates })
-        {
-            var item = menu.Single(i => i.Command == command);
-            Assert.False(item.Enabled);
-            Assert.False(string.IsNullOrWhiteSpace(item.ToolTip));
-        }
+        var updates = menu.Single(i => i.Command == TrayCommand.CheckForUpdates);
+        Assert.False(updates.Enabled);
+        Assert.False(string.IsNullOrWhiteSpace(updates.ToolTip));
+        Assert.True(menu.Single(i => i.Command == TrayCommand.Settings).Enabled);
+    }
+
+    [Fact]
+    public void Display_order_is_left_to_right_then_top_to_bottom()
+    {
+        var below = Primary with { Id = "below-id", Bounds = new(0, 1080, 1920, 1080), IsPrimary = false };
+
+        Assert.Equal(["left-id", "primary-id", "below-id"], TrayMenuModel.OrderDisplays([below, Primary, Left]).Select(m => m.Id));
     }
 }

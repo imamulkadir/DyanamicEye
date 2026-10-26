@@ -43,5 +43,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0011 — Activity budget, power-aware motion and visual regression](0011-activity-budget-motion-visual-qa.md) — Accepted (P02-05)
 - [0012 — Notification-area (tray) icon](0012-tray-icon.md) — Accepted (P03-01)
 - [0013 — Tray actions, settings service, restart contract and shutdown mode](0013-tray-actions-settings-restart.md) — Accepted (P03-02)
+- [0014 — Settings window: navigation, save semantics, validation and reset](0014-settings-window.md) — Accepted (P03-03)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

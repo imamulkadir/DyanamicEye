@@ -55,7 +55,7 @@ public static class TrayMenuModel
             new(TrayCommand.TogglePause, paused ? "_Resume" : "P_ause", ToolTip: paused ? null : "Hide the island and pause its background work", AutomationId: "Tray.TogglePause"),
             new(TrayCommand.DisplayMenu, "_Display", AutomationId: "Tray.Display", Children: DisplayItems(monitors, islandMonitorId)),
             TrayMenuItem.Separator,
-            new(TrayCommand.Settings, "_Settings…", Enabled: false, ToolTip: "The settings window arrives in the next update", AutomationId: "Tray.Settings"),
+            new(TrayCommand.Settings, "_Settings…", AutomationId: "Tray.Settings"),
             new(TrayCommand.CheckForUpdates, "Check for _updates", Enabled: false, ToolTip: "Update checks arrive in a later version", AutomationId: "Tray.CheckForUpdates"),
             new(TrayCommand.OpenLogs, "Open _logs folder", AutomationId: "Tray.OpenLogs"),
             TrayMenuItem.Separator,
@@ -65,10 +65,14 @@ public static class TrayMenuModel
         ];
     }
 
+    /// <summary>The order behind the user-visible "Display N" numbers (tray and settings): left to right, then top to bottom.</summary>
+    public static MonitorInfo[] OrderDisplays(IReadOnlyList<MonitorInfo> monitors) =>
+        [.. monitors.OrderBy(m => m.Bounds.Left).ThenBy(m => m.Bounds.Top)];
+
     /// <summary>Displays ordered left-to-right, top-to-bottom: "Display 1 (primary)", "Display 2", …, then reset.</summary>
     private static TrayMenuItem[] DisplayItems(IReadOnlyList<MonitorInfo> monitors, string? islandMonitorId)
     {
-        var ordered = monitors.OrderBy(m => m.Bounds.Left).ThenBy(m => m.Bounds.Top).ToArray();
+        var ordered = OrderDisplays(monitors);
         var items = new List<TrayMenuItem>(ordered.Length + 2);
         for (var i = 0; i < ordered.Length; i++)
         {

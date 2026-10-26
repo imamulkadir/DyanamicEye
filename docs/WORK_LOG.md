@@ -2,6 +2,23 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-26 (summary lines P00 … P02-05, moved from RECENT VERIFIED CHANGES)
+
+### Verified changes
+- 2026-10-25 P02-05 pushed; CI run 40207131071 **success**: Release 342, Debug 343, **0 skipped**, including the fullscreen end-to-end and visual regression tests.
+- 2026-10-25 P02-04 + P02-05 IMPLEMENTED_AWAITING_VALIDATION: fullscreen detection with the cloaked-window fix, idle budget (0 ms CPU), power-aware motion, notch visual regression (ADRs 0010/0011). Details are in WORK_LOG.
+- 2026-10-25 P02-03 IMPLEMENTED_AWAITING_VALIDATION + notch redesign: state machine, UIA, keyboard/focus, notch design (ADR 0009 + amendment); CI 40204446036 success. Details are in WORK_LOG.
+- 2026-10-25 P02-02 IMPLEMENTED_AWAITING_VALIDATION: display-change debounce, placement controller, click-through, DPI scope, original icon (ADR 0008 amendment). Details are in WORK_LOG.
+- 2026-10-25 P02-01 pushed; CI run 40201946771 **success**, including the placement smoke test on the runner.
+- 2026-10-25 P02-01 DONE: island window, Win32 monitor service, placement calculator, PerMonitorV2 manifest (ADR 0008). Details are in WORK_LOG.
+- 2026-10-25 P01-05 pushed; CI run 40201274900 **success**. **G01 confirmed on CI.**
+- 2026-10-25 P01-05 DONE: component error boundaries, notices, diagnostics preview (ADR 0007). Details are in WORK_LOG.
+- 2026-10-25 P01-04 pushed; CI run 40200547110 **success** (Release and Debug steps, including the crash-injection smoke tests on the runner).
+- 2026-10-25 P01-04 DONE: crash supervision, launcher, Safe Mode, Debug-only test hooks (ADR 0006). Details are in WORK_LOG.
+- 2026-10-25 P01-03 DONE + CI fix: lifecycle coordinator, single instance with acknowledged pipe (ADR 0005); CI 40199779718 success.
+- 2026-10-25 P01-02 DONE: redacting rolling log (ADR 0004). P01-01 DONE: versioned settings store (ADR 0003).
+- 2026-10-25 P00-01..04 DONE: baseline, SDK pin, solution/build policy, Windows CI; G00 PASS.
+
 ## Archived 2026-10-25 (P02-04, P02-05)
 
 ### Verified changes

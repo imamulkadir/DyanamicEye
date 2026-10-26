@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -33,6 +32,7 @@ public sealed class TrayController : IDisposable
     private readonly IMonitorService _monitors;
     private readonly Func<string?> _islandMonitorId;
     private readonly RestartService _restart;
+    private readonly Action _openSettings;
     private readonly string _logsFolder;
     private readonly ILogger<TrayController> _logger;
     private readonly HwndSource _messageWindow;
@@ -47,6 +47,7 @@ public sealed class TrayController : IDisposable
         IMonitorService monitors,
         Func<string?> islandMonitorId,
         RestartService restart,
+        Action openSettings,
         string logsFolder,
         ILogger<TrayController> logger)
     {
@@ -57,6 +58,7 @@ public sealed class TrayController : IDisposable
         _monitors = monitors;
         _islandMonitorId = islandMonitorId;
         _restart = restart;
+        _openSettings = openSettings;
         _logsFolder = logsFolder;
         _logger = logger;
 
@@ -204,6 +206,9 @@ public sealed class TrayController : IDisposable
                     Appearance = s.Appearance with { HorizontalOffset = defaults.HorizontalOffset, VerticalOffset = defaults.VerticalOffset },
                 });
                 break;
+            case TrayCommand.Settings:
+                _openSettings();
+                break;
             case TrayCommand.OpenLogs:
                 OpenLogsFolder();
                 break;
@@ -237,16 +242,9 @@ public sealed class TrayController : IDisposable
 
     private void OpenLogsFolder()
     {
-        try
+        if (ShellLauncher.TryOpenFolder(_logsFolder) is { } errorType)
         {
-            Directory.CreateDirectory(_logsFolder);
-            var startInfo = new ProcessStartInfo("explorer.exe") { UseShellExecute = false };
-            startInfo.ArgumentList.Add(_logsFolder);
-            Process.Start(startInfo)?.Dispose();
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
-        {
-            AppLog.OpenLogsFailed(_logger, ex.GetType().Name);
+            AppLog.OpenLogsFailed(_logger, errorType);
         }
     }
 }

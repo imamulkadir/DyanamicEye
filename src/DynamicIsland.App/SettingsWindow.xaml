@@ -1,0 +1,338 @@
+<Window x:Class="DynamicIsland.App.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dynamic Island settings"
+        AutomationProperties.AutomationId="Settings.Window"
+        Width="720" Height="560" MinWidth="560" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+    <!-- Standard system styles only, so high-contrast themes apply; layout scales with per-monitor DPI (ADR 0014). -->
+    <Window.Resources>
+        <Style x:Key="PageTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+            <Setter Property="Margin" Value="0,2,0,10" />
+        </Style>
+        <Style x:Key="Error" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="Firebrick" />
+            <Setter Property="Margin" Value="0,2,0,8" />
+            <Style.Triggers>
+                <Trigger Property="Text" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Trigger>
+                <Trigger Property="Text" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Trigger>
+                <DataTrigger Binding="{Binding Source={x:Static SystemParameters.HighContrast}}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" />
+                    <Setter Property="FontWeight" Value="Bold" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="Label">
+            <Setter Property="Padding" Value="0,6,0,2" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="3" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="26" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="MinWidth" Value="88" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="10,2" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,6,0,2" />
+        </Style>
+        <Style TargetType="ScrollViewer">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="Focusable" Value="False" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- Read-only store banner (ADR 0003): changes apply until the app restarts. -->
+        <Border x:Name="ReadOnlyBanner" DockPanel.Dock="Top" Visibility="Collapsed" Padding="12,8"
+                Background="{DynamicResource {x:Static SystemColors.InfoBrushKey}}"
+                AutomationProperties.AutomationId="Settings.ReadOnlyBanner">
+            <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
+                       Text="Settings can't be saved on this PC (the settings file belongs to a newer version or could not be upgraded). Changes apply until Dynamic Island restarts." />
+        </Border>
+
+        <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" Padding="12,10"
+                BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="RevertButton" Content="_Revert" Margin="8,0,0,0" Click="OnRevert"
+                            ToolTip="Discard the changes you have not saved"
+                            AutomationProperties.AutomationId="Settings.Revert"
+                            IsEnabled="{Binding IsDirty}" />
+                    <Button x:Name="SaveButton" Content="_Save" Margin="8,0,0,0" IsDefault="True" Click="OnSave"
+                            ToolTip="Save (Ctrl+S)"
+                            AutomationProperties.AutomationId="Settings.Save"
+                            IsEnabled="{Binding CanSave}" />
+                    <Button Content="_Close" Margin="8,0,0,0" IsCancel="True" Click="OnCloseClick"
+                            AutomationProperties.AutomationId="Settings.Close" />
+                </StackPanel>
+                <TextBlock x:Name="StatusText" VerticalAlignment="Center" TextWrapping="Wrap"
+                           AutomationProperties.AutomationId="Settings.Status"
+                           AutomationProperties.LiveSetting="Polite" />
+            </DockPanel>
+        </Border>
+
+        <TabControl x:Name="Pages" TabStripPlacement="Left" Padding="16,12" BorderThickness="1,0,0,0"
+                    AutomationProperties.Name="Settings pages" AutomationProperties.AutomationId="Settings.Pages">
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="Padding" Value="14,7" />
+                    <Setter Property="MinWidth" Value="130" />
+                    <Setter Property="HorizontalContentAlignment" Value="Left" />
+                </Style>
+            </TabControl.Resources>
+
+            <!-- General -->
+            <TabItem Header="General" AutomationProperties.AutomationId="Settings.Page.General">
+                <ScrollViewer>
+                    <StackPanel MaxWidth="520" HorizontalAlignment="Left">
+                        <TextBlock Text="General" Style="{StaticResource PageTitle}" />
+                        <Label Content="_Display" Target="{Binding ElementName=DisplayBox}" />
+                        <ComboBox x:Name="DisplayBox" ItemsSource="{Binding DisplayOptions}" DisplayMemberPath="Label"
+                                  SelectedItem="{Binding SelectedDisplay}"
+                                  AutomationProperties.Name="Display" AutomationProperties.AutomationId="Settings.Display" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Displays are numbered from left to right, as in the tray menu. If the chosen display is missing, the island uses the primary display." />
+
+                        <Label Content="Start with Windows" />
+                        <TextBlock x:Name="StartWithWindowsText" Style="{StaticResource Hint}"
+                                   AutomationProperties.AutomationId="Settings.StartWithWindows" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                            <Button Content="Reset this _page" Click="OnResetPage" Tag="General"
+                                    AutomationProperties.AutomationId="Settings.Reset.General" />
+                            <Button Content="Reset _all settings…" Margin="8,0,0,0" Click="OnResetAll"
+                                    AutomationProperties.AutomationId="Settings.ResetAll" />
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Reset fills in the defaults; nothing changes until you select Save. Your Start with Windows and update-check choices are never reset." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Appearance -->
+            <TabItem Header="Appearance" AutomationProperties.AutomationId="Settings.Page.Appearance">
+                <ScrollViewer>
+                    <StackPanel MaxWidth="520" HorizontalAlignment="Left">
+                        <TextBlock Text="Appearance" Style="{StaticResource PageTitle}" />
+
+                        <Label Content="_Theme" Target="{Binding ElementName=ThemeBox}" />
+                        <ComboBox x:Name="ThemeBox" SelectedValuePath="Value" DisplayMemberPath="Label"
+                                  SelectedValue="{Binding Theme}" AutomationProperties.Name="Theme" AutomationProperties.AutomationId="Settings.Theme" />
+
+                        <Label Content="_Size" Target="{Binding ElementName=ScaleSlider}" />
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" MinWidth="48" Margin="8,0,0,0" VerticalAlignment="Center"
+                                       Text="{Binding Scale, StringFormat={}{0:P0}}" />
+                            <Slider x:Name="ScaleSlider" Minimum="0.75" Maximum="2" SmallChange="0.05" LargeChange="0.25"
+                                    TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding Scale}"
+                                    AutomationProperties.Name="Size" AutomationProperties.AutomationId="Settings.Scale" />
+                        </DockPanel>
+
+                        <Label Content="_Opacity" Target="{Binding ElementName=OpacitySlider}" />
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" MinWidth="48" Margin="8,0,0,0" VerticalAlignment="Center"
+                                       Text="{Binding Opacity, StringFormat={}{0:P0}}" />
+                            <Slider x:Name="OpacitySlider" Minimum="0.3" Maximum="1" SmallChange="0.05" LargeChange="0.1"
+                                    TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding Opacity}"
+                                    AutomationProperties.Name="Opacity" AutomationProperties.AutomationId="Settings.Opacity" />
+                        </DockPanel>
+
+                        <Label Content="_Position" Target="{Binding ElementName=PlacementBox}" />
+                        <ComboBox x:Name="PlacementBox" SelectedValuePath="Value" DisplayMemberPath="Label"
+                                  SelectedValue="{Binding Placement}" AutomationProperties.Name="Position" AutomationProperties.AutomationId="Settings.Placement" />
+
+                        <Label Content="_Horizontal offset (pixels at 100 % scaling)" Target="{Binding ElementName=HorizontalOffsetBox}" />
+                        <TextBox x:Name="HorizontalOffsetBox" Width="120" HorizontalAlignment="Left"
+                                 Text="{Binding HorizontalOffsetText, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="Horizontal offset in pixels at 100 % scaling" AutomationProperties.AutomationId="Settings.HorizontalOffset"
+                                 AutomationProperties.HelpText="{Binding HorizontalOffsetError}" />
+                        <TextBlock Style="{StaticResource Error}" Text="{Binding HorizontalOffsetError}" />
+
+                        <Label Content="_Gap below the top edge (pixels at 100 % scaling)" Target="{Binding ElementName=VerticalOffsetBox}" />
+                        <TextBox x:Name="VerticalOffsetBox" Width="120" HorizontalAlignment="Left"
+                                 Text="{Binding VerticalOffsetText, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="Gap below the top edge in pixels at 100 % scaling" AutomationProperties.AutomationId="Settings.VerticalOffset"
+                                 AutomationProperties.HelpText="{Binding VerticalOffsetError}" />
+                        <TextBlock Style="{StaticResource Error}" Text="{Binding VerticalOffsetError}" />
+
+                        <Label Content="_Motion" Target="{Binding ElementName=MotionBox}" />
+                        <ComboBox x:Name="MotionBox" SelectedValuePath="Value" DisplayMemberPath="Label"
+                                  SelectedValue="{Binding Motion}" AutomationProperties.Name="Motion" AutomationProperties.AutomationId="Settings.Motion" />
+
+                        <Button Content="Reset this _page" Margin="0,16,0,0" HorizontalAlignment="Left" Click="OnResetPage" Tag="Appearance"
+                                AutomationProperties.AutomationId="Settings.Reset.Appearance" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Behavior -->
+            <TabItem Header="Behavior" AutomationProperties.AutomationId="Settings.Page.Behavior">
+                <ScrollViewer>
+                    <StackPanel MaxWidth="520" HorizontalAlignment="Left">
+                        <TextBlock Text="Behavior" Style="{StaticResource PageTitle}" />
+
+                        <CheckBox Content="Show a _preview when the pointer rests on the island" IsChecked="{Binding HoverPreviewEnabled}"
+                                  AutomationProperties.AutomationId="Settings.HoverPreview" />
+                        <Label Content="Preview _delay (milliseconds)" Target="{Binding ElementName=HoverDelayBox}" />
+                        <TextBox x:Name="HoverDelayBox" Width="120" HorizontalAlignment="Left"
+                                 IsEnabled="{Binding HoverPreviewEnabled}"
+                                 Text="{Binding HoverPreviewDelayText, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="Preview delay in milliseconds" AutomationProperties.AutomationId="Settings.HoverDelay"
+                                 AutomationProperties.HelpText="{Binding HoverPreviewDelayError}" />
+                        <TextBlock Style="{StaticResource Error}" Text="{Binding HoverPreviewDelayError}" />
+
+                        <CheckBox Content="_Hide the island while a fullscreen app or game is in front" IsChecked="{Binding AutoHideInFullscreen}"
+                                  AutomationProperties.AutomationId="Settings.AutoHide" />
+                        <Label Content="_Keep the island visible over these fullscreen programs (one per line, e.g. vlc.exe)"
+                               Target="{Binding ElementName=ExceptionsBox}" />
+                        <TextBox x:Name="ExceptionsBox" AcceptsReturn="True" MinHeight="90" MaxHeight="200" TextWrapping="NoWrap"
+                                 VerticalScrollBarVisibility="Auto" IsEnabled="{Binding AutoHideInFullscreen}"
+                                 Text="{Binding FullscreenExceptionsText, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="Programs that keep the island visible in fullscreen, one per line" AutomationProperties.AutomationId="Settings.FullscreenExceptions"
+                                 AutomationProperties.HelpText="{Binding FullscreenExceptionsError}" />
+                        <TextBlock Style="{StaticResource Error}" Text="{Binding FullscreenExceptionsError}" />
+                        <TextBlock Style="{StaticResource Hint}" Text="This list stays on this PC and is never written to logs or diagnostic reports." />
+
+                        <Button Content="Reset this _page" Margin="0,16,0,0" HorizontalAlignment="Left" Click="OnResetPage" Tag="Behavior"
+                                AutomationProperties.AutomationId="Settings.Reset.Behavior" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Widgets -->
+            <TabItem Header="Widgets" AutomationProperties.AutomationId="Settings.Page.Widgets">
+                <DockPanel MaxWidth="520" HorizontalAlignment="Left" LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top" Text="Widgets" Style="{StaticResource PageTitle}" />
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}"
+                               Text="Choose which widgets the island shows and their order. The widgets themselves arrive in a later update; your choices are kept." />
+                    <StackPanel DockPanel.Dock="Right" Margin="8,0,0,0">
+                        <Button Content="Move _up" Click="OnMoveUp" AutomationProperties.AutomationId="Settings.Widgets.Up" />
+                        <Button Content="Move do_wn" Margin="0,8,0,0" Click="OnMoveDown" AutomationProperties.AutomationId="Settings.Widgets.Down" />
+                        <Button Content="Reset this _page" Margin="0,24,0,0" Click="OnResetPage" Tag="Widgets"
+                                AutomationProperties.AutomationId="Settings.Reset.Widgets" />
+                    </StackPanel>
+                    <ListBox x:Name="WidgetList" ItemsSource="{Binding Widgets}" MinWidth="240" MinHeight="180" VerticalAlignment="Top"
+                             KeyboardNavigation.TabNavigation="Continue"
+                             AutomationProperties.Name="Widgets" AutomationProperties.AutomationId="Settings.Widgets">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="AutomationProperties.Name" Value="{Binding Label}" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Label}" IsChecked="{Binding Enabled}" Margin="2"
+                                          AutomationProperties.AutomationId="{Binding Id, StringFormat=Settings.Widget.{0}}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </TabItem>
+
+            <!-- Updates -->
+            <TabItem Header="Updates" AutomationProperties.AutomationId="Settings.Page.Updates">
+                <ScrollViewer>
+                    <StackPanel MaxWidth="520" HorizontalAlignment="Left">
+                        <TextBlock Text="Updates" Style="{StaticResource PageTitle}" />
+                        <Label Content="Installed version" />
+                        <TextBlock x:Name="UpdatesVersionText" AutomationProperties.AutomationId="Settings.Version" />
+                        <Label Content="Daily update check" Margin="0,12,0,0" />
+                        <TextBlock x:Name="UpdateChecksText" Style="{StaticResource Hint}"
+                                   AutomationProperties.AutomationId="Settings.UpdateChecks" />
+                        <Button Content="Check for _updates" HorizontalAlignment="Left" IsEnabled="False"
+                                ToolTipService.ShowOnDisabled="True" ToolTip="Update checks arrive in a later version"
+                                AutomationProperties.AutomationId="Settings.CheckForUpdates" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0"
+                                   Text="Updates come only from the project's GitHub releases. Downloading and installing each need your separate approval." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Privacy -->
+            <TabItem Header="Privacy" AutomationProperties.AutomationId="Settings.Page.Privacy">
+                <ScrollViewer>
+                    <StackPanel MaxWidth="520" HorizontalAlignment="Left">
+                        <TextBlock Text="Privacy" Style="{StaticResource PageTitle}" />
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Dynamic Island works offline. It has no account and sends no telemetry or usage data." />
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="It does not record your activity. Window titles, clipboard contents and notes are never written to logs." />
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Logs stay on this PC, have personal details removed, and are only shared if you attach a diagnostic report yourself." />
+                        <Label Content="Your settings and data are stored in" />
+                        <TextBox x:Name="DataFolderText" IsReadOnly="True" BorderThickness="0" Background="Transparent" TextWrapping="Wrap"
+                                 AutomationProperties.Name="Data folder" AutomationProperties.AutomationId="Settings.DataFolder" />
+                        <Button Content="Open _data folder" HorizontalAlignment="Left" Margin="0,8,0,0" Click="OnOpenDataFolder"
+                                AutomationProperties.AutomationId="Settings.OpenDataFolder" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Diagnostics -->
+            <TabItem Header="Diagnostics" AutomationProperties.AutomationId="Settings.Page.Diagnostics">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" MaxWidth="560" HorizontalAlignment="Left">
+                        <TextBlock Text="Diagnostics" Style="{StaticResource PageTitle}" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="A diagnostic report helps with bug reports. You can read everything in it before saving; nothing is uploaded. Settings values, notes and window titles are never included." />
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Open _logs folder" Click="OnOpenLogs" AutomationProperties.AutomationId="Settings.OpenLogs" />
+                            <Button x:Name="PrepareReportButton" Content="_Prepare diagnostic report" Margin="8,0,0,0" Click="OnPrepareReport"
+                                    AutomationProperties.AutomationId="Settings.PrepareReport" />
+                            <Button x:Name="SaveReportButton" Content="Save _report…" Margin="8,0,0,0" Click="OnSaveReport" IsEnabled="False"
+                                    AutomationProperties.AutomationId="Settings.SaveReport" />
+                        </StackPanel>
+                        <TextBlock x:Name="ReportSummaryText" Style="{StaticResource Hint}" Margin="0,8,0,4"
+                                   AutomationProperties.AutomationId="Settings.ReportSummary" />
+                    </StackPanel>
+                    <DockPanel x:Name="ReportPreview" Visibility="Collapsed">
+                        <ListBox x:Name="ReportFiles" DockPanel.Dock="Left" MinWidth="170" Margin="0,0,8,0" DisplayMemberPath="Label"
+                                 SelectionChanged="OnReportFileSelected"
+                                 AutomationProperties.Name="Report files" AutomationProperties.AutomationId="Settings.ReportFiles" />
+                        <TextBox x:Name="ReportContent" IsReadOnly="True" FontFamily="Consolas" TextWrapping="NoWrap"
+                                 HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                                 AutomationProperties.Name="Report file content" AutomationProperties.AutomationId="Settings.ReportContent" />
+                    </DockPanel>
+                </DockPanel>
+            </TabItem>
+
+            <!-- About -->
+            <TabItem Header="About" AutomationProperties.AutomationId="Settings.Page.About">
+                <ScrollViewer>
+                    <StackPanel MaxWidth="520" HorizontalAlignment="Left">
+                        <TextBlock Text="Dynamic Island for Windows" Style="{StaticResource PageTitle}" />
+                        <TextBlock x:Name="AboutVersionText" Margin="0,0,0,8" AutomationProperties.AutomationId="Settings.AboutVersion" />
+                        <TextBlock x:Name="AboutCopyrightText" TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Free and open source under the MIT License. Third-party notices are listed in THIRD_PARTY_NOTICES.md on the project page." />
+                        <TextBlock Margin="0,0,0,8">
+                            <Hyperlink x:Name="ProjectLink" Click="OnProjectLink" AutomationProperties.AutomationId="Settings.ProjectLink">
+                                <Run Text="Project page and bug reports on GitHub" />
+                            </Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

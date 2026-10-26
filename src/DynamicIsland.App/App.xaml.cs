@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Threading;
@@ -52,7 +51,7 @@ public partial class App : Application
         _session = _host.Services.GetRequiredService<ISessionStateMarker>();
         RegisterUnhandledExceptionHandlers();
 
-        var version = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+        var version = _host.Services.GetRequiredService<AppInfo>().Version;
         var architecture = RuntimeInformation.OSArchitecture.ToString();
         AppLog.Started(_logger, version, Environment.OSVersion.VersionString, architecture);
         if (launch.SafeMode)
@@ -78,6 +77,7 @@ public partial class App : Application
         var token = _lifecycle.ApplicationStopping;
         var settings = Task.Run(() => store.LoadAsync(token), token).GetAwaiter().GetResult();
         AppLog.SettingsLoaded(_logger, settings.Outcome, settings.Corrections.Count, store.IsReadOnly);
+        _host.Services.GetRequiredService<AppInfo>().SettingsOutcome = settings.Outcome;
 
         _host.Services.GetRequiredService<SettingsService>().Initialize(settings.Settings);
         var window = _host.Services.GetRequiredService<IslandWindow>();

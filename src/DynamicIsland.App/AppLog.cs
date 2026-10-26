@@ -94,6 +94,22 @@ internal static partial class AppLog
         Message = "Pausing or resuming components did not finish in time")]
     public static partial void ComponentPauseIncomplete(ILogger logger);
 
+    [LoggerMessage(EventId = 1046, EventName = "SettingsSaved", Level = LogLevel.Information,
+        Message = "Settings saved from the settings window ({Result})")]
+    public static partial void SettingsSaved(ILogger logger, SettingsSaveResult result);
+
+    [LoggerMessage(EventId = 1047, EventName = "DiagnosticReportSaved", Level = LogLevel.Information,
+        Message = "Diagnostic report saved by the user ({Files} files, {Bytes} bytes)")]
+    public static partial void DiagnosticReportSaved(ILogger logger, int files, long bytes);
+
+    [LoggerMessage(EventId = 1048, EventName = "DiagnosticReportFailed", Level = LogLevel.Warning,
+        Message = "Diagnostic report could not be prepared or saved ({ErrorType})")]
+    public static partial void DiagnosticReportFailed(ILogger logger, string errorType);
+
+    [LoggerMessage(EventId = 1049, EventName = "OpenFolderFailed", Level = LogLevel.Warning,
+        Message = "A folder or link could not be opened ({ErrorType})")]
+    public static partial void OpenFolderFailed(ILogger logger, string errorType);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

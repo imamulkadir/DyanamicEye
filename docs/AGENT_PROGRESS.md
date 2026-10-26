@@ -3,9 +3,9 @@
 > **Keep this file accurate on every session.** This is the durable checkpoint that lets a new agent resume after a context reset. Update it alongside source changes, and never mark anything DONE without evidence. Move older detail to `docs/WORK_LOG.md` so this file stays short.
 
 ## CURRENT STATUS (read first)
-- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01 and P03-02 are implemented (awaiting manual validation).
-- **Active task:** next is P03-03 (settings window). P03-02 (tray actions, settings service, restart contract, shutdown mode; ADR 0013) is IMPLEMENTED_AWAITING_VALIDATION. G02 and the P03-01/02 manual rows (Y1–Y7, T1–T10) are owed by the owner.
-- **Active task status:** P03-02 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26). Full suites green 7× locally; the 2 intermittent smoke failures from 2026-10-25 did not reproduce. Everything since P03-01 is **uncommitted**; the owner commits. P03-01 was pushed and CI 40208475923 is green.
+- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01, P03-02 and P03-03 are implemented (awaiting manual validation).
+- **Active task:** next is P03-04 (first-run onboarding and sign-in startup). P03-03 (settings window; ADR 0014) is IMPLEMENTED_AWAITING_VALIDATION. G02 and the P03 manual rows (Y1–Y7, TA1–TA10, SW1–SW8) are owed by the owner.
+- **Active task status:** P03-03 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P03-02 is committed as `ba52b9e`, and CI 40286979868 is green with 0 skipped.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,11 +23,15 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P03-02 IMPLEMENTED_AWAITING_VALIDATION; next P03-03)
+- **Last updated:** 2026-10-26 (P03-03 IMPLEMENTED_AWAITING_VALIDATION; next P03-04)
 
 ## NEXT ACTION (ONE task only)
-**Owner first:** review and commit the P03-02 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. Watch the CI run for the two earlier intermittent smoke tests (`FullscreenSmokeTests`, `IdleBudgetSmokeTests`); if either fails, read the "App log tail" / idle-CPU diagnostic in the log before changing anything.
-**Then agent: start P03-03** (guide §5 line 178): a dedicated WPF settings window with General/Appearance/Behavior/Widgets/Updates/Privacy/Diagnostics/About navigation, explicit Save/auto-save semantics, validation and reset. Bind it to `ISettingsService` (ADR 0013), open it from the tray's Settings… item (enable that item and remove its tooltip), and keep it keyboard accessible and DPI aware. Closing it must not exit the app (`ShutdownMode=OnExplicitShutdown`). Write an ADR if the save semantics need a decision.
+**Owner first:** review and commit the P03-03 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. Optionally run manual rows SW1–SW8.
+**Then agent: start P03-04** (guide §5 P03-04): first-run onboarding that asks for sign-in startup permission and shows privacy and widget choices.
+- Startup uses HKCU only, with the stable launcher path and a 5 s default delay; a disabled startup is obeyed.
+- Write the consents (`GeneralSettings.StartWithWindows`, `UpdateSettings.AutomaticChecks`) only from an explicit user choice.
+- Replace the read-only consent text on the settings General and Updates pages (ADR 0014 §6) with real controls tied to their effect.
+- Write an ADR for the Run-entry format and the delay mechanism before implementing.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -36,7 +40,7 @@
 | P00 — Environment and baseline | P00-01…P00-04 | DONE | **G00 PASS** 2026-10-25, run 40196393380 (`963b01c`) |
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
-| P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–02 IMPLEMENTED_AWAITING_VALIDATION; 03 next; started with owner approval while G02 is open) | G03 pending |
+| P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–03 IMPLEMENTED_AWAITING_VALIDATION; 04 next; started with owner approval while G02 is open) | G03 pending |
 | P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
@@ -52,6 +56,32 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **P03-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0014**.
+  - **Core:**
+    - New `Shell/SettingsEditor.cs`: the settings-window draft (INotifyPropertyChanged), strict validation with user messages using `SettingsValidator` limits, `IsDirty`/`CanSave`, per-page and full reset (consents are never reset), widget move, and `CreateChange()`/`ApplyTo()`, which merge only the fields the user changed onto the latest settings. Loading suppresses intermediate notifications.
+    - `TrayMenu.cs`: `OrderDisplays` is shared with the settings display list, and Settings… is now enabled.
+  - **App:**
+    - New `SettingsWindow.xaml(.cs)` with 8 left tabs (General, Appearance, Behavior, Widgets, Updates, Privacy, Diagnostics, About).
+      - Buttons: Save (default, Ctrl+S), Revert, Close (Esc).
+      - Closing with unsaved changes asks Save / Don't save / Cancel. The prompt is skipped while the app shuts down or with the NoDialogs test hook.
+      - A banner shows when the store is read-only. A status line (UIA live region) names the page that holds an error.
+      - Diagnostics shows the `DiagnosticBundleBuilder` preview, then Save report… (a save dialog, then `WriteZipAsync`).
+      - Privacy shows the data folder with an Open button. About links to the GitHub page (https only).
+      - Consents are shown as read-only text.
+    - New `SettingsWindowService` (one window: open or activate), `AppInfo` (version, copyright, settings load outcome for diagnostics) and `ShellLauncher` (open a folder or an https link; the tray uses it too).
+    - `AppHost` and `TrayController` wiring; `App.xaml.cs` uses `AppInfo`.
+    - `AppLog` adds SettingsSaved (1046), DiagnosticReportSaved (1047), DiagnosticReportFailed (1048) and OpenFolderFailed (1049).
+  - **Tests:**
+    - Unit: `Shell/SettingsEditorTests.cs` (31 cases) and the display-order and settings-enabled tray tests.
+    - Integration: `SettingsWindowTests.cs` (9, real offscreen WPF window). Covers pages and AutomationIds; every input has a UIA name (this found 10 `Label.Target` inputs without names, now fixed); save merges with a concurrent tray change; reload without edits; validation disables Save; a failed save keeps the draft; read-only banner; display list; the diagnostic preview writes no file.
+    - Smoke: `Settings_opens_once_and_closing_it_keeps_the_app_running` (real app, tray → Settings… twice, WM_CLOSE, the app stays up and exits 0).
+  - **Bug found and fixed:** `Load` reported a half-loaded draft (widgets cleared) as dirty, which cleared the "Settings saved." status.
+  - **Docs:** ADR 0014; TEST_MATRIX rows SW1–SW8. The P03-02 tray rows were renamed to TA1–TA10 because T1/T2 were already used by G02, and the ADR 0013 reference was updated.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/0013-tray-actions-settings-restart.md`, `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `docs/WORK_LOG.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, TrayController.cs}`, `src/DynamicIsland.Core/Shell/TrayMenu.cs`, `tests/DynamicIsland.UnitTests/Shell/TrayMenuModelTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/TrayActionSmokeTests.cs`
+    - new: `docs/ADR/0014-settings-window.md`, `src/DynamicIsland.App/{AppInfo.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs, SettingsWindowService.cs, ShellLauncher.cs}`, `src/DynamicIsland.Core/Shell/SettingsEditor.cs`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`, `tests/DynamicIsland.UnitTests/Shell/SettingsEditorTests.cs`
+    - Suggested commit message: `feat(settings): settings window with explicit save, validation and reset (P03-03, ADR 0014)`
+- 2026-10-26 P03-02 committed by the owner as `ba52b9e` and pushed; CI run 40286979868 **success** (0 skipped).
 - 2026-10-26 **P03-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits).
   - Wrote ADR 0013 (`docs/ADR/0013-tray-actions-settings-restart.md`, indexed in the ADR README) and TEST_MATRIX rows T1–T10.
   - Intermittent smoke failures: neither reproduced in 7 full-suite runs (see TEST EVIDENCE). Analysis:
@@ -102,19 +132,6 @@
     - (1) `taskkill` closed the hidden tray window, so the app kept running with an orphaned icon. Fixed and regression-tested.
     - (2) The intermittent Debug click-through failure was a race with the first WPF paint of the layered window. Fixed in the test, by waiting for the painted state.
     - Known limitation: a close request while the tray menu is open only dismisses the menu.
-- 2026-10-25 P02-05 pushed; CI run 40207131071 **success**: Release 342, Debug 343, **0 skipped**, including the fullscreen end-to-end and visual regression tests.
-- 2026-10-25 P02-04 + P02-05 IMPLEMENTED_AWAITING_VALIDATION: fullscreen detection with the cloaked-window fix, idle budget (0 ms CPU), power-aware motion, notch visual regression (ADRs 0010/0011). Details are in WORK_LOG.
-- 2026-10-25 P02-03 IMPLEMENTED_AWAITING_VALIDATION + notch redesign: state machine, UIA, keyboard/focus, notch design (ADR 0009 + amendment); CI 40204446036 success. Details are in WORK_LOG.
-- 2026-10-25 P02-02 IMPLEMENTED_AWAITING_VALIDATION: display-change debounce, placement controller, click-through, DPI scope, original icon (ADR 0008 amendment). Details are in WORK_LOG.
-- 2026-10-25 P02-01 pushed; CI run 40201946771 **success**, including the placement smoke test on the runner.
-- 2026-10-25 P02-01 DONE: island window, Win32 monitor service, placement calculator, PerMonitorV2 manifest (ADR 0008). Details are in WORK_LOG.
-- 2026-10-25 P01-05 pushed; CI run 40201274900 **success**. **G01 confirmed on CI.**
-- 2026-10-25 P01-05 DONE: component error boundaries, notices, diagnostics preview (ADR 0007). Details are in WORK_LOG.
-- 2026-10-25 P01-04 pushed; CI run 40200547110 **success** (Release and Debug steps, including the crash-injection smoke tests on the runner).
-- 2026-10-25 P01-04 DONE: crash supervision, launcher, Safe Mode, Debug-only test hooks (ADR 0006). Details are in WORK_LOG.
-- 2026-10-25 P01-03 DONE + CI fix: lifecycle coordinator, single instance with acknowledged pipe (ADR 0005); CI 40199779718 success.
-- 2026-10-25 P01-02 DONE: redacting rolling log (ADR 0004). P01-01 DONE: versioned settings store (ADR 0003).
-- 2026-10-25 P00-01..04 DONE: baseline, SDK pin, solution/build policy, Windows CI; G00 PASS.
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -123,6 +140,8 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | P03-03 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then `dotnet test --solution DynamicIsland.sln -c <cfg> --no-build --max-parallel-test-modules 1`: Release ×2, Debug ×2 | PASS | 0 failed in all runs. Release 421/421 once, and 420 + 1 skipped once (the fullscreen smoke test: Windows refused the helper window foreground, so a skip, not a pass). Debug 425/425 twice. Offscreen renderings of all 8 pages were checked by eye: layout, error message, banner. |
+| 2026-10-26 | P03-02 | GitHub Actions `windows-2025` (`ba52b9e`) | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40286979868; Release 380/380, Debug 384/384, **0 skipped** (fullscreen and idle-CPU smoke tests both ran and passed) |
 | 2026-10-26 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug, then `dotnet test --solution DynamicIsland.sln -c <cfg> --no-build --max-parallel-test-modules 1`: Release ×4, Debug ×3 | PASS | 0 failed in all 7 runs. Release: 380/380 three times and 379 + 1 skipped once. Debug: 384/384 twice and 383 + 1 skipped once. Both skips were the fullscreen smoke test, skipped because Windows refused the helper window foreground; this is a skip, not a pass. The intermittent failures from 2026-10-25 did not reproduce. |
 | 2026-10-25 | P03-02 | same, `CI=true` | Full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | **2 intermittent FAILs** | Release run 1: fullscreen smoke failed. Debug run 1: idle CPU over 300 ms. Runs 2: Release 380 (1 skipped), Debug 384 green. Not yet diagnosed; see NEXT ACTION. |
 | 2026-10-25 | P02-05 | GitHub Actions `windows-2025` | CI workflow (Release + Debug, sequential modules) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40207131071; 342/343, 0 skipped |

@@ -59,5 +59,5 @@
 ## Consequences
 - P03-03 binds the settings window to `ISettingsService` and enables the Settings… item. P06 enables Check for updates.
 - The launcher must be shipped next to the app in both the portable and installed layouts, or Restart is unavailable.
-- Manual verification rows T1–T10 in `docs/TEST_MATRIX.md`, including two-monitor display selection, are owed on real
+- Manual verification rows TA1–TA10 in `docs/TEST_MATRIX.md`, including two-monitor display selection, are owed on real
   hardware.

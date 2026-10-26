@@ -77,6 +77,26 @@ public static class AppHost
         builder.Services.AddSingleton<IMotionGate, MotionGate>();
         builder.Services.AddSingleton<IslandWindow>();
         builder.Services.AddSingleton<RestartService>();
+        builder.Services.AddSingleton<AppInfo>();
+        builder.Services.AddSingleton(sp => new SettingsWindowService(() =>
+        {
+            var info = sp.GetRequiredService<AppInfo>();
+            var launch = sp.GetRequiredService<LaunchArguments>();
+            var components = sp.GetRequiredService<ComponentHost>();
+            var lifecycle = sp.GetRequiredService<LifecycleCoordinator>();
+            return new SettingsWindow(
+                sp.GetRequiredService<ISettingsService>(),
+                sp.GetRequiredService<IMonitorService>(),
+                sp.GetRequiredService<DiagnosticBundleBuilder>(),
+                new SettingsWindowContext(
+                    info.DisplayVersion,
+                    info.Copyright,
+                    root,
+                    sp.GetRequiredService<FileLoggerOptions>().Directory,
+                    () => new DiagnosticContext(info.Version, launch.SafeMode, info.SettingsOutcome?.ToString(), components.Statuses),
+                    () => lifecycle.Reason is not null),
+                sp.GetRequiredService<ILogger<SettingsWindow>>());
+        }));
         builder.Services.AddSingleton(sp => new TrayController(
             sp.GetRequiredService<IIslandStateMachine>(),
             sp.GetRequiredService<LifecycleCoordinator>(),
@@ -85,6 +105,7 @@ public static class AppHost
             sp.GetRequiredService<IMonitorService>(),
             () => sp.GetRequiredService<IslandWindow>().LastPlacement?.Monitor.Id,
             sp.GetRequiredService<RestartService>(),
+            () => sp.GetRequiredService<SettingsWindowService>().Show(),
             sp.GetRequiredService<FileLoggerOptions>().Directory,
             sp.GetRequiredService<ILogger<TrayController>>()));
         builder.Services.AddSingleton<Win32FullscreenDetector>();

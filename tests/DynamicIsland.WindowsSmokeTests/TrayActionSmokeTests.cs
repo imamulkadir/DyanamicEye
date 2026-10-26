@@ -60,6 +60,40 @@ public sealed class TrayActionSmokeTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Settings_opens_once_and_closing_it_keeps_the_app_running()
+    {
+        SkipWithoutTray();
+        using var app = RealApp.Start(RealApp.AppExe, Isolated());
+        try
+        {
+            await RealApp.WaitForMainWindowAsync(app);
+            var island = app.MainWindowHandle;
+
+            await TrayMenuDriver.InvokeAsync(app, "Tray.Settings");
+            var settings = await WaitForTopLevelAsync(app.Id, "Dynamic Island settings");
+
+            // A second request activates the open window instead of opening another one.
+            await TrayMenuDriver.InvokeAsync(app, "Tray.Settings");
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            Assert.Equal(settings, IslandWindowInterop.FindTopLevelWindow(app.Id, "Dynamic Island settings"));
+
+            IslandWindowInterop.RequestClose(settings);
+            Assert.True(await WaitUntilAsync(() => IslandWindowInterop.FindTopLevelWindow(app.Id, "Dynamic Island settings") == IntPtr.Zero), "Settings window must close.");
+            await Task.Delay(1000, TestContext.Current.CancellationToken);
+            Assert.False(app.HasExited, "Closing settings must not exit the app.");
+            Assert.True(IslandWindowInterop.IsVisible(island));
+
+            await TrayMenuDriver.InvokeAsync(app, "Tray.Exit");
+            await RealApp.WaitForExitAsync(app, RealApp.ExitTimeout);
+            Assert.Equal(0, app.ExitCode);
+        }
+        finally
+        {
+            RealApp.KillIfRunning(app);
+        }
+    }
+
 #if DYNAMICISLAND_TEST_HOOKS
     [Fact]
     public async Task Reset_display_saves_the_primary_display_choice()
@@ -188,6 +222,13 @@ public sealed class TrayActionSmokeTests : IDisposable
             using var reader = new StreamReader(stream);
             return reader.ReadToEnd();
         }));
+    }
+
+    private static async Task<IntPtr> WaitForTopLevelAsync(int processId, string title)
+    {
+        var handle = IntPtr.Zero;
+        Assert.True(await WaitUntilAsync(() => (handle = IslandWindowInterop.FindTopLevelWindow(processId, title)) != IntPtr.Zero), $"Window '{title}' did not appear.");
+        return handle;
     }
 
     private static async Task<bool> WaitUntilAsync(Func<bool> condition)

@@ -5,8 +5,6 @@ using DynamicIsland.App;
 using DynamicIsland.Core.Audio;
 using DynamicIsland.Core.Components;
 using DynamicIsland.Core.Lifecycle;
-using DynamicIsland.Core.Media;
-using DynamicIsland.Core.Metrics;
 using DynamicIsland.Core.Notifications;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Shell;
@@ -93,33 +91,31 @@ public sealed class VolumeAndLayoutTests : IDisposable
     }
 
     [Fact]
-    public void Expanded_height_follows_the_number_of_widgets()
+    public void Expanded_height_follows_the_selected_tab()
     {
-        var (one, four) = _ui.Invoke(() =>
+        var (clockHeight, tasksHeight) = _ui.Invoke(() =>
         {
             using var host = NewHost();
             using var registry = new WidgetRegistry(host, []);
             var view = new NotchView { Width = 420, Height = 360 };
             var presenter = new WidgetPresenter(registry, view, null!, null!, _lifecycle, NullLogger<WidgetPresenter>.Instance);
             view.ApplyVisualState(IslandState.Expanded, 360, 1.0);
-
-            WidgetSlot[] clockOnly = [new(WidgetIds.Clock, "Clock", Healthy, new ClockSnapshot(DateTime.Now, "2:42 PM", "2:42 PM", "Monday, October 26, 2026"))];
-            view.ShowWidgets(clockOnly, presenter.ViewFor);
-            var oneHeight = view.MeasureExpandedHeight(420);
-
-            WidgetSlot[] all =
+            var now = DateTimeOffset.Now;
+            WidgetSlot[] slots =
             [
-                .. clockOnly,
-                new(WidgetIds.Media, "Media", Healthy, new MediaSnapshot("Song", "Artist", MediaPlaybackState.Playing, MediaControls.Pause, 0, null, null)),
-                new(WidgetIds.SystemStats, "System", Healthy, new MetricsSnapshot(10, new MemoryStatus(8UL << 30, 4UL << 30), null, TimeSpan.FromHours(1))),
+                new(WidgetIds.Clock, "Clock", Healthy, new ClockSnapshot(DateTime.Now, "2:42 PM", "2:42 PM", "Monday, October 26, 2026")),
                 new(WidgetIds.Volume, "Volume", Healthy, new VolumeSnapshot(true, 50, false)),
+                new(WidgetIds.Tasks, "Tasks", Healthy, new TasksSnapshot(
+                    [.. Enumerable.Range(1, 6).Select(i => new Core.PersonalData.TaskItem(i, $"Task {i}", false, now, now, null))], 6, 0, false, null)),
             ];
-            view.ShowWidgets(all, presenter.ViewFor);
-            return (oneHeight, view.MeasureExpandedHeight(420));
+            view.ShowWidgets(slots, presenter.ViewFor);
+            var clock = view.MeasureExpandedHeight(420);
+            view.SelectWidget(WidgetIds.Tasks);
+            return (clock, view.MeasureExpandedHeight(420));
         });
 
-        Assert.True(four > one + 100, $"Four widgets ({four}) must need clearly more room than one ({one}).");
-        Assert.InRange(IslandLayout.ExpandedHeightFor(four), IslandLayout.Expanded.Height, IslandLayout.ExpandedMaxHeight);
+        Assert.True(tasksHeight > clockHeight + 60, $"Six tasks ({tasksHeight}) must need more room than the clock ({clockHeight}).");
+        Assert.InRange(IslandLayout.ExpandedHeightFor(clockHeight), IslandLayout.Expanded.Height, IslandLayout.ExpandedMaxHeight);
     }
 
     private ComponentHost NewHost() =>

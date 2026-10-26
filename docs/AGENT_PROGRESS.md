@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** next is P04-07 (backup/export/import). P04-06 (SQLite notes and tasks; ADR 0023) is IMPLEMENTED_AWAITING_VALIDATION, but its **smoke and Debug runs are still owed** (see TEST EVIDENCE). G02/G03 manual rows are still owed by the owner.
-- **Active task status:** P04-06 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-05 is committed as `6ab223e`, and CI 40313608497 is green with 0 skipped.
+- **Active task:** P04-01…P04-07 are all IMPLEMENTED_AWAITING_VALIDATION. Next is the **G04 gate evidence** (a 100-restart test and an update-shaped migration test), then the owner's manual rows. G02/G03 manual rows are still owed by the owner.
+- **Active task status:** P04-07 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-06 is committed as `c2bb883`; CI 40325111433 is green with 0 skipped and covered the Debug and smoke runs owed for P04-06.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,20 +23,24 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P04-06 IMPLEMENTED_AWAITING_VALIDATION; next P04-07)
+- **Last updated:** 2026-10-26 (P04-07 IMPLEMENTED_AWAITING_VALIDATION; next: G04 evidence)
 
 ## NEXT ACTION (ONE task only)
-**First, owed for P04-06:** with no Dynamic Island running (the owner's Debug instance locked `bin\Debug` and the single-instance lock during this session), run:
-- `dotnet build DynamicIsland.sln -c Debug --no-restore`;
-- the full suite, Release ×2 and Debug ×2 (`--max-parallel-test-modules 1`).
+**Owner:** review and commit P04-07 and the tabbed island (both file lists in RECENT VERIFIED CHANGES; one commit is fine), push, and check that CI is green. TB1–TB3 are quick manual checks.
+**Then agent: G04 gate evidence** (guide §5 G04: "all core widgets work without internet, survive 100 restarts and update-shaped migrations in tests; one failing widget never crashes others"). Two pieces are missing:
+1. A **100-restart** test: in Debug smoke, start and exit the real app 100 times on one isolated data folder, asserting each time that:
+   - the exit code is 0;
+   - notes and tasks are unchanged;
+   - settings are intact;
+   - no corrupt files appeared;
+   - widget status is Healthy or Degraded, never Failed.
+   Keep it fast (no fixed sleeps) and consider gating it to CI/nightly if it takes over about 3 minutes.
+2. An **update-shaped migration** test: a v0 database or an older settings file, the current build migrates it, and data is preserved. Add a schema-v2 rehearsal migration only in tests if needed.
+3. Already covered:
+   - "Without internet": no widget uses the network (documented by tests and the ADRs).
+   - "One failing widget never crashes others": the registry tests.
 
-Record the results. CI also covers both configurations after the push.
-**Owner:** review and commit P04-06 (file list in RECENT VERIFIED CHANGES; includes the new package and lock files), push, and check that CI is green (locked restore of `Microsoft.Data.Sqlite`).
-**Then agent: P04-07** (guide §5): backup, export and import.
-- Versioned archive (zip with `manifest.json`: version, SHA-256 per file) containing `islands.db` (via the SQLite online backup API, consistent while open) and `settings.json`.
-- Dry-run preview (counts, versions); atomic restore that writes aside first and then swaps, keeping the previous files as a rollback copy.
-- Corrupt archive and version-mismatch tests; destination chosen by the user (save/open dialogs), never automatic.
-- Write an ADR first.
+Record G04 as automated PASS, with real-hardware rows owed to the owner (MD, SM, VO, NT, BK).
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -46,7 +50,7 @@ Record the results. CI also covers both configurations after the push.
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
-| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–06 IMPLEMENTED_AWAITING_VALIDATION; 07 next; started with owner approval while G02/G03 are open) | G04 pending |
+| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–07 IMPLEMENTED_AWAITING_VALIDATION; G04 evidence next; started with owner approval while G02/G03 are open) | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
@@ -61,6 +65,60 @@ Record the results. CI also covers both configurations after the push.
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **Owner request: tabbed expanded island — IMPLEMENTED_AWAITING_VALIDATION** (uncommitted). Decisions are in **ADR 0025**; ADR 0018 §6 and ADR 0022 §5 are amended.
+  - The owner asked "why everything is shown at once? wasnt the plan to show in individual tabs?". The guide only says "click-to-expand dashboard"; the stacked layout was my reading of that (ADR 0018). Asked with 3 options, the owner chose **one widget per tab**.
+  - **App:**
+    - `NotchView.xaml` has a `TabStrip` row (hidden for 0–1 widgets).
+    - `NotchView.ShowWidgets` builds one icon `RadioButton` tab per widget with content or a failure (reused by id, AutomationId `Tab.<id>`) and shows only the selected widget's element.
+    - New `SelectedWidgetId`, `SelectWidget`, `SelectAdjacentWidget` and `SelectedWidgetChanged`. The selection is kept across updates and falls back to the first tab.
+    - `IslandWindow`: Ctrl+Tab / Ctrl+Shift+Tab cycle tabs.
+    - `WidgetPresenter` routes "expanded" only to the selected widget.
+  - **Core:** `WidgetRegistry.SetExpanded(string? visibleWidgetId)` replaces `SetExpanded(bool)`; stats now sample only while their tab is visible.
+  - **Tests:**
+    - `WidgetPanelTests` rewritten: tabs in order, selection, kept across updates, wrap-around, change events, no strip for one widget.
+    - `VolumeAndLayoutTests`: the height follows the selected tab.
+    - Unit: only the visible tab's widget is expanded.
+    - The visual references did not change (the empty tab strip starts collapsed).
+    - Clock and media tab renderings checked by eye.
+  - **Changed files (tabs):**
+    - modified: `docs/ADR/{0018-widget-registry.md, 0022-volume-widget-and-content-sized-island.md, README.md}`, `docs/TEST_MATRIX.md` (TB1–TB3), `src/DynamicIsland.App/{IslandWindow.xaml.cs, NotchView.xaml, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `tests/DynamicIsland.IntegrationTests/{VolumeAndLayoutTests.cs, WidgetPanelTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/WidgetRegistryTests.cs`
+    - new: `docs/ADR/0025-tabbed-expanded-island.md`
+    - Suggested combined commit message: `feat: backup and restore (P04-07, ADR 0024); one widget per tab in the island (ADR 0025)`
+- 2026-10-26 **P04-07 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0024**.
+  - **Core:** new `PersonalData/DataBackup.cs` (`IDataBackupService` (guide §3), `BackupPreview`, `BackupProblem`, `BackupExportResult`).
+  - **Infrastructure:** new `PersonalData/DataBackupService.cs`.
+    - **Export:** a ZIP containing `manifest.json` (format, version, createdUtc, appVersion, schemas, counts, size and SHA-256 per file), `settings.json`, and `islands.db` made with the SQLite **online backup API** (busy timeout plus retry). Written to a temporary file, then moved; never overwrites.
+    - **Preview** (dry run into `data\restore-staging\<id>`) refuses with a reason:
+      - not a ZIP;
+      - manifest problems;
+      - unknown, duplicate or missing entries (e.g. `../evil.dll`);
+      - an entry over 64 MB or a total over 256 MB (counted while unpacking, so a lying header cannot fool it);
+      - a size or SHA-256 mismatch;
+      - bad settings JSON or a database failing `quick_check`;
+      - a newer settings or data schema.
+    - **Schedule** → `data\restore-pending`.
+    - **`ApplyPendingRestore`** at startup: current files move to `rollback-<UTC>` (newest 3 kept), then the restored files move in. On failure everything is moved back and the pending folder is kept.
+    - Logs 3110–3114 carry no text or paths.
+  - **App:**
+    - `App.xaml.cs` applies a pending restore before settings or the database are opened.
+    - `AppHost` registers `IDataBackupService`.
+    - Settings → Privacy → "Back up and restore": Export backup… (save dialog), Restore from backup… (open dialog → preview summary → OK → restart through `RestartService`), and a status line.
+    - `AppLog` 1060 BackupFailed. `SettingsWindowContext` gains `Backup` and `Restart`.
+  - **Bugs found by the tests:**
+    - (1) A non-ZIP file stayed **locked** after a refused preview, because the FileStream leaked. Fixed.
+    - (2) Export intermittently failed with "database is locked": the backup step only waits with a busy handler. Fixed with `busy_timeout` and a retry; unit tests passed 4×.
+  - **Tests:**
+    - Unit: `PersonalData/DataBackupServiceTests.cs` (12):
+      - export contents and checksums while the store is open; no overwrite;
+      - full round trip with a rollback copy; a failed apply keeps the previous data;
+      - tampering, a newer version and five broken-archive kinds;
+      - a 65 MB ZIP bomb is refused without unpacking.
+    - Smoke (Debug): `RestoreSmokeTests` (the real app applies a pending restore at startup and keeps the old database in the rollback folder).
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (BK1–BK5), `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs}`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`
+    - new: `docs/ADR/0024-backup-export-import.md`, `src/DynamicIsland.Core/PersonalData/DataBackup.cs`, `src/DynamicIsland.Infrastructure/PersonalData/DataBackupService.cs`, `tests/DynamicIsland.UnitTests/PersonalData/DataBackupServiceTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/RestoreSmokeTests.cs`
+    - Suggested commit message: `feat(data): backup export and verified restore with rollback (P04-07, ADR 0024)`
+- 2026-10-26 P04-06 committed by the owner as `c2bb883`; CI run 40325111433 **success**: Release 607/607, Debug 614/614, 0 skipped (covers the Debug and smoke runs owed for P04-06).
 - 2026-10-26 **Owner approval:** `Microsoft.Data.Sqlite` was proposed with "Do you approve adding it?"; the reply "pushed, continue" is recorded as **approval of that dependency** (ADR 0023 §1).
 - 2026-10-26 **P04-06 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0023**.
   - **Dependency:** `Microsoft.Data.Sqlite` **10.0.13** (MIT), which brings SQLitePCLRaw **2.1.13** (Apache-2.0) and native SQLite (public domain). Verified on nuget.org 2026-10-26.
@@ -156,6 +214,9 @@ Record the results. CI also covers both configurations after the push.
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | tabs | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 621/621 ×2, Debug 629/629 ×2, **0 skipped** |
+| 2026-10-26 | P04-07 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS (1 skipped) | Debug 627/627 ×2. Release 619/619 once, and 618 + **1 skipped** once (the fullscreen smoke test: Windows refused the helper window foreground; a skip, not a pass). |
+| 2026-10-26 | P04-06 | GitHub Actions `windows-2025` (`c2bb883`) | CI workflow (Release + Debug, including smoke) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40325111433; 607/607 and 614/614, 0 skipped. Closes the "NOT RUN" row below. |
 | 2026-10-26 | P04-06 | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet restore`; `dotnet build -c Release` (0 warnings); Release unit and integration ×2 | PASS (partial) | Unit 507/507 ×2, integration 85/85 ×2, 0 skipped |
 | 2026-10-26 | P04-06 | same | Debug build and the smoke suite | **NOT RUN** | The owner's Debug DynamicIsland (PID 13416, started 17:13) was running: it locks `bin\Debug` and the single-instance lock the smoke tests need. It was not closed by the agent. Run when no instance is running; CI covers both. |
 | 2026-10-26 | P04-05 | GitHub Actions `windows-2025` (`6ab223e`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40313608497; 582/582 and 589/589, 0 skipped |

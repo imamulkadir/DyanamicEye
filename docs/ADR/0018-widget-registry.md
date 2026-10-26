@@ -1,6 +1,6 @@
 # 0018 — Widget registry and lifecycle
 
-- Status: Accepted
+- Status: Accepted (§6 amended by ADR 0025: one widget per tab)
 - Date: 2026-10-26
 - Task: P04-01
 

@@ -317,6 +317,19 @@
                                  AutomationProperties.Name="Data folder" AutomationProperties.AutomationId="Settings.DataFolder" />
                         <Button Content="Open _data folder" HorizontalAlignment="Left" Margin="0,8,0,0" Click="OnOpenDataFolder"
                                 AutomationProperties.AutomationId="Settings.OpenDataFolder" />
+
+                        <!-- Backup and restore (ADR 0024). -->
+                        <TextBlock Text="Back up and restore" FontWeight="SemiBold" Margin="0,18,0,0" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="A backup holds your notes, tasks and settings. It contains personal data: store it somewhere safe. Nothing is uploaded." />
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="ExportBackupButton" Content="E_xport backup…" Click="OnExportBackup"
+                                    AutomationProperties.AutomationId="Settings.ExportBackup" />
+                            <Button x:Name="RestoreBackupButton" Content="R_estore from backup…" Margin="8,0,0,0" Click="OnRestoreBackup"
+                                    AutomationProperties.AutomationId="Settings.RestoreBackup" />
+                        </StackPanel>
+                        <TextBlock x:Name="BackupStatusText" Style="{StaticResource Hint}" Margin="0,8,0,0"
+                                   AutomationProperties.AutomationId="Settings.BackupStatus" AutomationProperties.LiveSetting="Polite" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

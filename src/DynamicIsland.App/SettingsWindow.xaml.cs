@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using DynamicIsland.Core.Diagnostics;
+using DynamicIsland.Core.PersonalData;
 using DynamicIsland.Core.Display;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Shell;
@@ -20,6 +21,8 @@ namespace DynamicIsland.App;
 /// <param name="IsShuttingDown">True once the app is exiting: closing then never asks to save.</param>
 /// <param name="StartupState">Current sign-in startup registration (ADR 0015).</param>
 /// <param name="ShortcutState">Current global shortcut registration (ADR 0017).</param>
+/// <param name="Backup">Backup export and restore (ADR 0024).</param>
+/// <param name="Restart">Restarts the app (used after scheduling a restore); returns false when that is not possible.</param>
 public sealed record SettingsWindowContext(
     string Version,
     string Copyright,
@@ -28,7 +31,9 @@ public sealed record SettingsWindowContext(
     Func<DiagnosticContext> Diagnostics,
     Func<bool> IsShuttingDown,
     Func<StartupState> StartupState,
-    Func<ShortcutState> ShortcutState);
+    Func<ShortcutState> ShortcutState,
+    IDataBackupService Backup,
+    Func<bool> Restart);
 
 /// <summary>
 /// Settings window (guide P03-03, ADR 0014): edits a <see cref="SettingsEditor"/> draft and saves it explicitly through
@@ -279,6 +284,109 @@ public partial class SettingsWindow : Window
             StatusText.Text = "The folder could not be opened.";
         }
     }
+
+    /// <summary>Export: the user picks the file; an existing file is never overwritten (ADR 0024).</summary>
+    private async void OnExportBackup(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export backup",
+            FileName = $"dynamicisland-backup-{DateTime.Now:yyyyMMdd-HHmmss}.zip",
+            DefaultExt = ".zip",
+            Filter = "Dynamic Island backup (*.zip)|*.zip",
+            OverwritePrompt = false,
+            AddExtension = true,
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        ExportBackupButton.IsEnabled = false;
+        BackupStatusText.Text = "Exporting…";
+        try
+        {
+            var result = await _context.Backup.ExportAsync(dialog.FileName, CancellationToken.None);
+            BackupStatusText.Text = $"Backup saved: {result.Notes} notes, {result.Tasks} tasks and your settings.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            AppLog.BackupFailed(_logger, ex.GetType().Name);
+            BackupStatusText.Text = File.Exists(dialog.FileName)
+                ? "A file with that name already exists. Choose another name."
+                : "The backup could not be saved there. Choose another folder.";
+        }
+        finally
+        {
+            ExportBackupButton.IsEnabled = true;
+        }
+    }
+
+    /// <summary>Restore: full validation first, then a confirmation with what will be restored, then a restart (ADR 0024).</summary>
+    private async void OnRestoreBackup(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Title = "Restore from backup", Filter = "Dynamic Island backup (*.zip)|*.zip", CheckFileExists = true };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        RestoreBackupButton.IsEnabled = false;
+        BackupStatusText.Text = "Checking the backup…";
+        try
+        {
+            var preview = await _context.Backup.PreviewAsync(dialog.FileName, CancellationToken.None);
+            if (!preview.CanRestore)
+            {
+                BackupStatusText.Text = RefusalText(preview.Problem);
+                return;
+            }
+
+            var created = preview.CreatedUtc?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) ?? "an unknown date";
+            var question =
+                $"This backup is from {created} (version {preview.AppVersion ?? "unknown"}) and holds {preview.Notes} notes and {preview.Tasks} tasks"
+                + (preview.HasSettings ? " and settings" : string.Empty) + ".\n\n"
+                + "Restoring replaces your current notes, tasks" + (preview.HasSettings ? " and settings" : string.Empty)
+                + ". The current data is kept in a rollback folder inside the data folder. Dynamic Island restarts to finish.\n\nRestore now?";
+            var answer = TestHooks.Get(TestHooks.NoDialogsVariable) == "1"
+                ? MessageBoxResult.OK
+                : MessageBox.Show(this, question, "Restore from backup", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel);
+            if (answer != MessageBoxResult.OK)
+            {
+                BackupStatusText.Text = "Restore cancelled. Nothing changed.";
+                return;
+            }
+
+            if (!await _context.Backup.ScheduleRestoreAsync(preview, CancellationToken.None))
+            {
+                BackupStatusText.Text = "The restore could not be prepared. Nothing changed.";
+                return;
+            }
+
+            BackupStatusText.Text = "Restarting to finish the restore…";
+            if (!_context.Restart())
+            {
+                BackupStatusText.Text = "The restore will finish the next time Dynamic Island starts. Restart it from the tray when ready.";
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.BackupFailed(_logger, ex.GetType().Name);
+            BackupStatusText.Text = "The backup could not be read.";
+        }
+        finally
+        {
+            RestoreBackupButton.IsEnabled = true;
+        }
+    }
+
+    private static string RefusalText(BackupProblem problem) => problem switch
+    {
+        BackupProblem.NewerVersion => "This backup was made by a newer version of Dynamic Island. Update the app, then restore it.",
+        BackupProblem.ChecksumMismatch or BackupProblem.DamagedContent => "This backup is damaged and can't be restored. Nothing changed.",
+        BackupProblem.TooLarge => "This file is too large to be a Dynamic Island backup. Nothing changed.",
+        _ => "This file is not a Dynamic Island backup. Nothing changed.",
+    };
 
     private void OnProjectLink(object sender, RoutedEventArgs e)
     {

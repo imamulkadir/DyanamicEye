@@ -1,6 +1,6 @@
 # 0022 — Volume widget, persistent widget views and a content-sized expanded island
 
-- Status: Accepted
+- Status: Accepted (§5: the content measured is the selected tab's widget, ADR 0025)
 - Date: 2026-10-26
 - Task: P04-05
 

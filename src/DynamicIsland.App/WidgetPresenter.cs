@@ -106,13 +106,15 @@ public sealed class WidgetPresenter : IDisposable
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         _registry.SetActive(IsOnScreen(_state.State));
-        _registry.SetExpanded(IsExpanded(_state.State));
+        _view.SelectedWidgetChanged += OnSelectedWidgetChanged;
         Render();
+        UpdateExpanded();
     }
 
     public void Dispose()
     {
         _registry.Changed -= OnRegistryChanged;
+        _view.SelectedWidgetChanged -= OnSelectedWidgetChanged;
         AlbumArt.Decoded -= OnRegistryChanged;
         _settings.Changed -= OnSettingsChanged;
         _state.StateChanged -= OnStateChanged;
@@ -137,6 +139,11 @@ public sealed class WidgetPresenter : IDisposable
 
     private static bool IsExpanded(IslandState state) => state is IslandState.Expanded or IslandState.Pinned;
 
+    /// <summary>Only the widget on the selected tab counts as expanded (e.g. stats sample only while visible).</summary>
+    private void UpdateExpanded() => _registry.SetExpanded(IsExpanded(_state.State) ? _view.SelectedWidgetId : null);
+
+    private void OnSelectedWidgetChanged(object? sender, EventArgs e) => UpdateExpanded();
+
 
     private void OnRegistryChanged(object? sender, EventArgs e)
     {
@@ -160,7 +167,7 @@ public sealed class WidgetPresenter : IDisposable
 
         if (IsExpanded(e.Current) != IsExpanded(e.Previous))
         {
-            _registry.SetExpanded(IsExpanded(e.Current));
+            UpdateExpanded();
         }
     }
 

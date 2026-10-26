@@ -5,6 +5,7 @@ using System.Windows.Controls.Primitives;
 using DynamicIsland.App;
 using DynamicIsland.Core.Diagnostics;
 using DynamicIsland.Core.Display;
+using DynamicIsland.Core.PersonalData;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Startup;
 using DynamicIsland.Infrastructure.Diagnostics;
@@ -257,7 +258,9 @@ public sealed class SettingsWindowTests : IDisposable
             () => new DiagnosticContext("1.2.3", SafeMode: false, "Loaded", []),
             () => false,
             () => _startupState,
-            () => _shortcutState);
+            () => _shortcutState,
+            new NoBackup(),
+            () => false);
         var builder = new DiagnosticBundleBuilder(Path.Combine(_root, "logs"), Path.Combine(_root, "data"), new LogRedactor([]), TimeProvider.System);
         var window = new SettingsWindow(_settings, new FixedMonitors([Primary, Second]), builder, context, NullLogger<SettingsWindow>.Instance)
         {
@@ -287,6 +290,15 @@ public sealed class SettingsWindowTests : IDisposable
     private sealed class FixedMonitors(IReadOnlyList<MonitorInfo> monitors) : IMonitorService
     {
         public IReadOnlyList<MonitorInfo> GetMonitors() => monitors;
+    }
+
+    private sealed class NoBackup : IDataBackupService
+    {
+        public Task<BackupExportResult> ExportAsync(string destinationPath, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<BackupPreview> PreviewAsync(string archivePath, CancellationToken cancellationToken) => Task.FromResult(BackupPreview.Refused(BackupProblem.NotAnArchive));
+
+        public Task<bool> ScheduleRestoreAsync(BackupPreview approved, CancellationToken cancellationToken) => Task.FromResult(false);
     }
 
     private sealed class FakeSettingsService : ISettingsService

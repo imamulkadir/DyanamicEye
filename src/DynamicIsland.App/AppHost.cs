@@ -68,6 +68,12 @@ public static class AppHost
             dataDirectory,
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<Infrastructure.PersonalData.SqlitePersonalDataStore>>()));
+        builder.Services.AddSingleton<Core.PersonalData.IDataBackupService>(sp => new Infrastructure.PersonalData.DataBackupService(
+            dataDirectory,
+            sp.GetRequiredService<Infrastructure.PersonalData.SqlitePersonalDataStore>(),
+            sp.GetRequiredService<AppInfo>().Version,
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<Infrastructure.PersonalData.DataBackupService>>()));
         builder.Services.AddSingleton(sp => new WidgetRegistry(
             sp.GetRequiredService<ComponentHost>(),
             BuiltInWidgets.Create(
@@ -133,7 +139,9 @@ public static class AppHost
                     () => new DiagnosticContext(info.Version, launch.SafeMode, info.SettingsOutcome?.ToString(), components.Statuses),
                     () => lifecycle.Reason is not null,
                     () => sp.GetRequiredService<StartupCoordinator>().State,
-                    () => sp.GetRequiredService<ShortcutController>().State),
+                    () => sp.GetRequiredService<ShortcutController>().State,
+                    sp.GetRequiredService<Core.PersonalData.IDataBackupService>(),
+                    () => sp.GetRequiredService<RestartService>().Restart(launch.SafeMode)),
                 sp.GetRequiredService<ILogger<SettingsWindow>>());
         }));
         builder.Services.AddSingleton(sp => new TrayController(

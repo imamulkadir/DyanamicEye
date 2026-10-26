@@ -78,6 +78,12 @@ public partial class App : Application
         _host.Start();
         _lifecycle.ShutdownRequested += OnShutdownRequested;
 
+        // A restore approved in Settings is applied now, before settings or the database are opened (ADR 0024).
+        Infrastructure.PersonalData.DataBackupService.ApplyPendingRestore(
+            _host.Services.GetRequiredService<Infrastructure.Settings.SettingsStoreOptions>().DataDirectory,
+            _host.Services.GetRequiredService<TimeProvider>(),
+            _logger);
+
         var store = _host.Services.GetRequiredService<ISettingsStore>();
         var token = _lifecycle.ApplicationStopping;
         var settings = Task.Run(() => store.LoadAsync(token), token).GetAwaiter().GetResult();

@@ -69,9 +69,10 @@
                        Typography.NumeralAlignment="Tabular"
                        AutomationProperties.Name="Time" />
 
-            <!-- Expanded content placeholder: widgets arrive in P04. -->
+            <!-- Expanded panel: title and pin, one icon tab per enabled widget, the selected widget (ADR 0025). -->
             <Grid x:Name="ExpandedPanel" Grid.Row="1" Margin="18,4,18,16" Visibility="Collapsed">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
@@ -89,8 +90,12 @@
                                Foreground="#FFF2F3F5" FontSize="14" FontWeight="SemiBold"
                                VerticalAlignment="Center" />
                 </DockPanel>
-                <!-- Enabled widgets in the user's order (ADR 0018); the hint shows while none has content. -->
-                <Grid Grid.Row="1">
+                <!-- Tabs in the user's widget order; arrow keys move between them, Ctrl+Tab cycles from anywhere. -->
+                <StackPanel x:Name="TabStrip" Grid.Row="1" Orientation="Horizontal" Margin="-4,6,0,2" Visibility="Collapsed"
+                            KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle"
+                            AutomationProperties.Name="Widget tabs" AutomationProperties.AutomationId="Tabs" />
+                <!-- The selected widget; the hint shows while no widget has content. -->
+                <Grid Grid.Row="2">
                     <TextBlock x:Name="WidgetPlaceholder"
                                Text="Widgets will appear here."
                                Foreground="#B3F2F3F5" FontSize="12"

@@ -150,6 +150,10 @@ internal static partial class AppLog
         Message = "Widget {WidgetId} command failed ({ErrorType})")]
     public static partial void WidgetCommandFailed(ILogger logger, string widgetId, string errorType);
 
+    [LoggerMessage(EventId = 1060, EventName = "BackupFailed", Level = LogLevel.Warning,
+        Message = "Backup export or restore failed in the settings window ({ErrorType})")]
+    public static partial void BackupFailed(ILogger logger, string errorType);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

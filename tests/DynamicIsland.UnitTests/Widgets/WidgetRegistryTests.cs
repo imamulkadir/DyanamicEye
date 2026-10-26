@@ -149,6 +149,21 @@ public sealed class WidgetRegistryTests : IDisposable
     }
 
     [Fact]
+    public void Only_the_widget_on_the_visible_tab_is_expanded()
+    {
+        var clock = new FakeWidget(WidgetIds.Clock);
+        var stats = new FakeWidget(WidgetIds.SystemStats);
+        using var host = CreateHost();
+        var registry = new WidgetRegistry(host, [clock, stats]);
+
+        registry.SetExpanded(WidgetIds.SystemStats);
+        Assert.Equal((false, true), (clock.Expanded, stats.Expanded));
+
+        registry.SetExpanded(null); // Collapsed island.
+        Assert.Equal((false, false), (clock.Expanded, stats.Expanded));
+    }
+
+    [Fact]
     public void Widgets_must_use_known_ids_matching_names_and_be_unique()
     {
         using var host = CreateHost();
@@ -195,6 +210,10 @@ public sealed class WidgetRegistryTests : IDisposable
         public bool IsRunning => Volatile.Read(ref _running) == 1;
 
         public bool WasCancelled { get; private set; }
+
+        public bool Expanded { get; private set; }
+
+        public void SetExpanded(bool expanded) => Expanded = expanded;
 
         public async Task RunAsync(IComponentContext context, CancellationToken cancellationToken)
         {

@@ -14,8 +14,12 @@ namespace DynamicIsland.App;
 /// </summary>
 public partial class NotchView : UserControl
 {
+    private readonly Dictionary<string, UIElement> _elements = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RadioButton> _tabs = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _labels = new(StringComparer.Ordinal);
     private bool _expanded;
     private bool _clockInPanel;
+    private string? _selectedId;
 
     public NotchView() => InitializeComponent();
 
@@ -35,40 +39,147 @@ public partial class NotchView : UserControl
     }
 
     /// <summary>
-    /// Shows the enabled widgets in order (ADR 0018). A failed widget gets a short note; a widget whose
-    /// <paramref name="view"/> returns <c>null</c> (no content yet) takes no space.
+    /// Shows one icon tab per enabled widget that has something to show (a failed widget's tab shows a short note), in
+    /// the user's order, and the selected widget's view below them (ADR 0025). Tabs, views and notes are reused, so focus
+    /// and drags survive updates; the selection stays on the same widget while it exists.
     /// </summary>
     public void ShowWidgets(IReadOnlyList<WidgetSlot> slots, Func<WidgetSlot, UIElement?> view)
     {
         ArgumentNullException.ThrowIfNull(slots);
         ArgumentNullException.ThrowIfNull(view);
 
-        var elements = new List<UIElement>(slots.Count);
+        _elements.Clear();
+        var ids = new List<string>(slots.Count);
         foreach (var slot in slots)
         {
             var element = slot.IsUnavailable ? UnavailableNote(slot) : view(slot);
             if (element is not null)
             {
                 AutomationProperties.SetAutomationId(element, "Widget." + slot.Id);
-                elements.Add(element);
+                _elements[slot.Id] = element;
+                ids.Add(slot.Id);
+                _labels[slot.Id] = slot.Label;
             }
         }
 
-        // Re-parent only when the visible widgets or their order changed, so focus and drags survive updates (ADR 0022).
-        if (!elements.SequenceEqual(WidgetPanel.Children.OfType<UIElement>()))
+        var tabs = ids.Select(Tab).ToArray();
+        if (!tabs.SequenceEqual(TabStrip.Children.OfType<UIElement>()))
+        {
+            TabStrip.Children.Clear();
+            foreach (var tab in tabs)
+            {
+                TabStrip.Children.Add(tab);
+            }
+        }
+
+        // A single widget needs no tab strip.
+        TabStrip.Visibility = ids.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        Select(_selectedId is not null && ids.Contains(_selectedId) ? _selectedId : ids.FirstOrDefault(), force: true);
+    }
+
+    /// <summary>The widget whose view is shown, or <c>null</c> when none has content.</summary>
+    public string? SelectedWidgetId => _selectedId;
+
+    /// <summary>Raised when another widget's tab was selected (the presenter makes only that widget "expanded").</summary>
+    public event EventHandler? SelectedWidgetChanged;
+
+    /// <summary>Selects a widget's tab (user click, keyboard or tests); ignored for widgets without a tab.</summary>
+    public void SelectWidget(string id)
+    {
+        if (_elements.ContainsKey(id))
+        {
+            Select(id, force: false);
+        }
+    }
+
+    /// <summary>Moves to the next (+1) or previous (-1) tab, wrapping around (Ctrl+Tab / Ctrl+Shift+Tab).</summary>
+    public void SelectAdjacentWidget(int direction)
+    {
+        var ids = TabStrip.Children.OfType<FrameworkElement>().Select(t => (string)t.Tag).ToList();
+        if (ids.Count < 2 || _selectedId is null)
+        {
+            return;
+        }
+
+        var next = ids[(ids.IndexOf(_selectedId) + direction + ids.Count) % ids.Count];
+        Select(next, force: false);
+        _tabs[next].Focus();
+    }
+
+    private void Select(string? id, bool force)
+    {
+        var changed = id != _selectedId;
+        if (!changed && !force)
+        {
+            return;
+        }
+
+        _selectedId = id;
+        var element = id is null ? null : _elements[id];
+        if (WidgetPanel.Children.Count != (element is null ? 0 : 1) || (element is not null && WidgetPanel.Children[0] != element))
         {
             WidgetPanel.Children.Clear();
-            foreach (var element in elements)
+            if (element is not null)
             {
                 WidgetPanel.Children.Add(element);
             }
         }
 
-        WidgetPlaceholder.Visibility = WidgetPanel.Children.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        _clockInPanel = WidgetPanel.Children.OfType<UIElement>().Any(e => AutomationProperties.GetAutomationId(e) == "Widget." + WidgetIds.Clock);
+        foreach (var (tabId, tab) in _tabs)
+        {
+            tab.IsChecked = tabId == id;
+        }
+
+        WidgetPlaceholder.Visibility = element is null ? Visibility.Visible : Visibility.Collapsed;
+        _clockInPanel = id == WidgetIds.Clock;
         UpdateClockVisibility();
+        if (changed)
+        {
+            SelectedWidgetChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         ContentChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>The icon tab for a widget (created once). Radio semantics: arrow keys move, the selected one is checked.</summary>
+    private RadioButton Tab(string id)
+    {
+        if (_tabs.TryGetValue(id, out var tab))
+        {
+            return tab;
+        }
+
+        var label = _labels.GetValueOrDefault(id, id);
+        tab = new RadioButton
+        {
+            Tag = id,
+            GroupName = "IslandWidgetTabs",
+            Content = TabGlyph(id),
+            FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+            FontSize = 15,
+            Width = 34,
+            Height = 30,
+            Margin = new Thickness(0, 0, 4, 0),
+            Style = (Style)Resources["IslandIconToggle"],
+            ToolTip = label,
+        };
+        AutomationProperties.SetName(tab, label);
+        AutomationProperties.SetAutomationId(tab, "Tab." + id);
+        tab.Checked += (_, _) => Select(id, force: false);
+        _tabs.Add(id, tab);
+        return tab;
+    }
+
+    private static string TabGlyph(string id) => id switch
+    {
+        WidgetIds.Clock => "\uE823", // Clock
+        WidgetIds.Media => "\uE8D6", // Music note
+        WidgetIds.SystemStats => "\uE9D9", // Diagnostic
+        WidgetIds.Volume => "\uE767", // Volume
+        WidgetIds.Tasks => "\uE762", // Multi-select
+        WidgetIds.Notes => "\uE70B", // Quick note
+        _ => "\uE74C",
+    };
 
     /// <summary>Raised after <see cref="ShowWidgets"/>: the expanded content (and so its height) may have changed.</summary>
     public event EventHandler? ContentChanged;
@@ -87,7 +198,7 @@ public partial class NotchView : UserControl
         return ClockRow.Height.Value + ExpandedPanel.DesiredSize.Height;
     }
 
-    /// <summary>Widget elements currently shown (tests).</summary>
+    /// <summary>The selected widget's element, as shown (tests).</summary>
     public IReadOnlyList<UIElement> WidgetElements => [.. WidgetPanel.Children.OfType<UIElement>()];
 
     /// <summary>The top-row time hides while the expanded panel shows the large clock, so the time is never shown twice.</summary>

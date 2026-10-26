@@ -53,5 +53,7 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0021 — System metrics widget](0021-metrics-widget.md) — Accepted (P04-04)
 - [0022 — Volume widget, persistent widget views and a content-sized expanded island](0022-volume-widget-and-content-sized-island.md) — Accepted (P04-05)
 - [0023 — Notes and tasks: SQLite storage and widgets](0023-notes-and-tasks-storage.md) — Accepted (P04-06)
+- [0024 — Backup, export and import](0024-backup-export-import.md) — Accepted (P04-07)
+- [0025 — Tabbed expanded island](0025-tabbed-expanded-island.md) — Accepted (owner request; amends 0018 §6, 0022 §5)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

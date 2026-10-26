@@ -236,6 +236,11 @@ public sealed partial class IslandWindow : Window, IDisposable
                 _state.Fire(IslandInput.Click);
                 e.Handled = true;
                 break;
+            case Key.Tab when Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && _state.State is IslandState.Expanded or IslandState.Pinned:
+                // Widget tabs (ADR 0025): Ctrl+Tab next, Ctrl+Shift+Tab previous.
+                Notch.SelectAdjacentWidget(Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1);
+                e.Handled = true;
+                break;
             case Key.P when Keyboard.Modifiers == ModifierKeys.Control:
                 _state.Fire(IslandInput.TogglePin);
                 e.Handled = true;

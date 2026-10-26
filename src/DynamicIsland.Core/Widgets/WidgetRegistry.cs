@@ -203,12 +203,15 @@ public sealed class WidgetRegistry : IDisposable
         }
     }
 
-    /// <summary>Forwards whether the expanded panel is visible to every widget.</summary>
-    public void SetExpanded(bool expanded)
+    /// <summary>
+    /// Tells widgets whose expanded view is on screen: only <paramref name="visibleWidgetId"/> (the selected tab, ADR 0025),
+    /// or none when the island is not expanded.
+    /// </summary>
+    public void SetExpanded(string? visibleWidgetId)
     {
         foreach (var widget in _widgets.Values)
         {
-            widget.SetExpanded(expanded);
+            widget.SetExpanded(widget.Id == visibleWidgetId);
         }
     }
 

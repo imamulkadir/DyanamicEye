@@ -81,6 +81,21 @@ public sealed class ComponentBoundary : IComponentContext, IDisposable
     /// <summary>Marks the component as stopped because the user paused the island.</summary>
     public void MarkPaused() => SetStatus(Status with { State = ComponentState.Stopped, ReasonCode = "paused", NextRetryUtc = null, ConsecutiveFailures = 0 });
 
+    /// <summary>Marks the component as stopped because the user turned it off (ADR 0018).</summary>
+    public void MarkDisabled() => SetStatus(Status with { State = ComponentState.Stopped, ReasonCode = "disabled", NextRetryUtc = null, ConsecutiveFailures = 0 });
+
+    /// <summary>True while the component's run loop is active.</summary>
+    public bool IsRunning
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _loop is { IsCompleted: false };
+            }
+        }
+    }
+
     /// <summary>Marks the component as not started because of Safe Mode.</summary>
     public void MarkSkippedForSafeMode() => SetStatus(_status with { State = ComponentState.SkippedSafeMode, ReasonCode = "safe-mode" });
 

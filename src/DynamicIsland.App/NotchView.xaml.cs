@@ -3,6 +3,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using DynamicIsland.Core.Shell;
+using DynamicIsland.Core.Widgets;
 
 namespace DynamicIsland.App;
 
@@ -28,6 +29,41 @@ public partial class NotchView : UserControl
         ClockText.Text = text ?? string.Empty;
         ClockText.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
     }
+
+    /// <summary>
+    /// Shows the enabled widgets in order (ADR 0018). A failed widget gets a short note; a widget whose
+    /// <paramref name="view"/> returns <c>null</c> (no content yet) takes no space.
+    /// </summary>
+    public void ShowWidgets(IReadOnlyList<WidgetSlot> slots, Func<WidgetSlot, UIElement?> view)
+    {
+        ArgumentNullException.ThrowIfNull(slots);
+        ArgumentNullException.ThrowIfNull(view);
+
+        WidgetPanel.Children.Clear();
+        foreach (var slot in slots)
+        {
+            var element = slot.IsUnavailable ? UnavailableNote(slot) : view(slot);
+            if (element is not null)
+            {
+                AutomationProperties.SetAutomationId(element, "Widget." + slot.Id);
+                WidgetPanel.Children.Add(element);
+            }
+        }
+
+        WidgetPlaceholder.Visibility = WidgetPanel.Children.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Widget elements currently shown (tests).</summary>
+    public IReadOnlyList<UIElement> WidgetElements => [.. WidgetPanel.Children.OfType<UIElement>()];
+
+    private static TextBlock UnavailableNote(WidgetSlot slot) => new()
+    {
+        Text = $"{slot.Label} isn't available right now.",
+        Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(0xB3, 0xF2, 0xF3, 0xF5)),
+        FontSize = 12,
+        Margin = new Thickness(0, 2, 0, 2),
+        TextTrimming = TextTrimming.CharacterEllipsis,
+    };
 
     /// <summary>The clock text as shown (tests).</summary>
     public string ClockDisplay => ClockText.Visibility == Visibility.Visible ? ClockText.Text : string.Empty;

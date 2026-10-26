@@ -89,10 +89,15 @@
                                Foreground="#FFF2F3F5" FontSize="14" FontWeight="SemiBold"
                                VerticalAlignment="Center" />
                 </DockPanel>
-                <TextBlock Grid.Row="1"
-                           Text="Widgets will appear here."
-                           Foreground="#B3F2F3F5" FontSize="12"
-                           VerticalAlignment="Center" HorizontalAlignment="Center" />
+                <!-- Enabled widgets in the user's order (ADR 0018); the hint shows while none has content. -->
+                <Grid Grid.Row="1">
+                    <TextBlock x:Name="WidgetPlaceholder"
+                               Text="Widgets will appear here."
+                               Foreground="#B3F2F3F5" FontSize="12"
+                               VerticalAlignment="Center" HorizontalAlignment="Center" />
+                    <StackPanel x:Name="WidgetPanel" VerticalAlignment="Center"
+                                AutomationProperties.Name="Widgets" />
+                </Grid>
             </Grid>
         </Grid>
     </local:IslandSurface>

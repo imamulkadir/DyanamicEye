@@ -6,6 +6,7 @@ using DynamicIsland.Core.Notifications;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Shell;
 using DynamicIsland.Core.Startup;
+using DynamicIsland.Core.Widgets;
 using DynamicIsland.Infrastructure;
 using DynamicIsland.Infrastructure.Diagnostics;
 using DynamicIsland.Infrastructure.Lifecycle;
@@ -13,6 +14,7 @@ using DynamicIsland.Infrastructure.Logging;
 using DynamicIsland.Infrastructure.Settings;
 using DynamicIsland.Platform.Windows.Display;
 using DynamicIsland.Platform.Windows.Startup;
+using DynamicIsland.Widgets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -62,6 +64,9 @@ public static class AppHost
         builder.Services.AddSingleton<INotificationService, InMemoryNotificationService>();
         builder.Services.AddSingleton<IFailureClassifier, DefaultFailureClassifier>();
         builder.Services.AddSingleton<ComponentHost>();
+        builder.Services.AddSingleton(sp => new WidgetRegistry(
+            sp.GetRequiredService<ComponentHost>(),
+            BuiltInWidgets.Create(sp.GetRequiredService<TimeProvider>())));
         builder.Services.AddSingleton(sp => new DiagnosticBundleBuilder(
             System.IO.Path.Combine(root, AppDataPaths.LogsFolderName),
             dataDirectory,
@@ -84,6 +89,12 @@ public static class AppHost
             sp.GetRequiredService<IIslandStateMachine>(),
             sp.GetRequiredService<ISettingsService>(),
             sp.GetRequiredService<ILogger<ShortcutController>>()));
+        builder.Services.AddSingleton(sp => new WidgetPresenter(
+            sp.GetRequiredService<WidgetRegistry>(),
+            sp.GetRequiredService<IslandWindow>().NotchView,
+            sp.GetRequiredService<ISettingsService>(),
+            sp.GetRequiredService<LifecycleCoordinator>(),
+            sp.GetRequiredService<ILogger<WidgetPresenter>>()));
         builder.Services.AddSingleton(sp => new NotchClock(
             sp.GetRequiredService<IslandWindow>().NotchView,
             sp.GetRequiredService<ISettingsService>(),

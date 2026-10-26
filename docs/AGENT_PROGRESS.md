@@ -3,9 +3,9 @@
 > **Keep this file accurate on every session.** This is the durable checkpoint that lets a new agent resume after a context reset. Update it alongside source changes, and never mark anything DONE without evidence. Move older detail to `docs/WORK_LOG.md` so this file stays short.
 
 ## CURRENT STATUS (read first)
-- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**.
-- **Active task:** none in progress. P03-05 (optional global shortcut; ADR 0017) is IMPLEMENTED_AWAITING_VALIDATION, which completes P03. Gates G02 and G03 are owed by the owner (TEST_MATRIX: G02 rows, Y1–Y7, TA1–TA10, SW1–SW8, ST1–ST7, CK1–CK5, SC1–SC4).
-- **Active task status:** P03-05 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P03-04 and the notch clock are committed as `8917a21`, and CI 40296571628 is green with 0 skipped.
+- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
+- **Active task:** next is P04-02 (clock/date widget). P04-01 (widget registry and lifecycle; ADR 0018) is IMPLEMENTED_AWAITING_VALIDATION. G02/G03 manual rows are still owed by the owner.
+- **Active task status:** P04-01 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P03-05 is committed as `2dc4315`, and CI 40299277622 is green with 0 skipped.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,19 +23,16 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P03-05 IMPLEMENTED_AWAITING_VALIDATION; P03 complete; G02/G03 owner checks next)
+- **Last updated:** 2026-10-26 (P04-01 IMPLEMENTED_AWAITING_VALIDATION; next P04-02)
 
 ## NEXT ACTION (ONE task only)
-**Owner:**
-1. Review and commit the P03-05 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green.
-2. Gates: run the G02 and G03 manual rows in `docs/TEST_MATRIX.md` on real hardware. The G03 criteria are: Explorer restart restores the tray; sign-in starts one collapsed island when opted in; the user can fully exit, change monitor and reset an off-screen position. Then do one of these:
-   - record the results;
-   - or explicitly approve continuing to P04 while the gates stay open, as was done for P03.
-
-**Agent, only after that approval:** start **P04-01** (guide §5): the widget registry and lifecycle.
-- Built-in, compiled-in modules as `IIsolatedComponent`s (ADR 0007), using the existing `WidgetSetting` enable/order data.
-- Failures are isolated; memory and background work stop when a widget is disabled.
-- The notch clock (ADR 0016) becomes the clock widget's collapsed view.
+**Owner first:** review and commit the P04-01 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. G02/G03 manual rows are still open.
+**Then agent: P04-02** (guide §5): the clock/date widget.
+- `Widgets/ClockWidget : IWidget`, added to `BuiltInWidgets`.
+- The expanded view shows the time large plus the full date, using the `ClockFormatter`/`ClockSettings` from ADR 0016. Register its view in `WidgetPresenter.Views`.
+- Ticking is minute- or second-aligned, never per frame, and stops while disabled or paused.
+- Move the notch clock behind the clock module (the collapsed view of the same widget), so disabling or failing it behaves consistently.
+- **Ask the owner before adding countdown timers or a stopwatch:** the guide says "timers only if approved for v1".
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -45,7 +42,7 @@
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
-| P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
+| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01 IMPLEMENTED_AWAITING_VALIDATION; 02 next; started with owner approval while G02/G03 are open) | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
@@ -60,6 +57,32 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **Owner approval:** after P03-05 was pushed, the reply "pushed, continue" (to the question "run G02/G03 or approve continuing to P04") is recorded as **approval to start P04 while G02/G03 stay open**.
+- 2026-10-26 **P04-01 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0018**.
+  - **Core:**
+    - `Components/ComponentHost`: per-component enable/disable.
+      - `Add(..., enabled)`, `SetEnabledAsync` (bounded stop, then status Stopped/"disabled"), `StatusOf`.
+      - Pause/resume and enable/disable are serialized; Resume never starts disabled components.
+      - Every non-skipped component is registered for shutdown once.
+    - `ComponentBoundary.IsRunning/MarkDisabled`.
+    - New `Widgets/WidgetRegistry.cs`:
+      - `IWidget` (an `IIsolatedComponent` with `Id`, `Snapshot`, `SnapshotChanged`, `Release`) and `WidgetSlot`.
+      - `WidgetRegistry` registers widgets with the saved enabled flags; `ApplyAsync` handles enable, disable plus `Release` (3 s stop bound) and reorder; ordered `Slots`; `Changed`; optional retry policy.
+  - **Widgets:** new `BuiltInWidgets.Create`, the compiled-in catalog. It is empty in P04-01; P04-02…06 add their modules.
+  - **App:**
+    - `NotchView.ShowWidgets`: slots in order; a failed widget shows "<name> isn't available right now."; widgets without content take no space; the hint stays when nothing is shown; AutomationId `Widget.<id>`.
+    - New `WidgetPresenter`: applies settings changes off the UI thread and coalesces redraws on the UI thread; per-widget views in `Views`.
+    - `AppLog` 1058 WidgetChangeIncomplete.
+    - `AppHost`/`App.xaml.cs` wiring: register before `StartAll`, presenter after.
+  - **Tests:**
+    - Unit: `Widgets/WidgetRegistryTests.cs` (8). Covers: order and unknown ids; disabled never starts; disable cancels the work, releases content and restarts on enable; reorder without restart; failure isolation with an "unavailable" slot; pause/resume with enable while paused; Safe Mode; id/name validation.
+    - Integration: `WidgetPanelTests.cs` (2).
+  - **No visible change yet:** there are no widget modules until P04-02.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, NotchView.xaml, NotchView.xaml.cs}`, `src/DynamicIsland.Core/Components/{ComponentBoundary.cs, ComponentHost.cs}`
+    - new: `docs/ADR/0018-widget-registry.md`, `src/DynamicIsland.App/WidgetPresenter.cs`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/WidgetPanelTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/WidgetRegistryTests.cs`
+    - Suggested commit message: `feat(widgets): widget registry and lifecycle with enable/disable (P04-01, ADR 0018)`
+- 2026-10-26 P03-05 committed by the owner as `2dc4315`; CI run 40299277622 **success**: Release 523/523, Debug 530/530, 0 skipped.
 - 2026-10-26 **P03-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0017**.
   - **Core:**
     - New `Shell/Hotkey.cs`: `Hotkey.TryParse`/`ToString`/`VirtualKey` (keys A–Z, 0–9, F1–F24, Space; **at least 2 modifiers**; canonical text "Ctrl+Alt+Shift+Win+Key"; `HotkeyModifiers` = Win32 MOD_* values).
@@ -176,6 +199,8 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | P04-01 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2; unit tests alone ×3 (the registry tests are timing-based) | PASS | Release 533/533 ×2, Debug 540/540 ×2, **0 skipped**; unit 441/441 ×3 |
+| 2026-10-26 | P03-05 | GitHub Actions `windows-2025` (`2dc4315`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40299277622; 523/523 and 530/530, 0 skipped |
 | 2026-10-26 | P03-05 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 523/523 ×2, Debug 530/530 ×2, **0 skipped** |
 | 2026-10-26 | P03-04 + clock | GitHub Actions `windows-2025` (`8917a21`) | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40296571628; 488/488 and 494/494, 0 skipped |
 | 2026-10-26 | notch clock | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 488/488 ×2, Debug 494/494 ×2, **0 skipped** (including the idle-CPU budget and the regenerated visual references). A real Release app on the desktop showed "2:54 PM" and exited 0. |

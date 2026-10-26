@@ -124,7 +124,10 @@ public partial class App : Application
         var components = _host.Services.GetRequiredService<ComponentHost>();
         components.StatusChanged +=
             (_, s) => AppLog.ComponentStatusChanged(logger, s.Name, s.State, s.ReasonCode, s.ConsecutiveFailures, s.LastErrorType);
+        // Built-in widgets are optional components with the user's enabled flags (ADR 0018).
+        _host.Services.GetRequiredService<Core.Widgets.WidgetRegistry>().Register(settingsService.Current.Widgets);
         components.StartAll();
+        _host.Services.GetRequiredService<WidgetPresenter>().Start();
 
         // Tray "Pause" also pauses optional background work (ADR 0013).
         _host.Services.GetRequiredService<IIslandStateMachine>().StateChanged += async (_, e) =>

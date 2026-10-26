@@ -63,6 +63,7 @@ public sealed partial class IslandWindow : Window, IDisposable
         surface.MouseLeave += (_, _) => _state.Fire(IslandInput.PointerLeave);
         surface.MouseLeftButtonUp += (_, _) => _state.Fire(IslandInput.Click);
         Notch.PinToggle.Click += (_, _) => _state.Fire(IslandInput.TogglePin);
+        Notch.ContentChanged += OnNotchContentChanged;
         PreviewKeyDown += OnPreviewKeyDown;
         _state.StateChanged += (_, e) => ApplyState(e.Previous, e.Current, animate: true);
 
@@ -161,9 +162,16 @@ public sealed partial class IslandWindow : Window, IDisposable
         var (width, height) = (size.Value.Width * scale, size.Value.Height * scale);
         var expanded = current is IslandState.Expanded or IslandState.Pinned;
 
+        Notch.ApplyVisualState(current, height, scale);
+        if (expanded)
+        {
+            // Content-sized expansion (ADR 0022): measure with the expanded panel visible, then settle the corners.
+            height = ExpandedHeight(width, scale);
+            Notch.ApplyVisualState(current, height, scale);
+        }
+
         Animate(Notch, WidthProperty, width, animate);
         Animate(Notch, HeightProperty, height, animate);
-        Notch.ApplyVisualState(current, height, scale);
 
         if (expanded && IsActive)
         {
@@ -173,6 +181,26 @@ public sealed partial class IslandWindow : Window, IDisposable
         {
             // Hand focus back to the app the user came from; Windows decides, nothing is forced (§4.1).
             IslandWindowInterop.TryActivate(_previousForeground);
+        }
+    }
+
+    private double ExpandedHeight(double width, double scale) =>
+        IslandLayout.ExpandedHeightFor(Notch.MeasureExpandedHeight(width) / scale) * scale;
+
+    /// <summary>Widget content changed while expanded: follow its height only (no focus or state changes).</summary>
+    private void OnNotchContentChanged(object? sender, EventArgs e)
+    {
+        if (_state.State is not (IslandState.Expanded or IslandState.Pinned) || !IsVisible)
+        {
+            return;
+        }
+
+        var scale = _settings.Current.Appearance.Scale;
+        var height = ExpandedHeight(IslandLayout.Expanded.Width * scale, scale);
+        if (Math.Abs(height - Notch.Height) >= 1)
+        {
+            Notch.ApplyVisualState(_state.State, height, scale);
+            Animate(Notch, HeightProperty, height, animate: true);
         }
     }
 

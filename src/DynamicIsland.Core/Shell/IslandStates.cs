@@ -127,10 +127,18 @@ public static class IslandLayout
 {
     public static readonly (double Width, double Height) Collapsed = (236, 32);
     public static readonly (double Width, double Height) Peek = (264, 38);
-    public static readonly (double Width, double Height) Expanded = (420, 252); // Room for the clock, media and metrics widgets (ADR 0020, 0021).
+    /// <summary>Expanded width and <b>minimum</b> height; the expanded height follows the widgets' content (ADR 0022).</summary>
+    public static readonly (double Width, double Height) Expanded = (420, 180);
+
+    /// <summary>Upper bound for the content-sized expanded height (ADR 0022).</summary>
+    public const double ExpandedMaxHeight = 360;
 
     /// <summary>The window is always this large; everything outside the visible pill is transparent and click-through.</summary>
-    public static (double Width, double Height) Max => Expanded;
+    public static (double Width, double Height) Max => (Expanded.Width, ExpandedMaxHeight);
+
+    /// <summary>The expanded height for content that needs <paramref name="contentHeight"/> DIPs (before scaling).</summary>
+    public static double ExpandedHeightFor(double contentHeight) =>
+        double.IsFinite(contentHeight) ? Math.Clamp(Math.Ceiling(contentHeight), Expanded.Height, ExpandedMaxHeight) : Expanded.Height;
 
     /// <returns><c>null</c> for states in which the window is hidden.</returns>
     public static (double Width, double Height)? For(IslandState state) => state switch

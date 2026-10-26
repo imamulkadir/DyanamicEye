@@ -95,11 +95,12 @@ public sealed class MediaWidgetIntegrationTests : IDisposable
             using var host = new ComponentHost(_lifecycle, new InMemoryNotificationService(TimeProvider.System), new DefaultFailureClassifier(), LaunchArguments.Default, TimeProvider.System);
             using var registry = new WidgetRegistry(host, []);
             using var presenter = new WidgetPresenter(registry, new NotchView(), new Settings(), new States(), _lifecycle, NullLogger<WidgetPresenter>.Instance);
-            var view = WidgetPresenter.Views[WidgetIds.Media](
+            var view = presenter.ViewFor(
                 new WidgetSlot(WidgetIds.Media, "Media", new ComponentStatus("widget-media", ComponentState.Healthy),
-                    new MediaSnapshot("A long video title without tags [Official Music Video]", string.Empty, MediaPlaybackState.Playing, MediaControls.Pause, 0, null, null)),
-                presenter)!;
-            return Descendants(view).OfType<TextBlock>().Where(t => t.Text.Length > 0 && t.FontFamily.Source != "Segoe Fluent Icons, Segoe MDL2 Assets").Select(t => (t.Text, t.TextWrapping)).ToArray();
+                    new MediaSnapshot("A long video title without tags [Official Music Video]", string.Empty, MediaPlaybackState.Playing, MediaControls.Pause, 0, null, null)))!;
+            return Descendants(view).OfType<TextBlock>()
+                .Where(t => t.Text.Length > 0 && t.Visibility == Visibility.Visible && t.FontFamily.Source != "Segoe Fluent Icons, Segoe MDL2 Assets")
+                .Select(t => (t.Text, t.TextWrapping)).ToArray();
         });
 
         var title = Assert.Single(lines);

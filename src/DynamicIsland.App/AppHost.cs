@@ -70,7 +70,8 @@ public static class AppHost
                 sp.GetRequiredService<ISettingsService>(),
                 sp.GetRequiredService<TimeProvider>(),
                 new Platform.Windows.Media.WindowsMediaSessionService(),
-                new Platform.Windows.Metrics.Win32SystemMetrics())));
+                new Platform.Windows.Metrics.Win32SystemMetrics(),
+                new Platform.Windows.Audio.CoreAudioService())));
         builder.Services.AddSingleton(sp => new DiagnosticBundleBuilder(
             System.IO.Path.Combine(root, AppDataPaths.LogsFolderName),
             dataDirectory,

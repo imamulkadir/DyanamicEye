@@ -43,13 +43,23 @@ public partial class NotchView : UserControl
         ArgumentNullException.ThrowIfNull(slots);
         ArgumentNullException.ThrowIfNull(view);
 
-        WidgetPanel.Children.Clear();
+        var elements = new List<UIElement>(slots.Count);
         foreach (var slot in slots)
         {
             var element = slot.IsUnavailable ? UnavailableNote(slot) : view(slot);
             if (element is not null)
             {
                 AutomationProperties.SetAutomationId(element, "Widget." + slot.Id);
+                elements.Add(element);
+            }
+        }
+
+        // Re-parent only when the visible widgets or their order changed, so focus and drags survive updates (ADR 0022).
+        if (!elements.SequenceEqual(WidgetPanel.Children.OfType<UIElement>()))
+        {
+            WidgetPanel.Children.Clear();
+            foreach (var element in elements)
+            {
                 WidgetPanel.Children.Add(element);
             }
         }
@@ -57,6 +67,24 @@ public partial class NotchView : UserControl
         WidgetPlaceholder.Visibility = WidgetPanel.Children.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         _clockInPanel = WidgetPanel.Children.OfType<UIElement>().Any(e => AutomationProperties.GetAutomationId(e) == "Widget." + WidgetIds.Clock);
         UpdateClockVisibility();
+        ContentChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Raised after <see cref="ShowWidgets"/>: the expanded content (and so its height) may have changed.</summary>
+    public event EventHandler? ContentChanged;
+
+    /// <summary>
+    /// The height the expanded notch needs for its current content at <paramref name="width"/> DIPs, before clamping
+    /// (ADR 0022). Call in an expanded state (after <see cref="ApplyVisualState"/>).
+    /// </summary>
+    public double MeasureExpandedHeight(double width)
+    {
+        // Settle pending layout first (changed texts or children only mark themselves dirty), then measure the panel
+        // without a height limit; the next layout pass measures it again with the real notch height.
+        UpdateLayout();
+        ExpandedPanel.InvalidateMeasure();
+        ExpandedPanel.Measure(new Size(width, double.PositiveInfinity));
+        return ClockRow.Height.Value + ExpandedPanel.DesiredSize.Height;
     }
 
     /// <summary>Widget elements currently shown (tests).</summary>
@@ -66,14 +94,26 @@ public partial class NotchView : UserControl
     private void UpdateClockVisibility() =>
         ClockText.Visibility = string.IsNullOrEmpty(ClockText.Text) || (_expanded && _clockInPanel) ? Visibility.Collapsed : Visibility.Visible;
 
-    private static TextBlock UnavailableNote(WidgetSlot slot) => new()
+    private readonly Dictionary<string, TextBlock> _notes = new(StringComparer.Ordinal);
+
+    /// <summary>One cached note per widget, so an unchanged failure does not re-parent the panel.</summary>
+    private TextBlock UnavailableNote(WidgetSlot slot)
     {
-        Text = $"{slot.Label} isn't available right now.",
-        Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(0xB3, 0xF2, 0xF3, 0xF5)),
-        FontSize = 12,
-        Margin = new Thickness(0, 2, 0, 2),
-        TextTrimming = TextTrimming.CharacterEllipsis,
-    };
+        if (!_notes.TryGetValue(slot.Id, out var note))
+        {
+            note = new TextBlock
+            {
+                Text = $"{slot.Label} isn't available right now.",
+                Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(0xB3, 0xF2, 0xF3, 0xF5)),
+                FontSize = 12,
+                Margin = new Thickness(0, 2, 0, 2),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            };
+            _notes.Add(slot.Id, note);
+        }
+
+        return note;
+    }
 
     /// <summary>The clock text as shown (tests).</summary>
     public string ClockDisplay => ClockText.Text;

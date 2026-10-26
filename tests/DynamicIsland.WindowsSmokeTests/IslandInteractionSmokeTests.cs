@@ -48,7 +48,7 @@ public sealed class IslandInteractionSmokeTests : IDisposable
             Assert.Equal(ExpandCollapseState.Collapsed, expandCollapse.Current.ExpandCollapseState);
 
             expandCollapse.Expand();
-            await WaitForPillSizeAsync(pill, IslandLayout.Expanded, scale);
+            await WaitForExpandedPillAsync(pill, scale);
             Assert.Equal(ExpandCollapseState.Expanded, expandCollapse.Current.ExpandCollapseState);
 
             toggle.Toggle();
@@ -79,6 +79,19 @@ public sealed class IslandInteractionSmokeTests : IDisposable
             bounds = Measure(() => pill.Current.BoundingRectangle);
             return Math.Abs(bounds.Width - expected.Width) <= TolerancePixels && Math.Abs(bounds.Height - expected.Height) <= TolerancePixels;
         }, $"pill size {expected.Width}x{expected.Height}");
+    }
+
+    /// <summary>Expanded height follows the widgets' content (ADR 0022): full width, height within the allowed range.</summary>
+    private static async Task WaitForExpandedPillAsync(AutomationElement pill, double scale)
+    {
+        System.Windows.Rect bounds = default;
+        await WaitUntilAsync(() =>
+        {
+            bounds = Measure(() => pill.Current.BoundingRectangle);
+            return Math.Abs(bounds.Width - IslandLayout.Expanded.Width * scale) <= TolerancePixels
+                && bounds.Height >= IslandLayout.Expanded.Height * scale - TolerancePixels
+                && bounds.Height <= IslandLayout.ExpandedMaxHeight * scale + TolerancePixels;
+        }, $"expanded pill {IslandLayout.Expanded.Width * scale} wide, {IslandLayout.Expanded.Height * scale}–{IslandLayout.ExpandedMaxHeight * scale} high");
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, string what = "condition")

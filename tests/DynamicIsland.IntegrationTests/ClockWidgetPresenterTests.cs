@@ -33,7 +33,7 @@ public sealed class ClockWidgetPresenterTests : IDisposable
     public async Task Notch_and_expanded_panel_show_the_clock_and_disabling_clears_them()
     {
         using var host = new ComponentHost(_lifecycle, new InMemoryNotificationService(TimeProvider.System), new DefaultFailureClassifier(), LaunchArguments.Default, TimeProvider.System);
-        using var registry = new WidgetRegistry(host, BuiltInWidgets.Create(_settings, TimeProvider.System, new NoMedia(), new Platform.Windows.Metrics.Win32SystemMetrics()));
+        using var registry = new WidgetRegistry(host, BuiltInWidgets.Create(_settings, TimeProvider.System, new NoMedia(), new Platform.Windows.Metrics.Win32SystemMetrics(), new Platform.Windows.Audio.CoreAudioService()));
         var view = _ui.Invoke(() => new NotchView());
         using var presenter = new WidgetPresenter(registry, view, _settings, new States(), _lifecycle, NullLogger<WidgetPresenter>.Instance);
 
@@ -49,7 +49,9 @@ public sealed class ClockWidgetPresenterTests : IDisposable
 
         await registry.ApplyAsync([.. WidgetIds.All.Select(id => new WidgetSetting(id, id != WidgetIds.Clock))], TestContext.Current.CancellationToken);
 
-        Assert.True(await WaitAsync(() => _ui.Invoke(() => view.ClockDisplay.Length == 0 && view.WidgetElements.Count == 0)), "Turning the clock off must clear it.");
+        Assert.True(
+            await WaitAsync(() => _ui.Invoke(() => view.ClockDisplay.Length == 0 && !view.WidgetElements.Any(e => System.Windows.Automation.AutomationProperties.GetAutomationId(e) == "Widget.clock"))),
+            "Turning the clock off must clear it.");
         Assert.DoesNotContain(registry.Slots, s => s.Id == WidgetIds.Clock);
     }
 

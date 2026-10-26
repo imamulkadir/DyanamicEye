@@ -59,10 +59,10 @@ public sealed class MetricsIntegrationTests : IDisposable
                 using var lifecycle = new LifecycleCoordinator(TimeProvider.System);
                 using var host = new ComponentHost(lifecycle, new InMemoryNotificationService(TimeProvider.System), new DefaultFailureClassifier(), LaunchArguments.Default, TimeProvider.System);
                 using var registry = new WidgetRegistry(host, []);
-                var view = WidgetPresenter.Views[WidgetIds.SystemStats](
-                    new WidgetSlot(WidgetIds.SystemStats, "System stats", new ComponentStatus("widget-system", ComponentState.Healthy), snapshot),
-                    null!)!;
-                return LogicalTreeHelper.GetChildren(view).OfType<StackPanel>().Select(AutomationProperties.GetName).ToArray();
+                var presenter = new WidgetPresenter(registry, new NotchView(), null!, null!, lifecycle, Microsoft.Extensions.Logging.Abstractions.NullLogger<WidgetPresenter>.Instance);
+                var view = presenter.ViewFor(
+                    new WidgetSlot(WidgetIds.SystemStats, "System stats", new ComponentStatus("widget-system", ComponentState.Healthy), snapshot))!;
+                return LogicalTreeHelper.GetChildren(view).OfType<StackPanel>().Where(p => p.Visibility == Visibility.Visible).Select(AutomationProperties.GetName).ToArray();
             }
             finally
             {

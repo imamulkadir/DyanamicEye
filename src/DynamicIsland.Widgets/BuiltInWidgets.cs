@@ -1,3 +1,4 @@
+using DynamicIsland.Core.Audio;
 using DynamicIsland.Core.Media;
 using DynamicIsland.Core.Metrics;
 using DynamicIsland.Core.Settings;
@@ -11,12 +12,13 @@ namespace DynamicIsland.Widgets;
 /// </summary>
 public static class BuiltInWidgets
 {
-    public static IReadOnlyList<IWidget> Create(ISettingsService settings, TimeProvider timeProvider, IMediaSessionService media, ISystemMetricsService metrics)
+    public static IReadOnlyList<IWidget> Create(ISettingsService settings, TimeProvider timeProvider, IMediaSessionService media, ISystemMetricsService metrics, IAudioService audio)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(media);
         ArgumentNullException.ThrowIfNull(metrics);
-        return [new ClockWidget(settings, timeProvider), new MediaWidget(media), new MetricsWidget(metrics, timeProvider)];
+        ArgumentNullException.ThrowIfNull(audio);
+        return [new ClockWidget(settings, timeProvider), new MediaWidget(media), new MetricsWidget(metrics, timeProvider), new VolumeWidget(audio)];
     }
 }

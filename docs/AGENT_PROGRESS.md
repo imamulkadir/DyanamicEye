@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** next is P04-05 (volume/mute widget). P04-04 (system metrics widget; ADR 0021) is IMPLEMENTED_AWAITING_VALIDATION. G02/G03 manual rows are still owed by the owner.
-- **Active task status:** P04-04 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-03 is committed as `179cef8`, and CI 40309259229 is green with 0 skipped (the WinRT targeting pack restored fine in locked mode).
+- **Active task:** next is P04-06 (SQLite notes and tasks). P04-05 (volume widget, persistent views, content-sized island; ADR 0022) is IMPLEMENTED_AWAITING_VALIDATION. G02/G03 manual rows are still owed by the owner.
+- **Active task status:** P04-05 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-04 is committed as `5f13f25`, and CI 40310973120 is green with 0 skipped.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,16 +23,16 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P04-04 IMPLEMENTED_AWAITING_VALIDATION; next P04-05)
+- **Last updated:** 2026-10-26 (P04-05 IMPLEMENTED_AWAITING_VALIDATION; next P04-06)
 
 ## NEXT ACTION (ONE task only)
-**Owner first:** review and commit the P04-04 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green.
-**Then agent: P04-05** (guide §5): the volume/mute widget.
-- Use the master volume of the default output device via Core Audio (`IMMDeviceEnumerator` and `IAudioEndpointVolume` with a callback; COM interop in Platform.Windows) behind a Core `IAudioService` (guide §3).
-- Handle default device changes (`IMMNotificationClient`), a missing output device, and changes made outside the app. No per-app volume.
-- The view needs a slider and a mute button, keyboard accessible. It is event-driven: no polling.
-- Expanded height is 252 now; adding a row needs space. Consider placing volume next to the media buttons, or start content-sized expansion (P05-01 territory: ask or record an ADR).
-- Write an ADR first.
+**Owner first:** review and commit the P04-05 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. VO1–VO3 with real devices are the valuable manual rows.
+**Then agent: P04-06** (guide §5): SQLite notes and tasks.
+- CRUD, edits, completion, timestamps and validation; transactional changes; search is optional; no network.
+- Note/task text is personal data: never log it (ADR 0004).
+- This needs a dependency decision: `Microsoft.Data.Sqlite` (MIT, from Microsoft). Verify the current version, licence, native bundle (`SQLitePCLRaw.bundle_e_sqlite3`) and size, and record them in an ADR together with the schema, migrations, DB path (`%LOCALAPPDATA%\DynamicIsland\data\islands.db`) and corruption/backup behaviour.
+- **Ask the owner to approve the new package before adding it** (AGENTS.md: avoid dependency churn).
+- Views: compact note and task lists in the expanded island, plus editing. Keyboard: Enter to add, Space to complete.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -42,7 +42,7 @@
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
-| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–04 IMPLEMENTED_AWAITING_VALIDATION; 05 next; started with owner approval while G02/G03 are open) | G04 pending |
+| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; 06 next; started with owner approval while G02/G03 are open) | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
@@ -57,6 +57,39 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **P04-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0022**.
+  - **Core:**
+    - New `Audio/AudioContracts.cs` (`IAudioService`, `AudioState`).
+    - `IslandLayout`: `Expanded` = 420×**180 minimum**; `ExpandedMaxHeight` 360; `Max` = 420×360; `ExpandedHeightFor`.
+  - **Platform.Windows:**
+    - New `Audio/CoreAudioInterop.cs`: classic `ComImport` declarations for MMDeviceEnumerator, IMMDevice, IMMNotificationClient, IAudioEndpointVolume and its callback, in exact vtable order.
+    - New `Audio/CoreAudioService.cs`: default render endpoint; endpoint and device callbacks re-bind off the callback thread; every COM failure means no device or not changed.
+  - **Widgets:** new `VolumeWidget` + `VolumeSnapshot`, event-driven, with commands `mute-toggle` and `set:N` (validated 0–100).
+  - **App:**
+    - **Persistent views:** new `WidgetView` base; `ClockView`; `MediaView` and `MetricsView` rewritten as persistent views; new `VolumeView` (mute toggle, slider, %; sends at most every 50 ms; ignores echoes for 400 ms after a user change).
+    - `WidgetPresenter.ViewFactories`/`ViewFor` (per-widget cache) replace `Views`.
+    - `NotchView.ShowWidgets` re-parents only when the visible set or order changes and caches "unavailable" notes; adds `ContentChanged` and `MeasureExpandedHeight` (UpdateLayout, then an unbounded measure).
+    - `IslandWindow` expands to the measured content height (clamped 180–360 × scale) and follows content changes without moving focus.
+  - **Bugs found while testing:**
+    - The first measure returned a stale size; WPF skips re-measuring clean ancestors, so the measure now runs a layout pass first.
+    - Parallel integration test classes hit a WPF XAML-parsing race (`XamlParseException ... 'RowDefinitions'`). New `tests/DynamicIsland.IntegrationTests/AssemblyInfo.cs` runs that assembly as one collection.
+  - **Tests:**
+    - Unit: `Widgets/VolumeWidgetTests.cs` (state/external change, no device, unavailable, commands valid and invalid, mute, height clamp).
+    - Integration: `VolumeAndLayoutTests`:
+      - real Core Audio, read-only (writes the same level back);
+      - the slider sends values and is not overwritten while adjusting, through the same element instance;
+      - no device;
+      - the height grows with the widget count.
+    - Media, metrics and clock presenter tests adapted to `ViewFor`.
+    - The expanded smoke test now checks the width plus a 180–360 height range.
+    - Visual references notch-expanded/pinned **regenerated** at the 180 px minimum.
+    - A 4-widget rendering was checked by eye (measured 284 px).
+    - Real Release app: widget-volume Healthy; exit 0.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (VO1–VO5), `src/DynamicIsland.App/{AppHost.cs, IslandWindow.xaml.cs, MediaView.cs, MetricsView.cs, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, MediaWidgetIntegrationTests.cs, MetricsIntegrationTests.cs, References/notch-expanded.png, References/notch-pinned.png}`, `tests/DynamicIsland.WindowsSmokeTests/IslandInteractionSmokeTests.cs`
+    - new: `docs/ADR/0022-volume-widget-and-content-sized-island.md`, `src/DynamicIsland.App/{ClockView.cs, VolumeView.cs, WidgetView.cs}`, `src/DynamicIsland.Core/Audio/AudioContracts.cs`, `src/DynamicIsland.Platform.Windows/Audio/{CoreAudioInterop.cs, CoreAudioService.cs}`, `src/DynamicIsland.Widgets/VolumeWidget.cs`, `tests/DynamicIsland.IntegrationTests/{AssemblyInfo.cs, VolumeAndLayoutTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/VolumeWidgetTests.cs`
+    - Suggested commit message: `feat(widgets): volume widget, persistent widget views and content-sized island (P04-05, ADR 0022)`
+- 2026-10-26 P04-04 committed by the owner as `5f13f25`; CI run 40310973120 **success**: Release 562/562, Debug 569/569, 0 skipped.
 - 2026-10-26 **P04-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0021**.
   - **Core:**
     - New `Metrics/SystemMetrics.cs`: `ISystemMetricsService`, `CpuTimes`, `MemoryStatus`, `BatteryStatus`, plus the pure helpers `CpuUsage.Between` and `MetricsFormat`.
@@ -154,6 +187,9 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | P04-05 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2; integration alone ×2 | PASS | Release 582/582 ×2, Debug 589/589 ×2, **0 skipped**; integration 82/82 ×2 |
+| 2026-10-26 | P04-05 | same, real Release app 5 s | `DynamicIsland.exe`, then close | PASS | widget-volume Healthy (Core Audio connected); exit 0 |
+| 2026-10-26 | P04-04 | GitHub Actions `windows-2025` (`5f13f25`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40310973120; 562/562 and 569/569, 0 skipped |
 | 2026-10-26 | P04-04 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2; unit tests alone ×3 | PASS (1 skipped) | Debug 569/569 ×2. Release 562/562 once, and 561 + **1 skipped** once (the fullscreen smoke test: Windows refused the helper window foreground; a skip, not a pass). Unit 469/469 ×3. |
 | 2026-10-26 | P04-03 | GitHub Actions `windows-2025` (`179cef8`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40309259229; 545/545 and 552/552, 0 skipped |
 | 2026-10-26 | P04-03 fixes | Windows 11 Pro 25H2 x64, `CI=true` | Full suite after the art-cap/retry/view fixes, Release ×1 and Debug ×1 | PASS | Release 545/545, Debug 552/552, 0 skipped |

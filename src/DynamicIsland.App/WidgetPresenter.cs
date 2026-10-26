@@ -1,7 +1,5 @@
 using System.Globalization;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
 using DynamicIsland.Core.Lifecycle;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Shell;
@@ -20,9 +18,6 @@ namespace DynamicIsland.App;
 /// </summary>
 public sealed class WidgetPresenter : IDisposable
 {
-    private static readonly Brush Primary = Frozen(Color.FromRgb(0xF2, 0xF3, 0xF5));
-    private static readonly Brush Secondary = Frozen(Color.FromArgb(0xB3, 0xF2, 0xF3, 0xF5));
-
     private readonly WidgetRegistry _registry;
     private readonly NotchView _view;
     private readonly ISettingsService _settings;
@@ -49,13 +44,38 @@ public sealed class WidgetPresenter : IDisposable
         _logger = logger;
     }
 
-    /// <summary>Widget id → expanded view for its <see cref="WidgetSlot.Snapshot"/> (null: nothing to show yet).</summary>
-    public static IReadOnlyDictionary<string, Func<WidgetSlot, WidgetPresenter, UIElement?>> Views { get; } = new Dictionary<string, Func<WidgetSlot, WidgetPresenter, UIElement?>>(StringComparer.Ordinal)
+    /// <summary>Widget id → factory of its persistent expanded view (ADR 0022).</summary>
+    public static IReadOnlyDictionary<string, Func<WidgetPresenter, WidgetView>> ViewFactories { get; } = new Dictionary<string, Func<WidgetPresenter, WidgetView>>(StringComparer.Ordinal)
     {
-        [WidgetIds.Clock] = (slot, _) => slot.Snapshot is ClockSnapshot clock ? ClockView(clock) : null,
-        [WidgetIds.Media] = (slot, presenter) => slot.Snapshot is MediaSnapshot media ? MediaView.Create(media, presenter) : null,
-        [WidgetIds.SystemStats] = (slot, _) => slot.Snapshot is MetricsSnapshot metrics ? MetricsView.Create(metrics) : null,
+        [WidgetIds.Clock] = _ => new ClockView(),
+        [WidgetIds.Media] = presenter => new MediaView(presenter),
+        [WidgetIds.SystemStats] = _ => new MetricsView(),
+        [WidgetIds.Volume] = presenter => new VolumeView(presenter),
     };
+
+    private readonly Dictionary<string, WidgetView> _views = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The expanded view element for <paramref name="slot"/>, updated with its snapshot; <c>null</c> when the widget has
+    /// nothing to show yet or no view. The same element is returned for the same widget every time (UI thread).
+    /// </summary>
+    public UIElement? ViewFor(WidgetSlot slot)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+        if (slot.Snapshot is null || !ViewFactories.TryGetValue(slot.Id, out var factory))
+        {
+            return null;
+        }
+
+        if (!_views.TryGetValue(slot.Id, out var view))
+        {
+            view = factory(this);
+            _views.Add(slot.Id, view);
+        }
+
+        view.Update(slot.Snapshot);
+        return view.Element;
+    }
 
     /// <summary>Decoded album art; decoding happens off the UI thread and triggers a redraw.</summary>
     public AlbumArtCache AlbumArt { get; } = new();
@@ -104,39 +124,17 @@ public sealed class WidgetPresenter : IDisposable
     public void Render()
     {
         var slots = _registry.Slots;
-        _view.ShowWidgets(slots, slot => Views.TryGetValue(slot.Id, out var view) && slot.Snapshot is not null ? view(slot, this) : null);
+        _view.ShowWidgets(slots, ViewFor);
 
         // The notch shows the clock widget's compact text; nothing when it is off, failed or skipped (Safe Mode).
         var clock = slots.FirstOrDefault(s => s.Id == WidgetIds.Clock);
         _view.SetClock(clock is { IsUnavailable: false, Snapshot: ClockSnapshot snapshot } ? snapshot.Compact : null);
     }
 
-    private static StackPanel ClockView(ClockSnapshot clock)
-    {
-        var panel = new StackPanel { Margin = new Thickness(0, 2, 0, 6) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = clock.Time,
-            Foreground = Primary,
-            FontSize = 34,
-            FontWeight = FontWeights.Light,
-            FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI"),
-        });
-        panel.Children.Add(new TextBlock { Text = clock.Date, Foreground = Secondary, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis });
-        System.Windows.Automation.AutomationProperties.SetName(panel, $"{clock.Time}, {clock.Date}");
-        return panel;
-    }
-
     private static bool IsOnScreen(IslandState state) => IslandLayout.For(state) is not null;
 
     private static bool IsExpanded(IslandState state) => state is IslandState.Expanded or IslandState.Pinned;
 
-    private static SolidColorBrush Frozen(Color color)
-    {
-        var brush = new SolidColorBrush(color);
-        brush.Freeze();
-        return brush;
-    }
 
     private void OnRegistryChanged(object? sender, EventArgs e)
     {

@@ -3,55 +3,74 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Media;
 using DynamicIsland.Core.Metrics;
 using DynamicIsland.Widgets;
 
 namespace DynamicIsland.App;
 
 /// <summary>Expanded view of the system metrics widget (ADR 0021): one row of small tiles; battery only when present.</summary>
-internal static class MetricsView
+internal sealed class MetricsView : WidgetView
 {
-    public static UIElement Create(MetricsSnapshot metrics)
+    private readonly UniformGrid _row = new() { Rows = 1, Margin = new Thickness(0, 6, 0, 2) };
+    private readonly Tile _cpu = new("CPU");
+    private readonly Tile _memory = new("Memory");
+    private readonly Tile _battery = new("Battery");
+    private readonly Tile _uptime = new("Up time");
+
+    public MetricsView()
     {
+        _row.Children.Add(_cpu.Panel);
+        _row.Children.Add(_memory.Panel);
+        _row.Children.Add(_battery.Panel);
+        _row.Children.Add(_uptime.Panel);
+        AutomationProperties.SetName(_row, "System stats");
+    }
+
+    public override UIElement Element => _row;
+
+    public override void Update(object snapshot)
+    {
+        var metrics = (MetricsSnapshot)snapshot;
         var culture = CultureInfo.CurrentCulture;
-        var tiles = new List<UIElement>
-        {
-            Tile("CPU", MetricsFormat.Percent(metrics.CpuPercent, culture), "Processor"),
-            Tile("Memory", MetricsFormat.Memory(metrics.Memory, culture), "Memory used"),
-        };
+        _cpu.Set(MetricsFormat.Percent(metrics.CpuPercent, culture), "Processor");
+        _memory.Set(MetricsFormat.Memory(metrics.Memory, culture), "Memory used");
 
         if (metrics.Battery is { HasBattery: true } battery)
         {
-            var value = MetricsFormat.Percent(battery.Percent, culture) + (battery.Charging ? " ⚡" : string.Empty);
-            tiles.Add(Tile("Battery", value, battery.Charging ? "Battery, charging" : "Battery"));
+            _battery.Set(MetricsFormat.Percent(battery.Percent, culture) + (battery.Charging ? " ⚡" : string.Empty), battery.Charging ? "Battery, charging" : "Battery");
+            _battery.Panel.Visibility = Visibility.Visible;
         }
-
-        tiles.Add(Tile("Up time", MetricsFormat.Uptime(metrics.Uptime), "Time since Windows started"));
-
-        var row = new UniformGrid { Rows = 1, Margin = new Thickness(0, 6, 0, 2) };
-        foreach (var tile in tiles)
+        else
         {
-            row.Children.Add(tile);
+            _battery.Panel.Visibility = Visibility.Collapsed;
         }
 
-        AutomationProperties.SetName(row, "System stats");
-        return row;
+        _uptime.Set(MetricsFormat.Uptime(metrics.Uptime), "Time since Windows started");
+        _row.Columns = _battery.Panel.Visibility == Visibility.Visible ? 4 : 3;
     }
 
-    private static StackPanel Tile(string label, string value, string spokenLabel)
+    private sealed class Tile
     {
-        var tile = new StackPanel { Margin = new Thickness(0, 0, 8, 0) };
-        tile.Children.Add(new TextBlock { Text = label, FontSize = 11, Foreground = new SolidColorBrush(Color.FromArgb(0xB3, 0xF2, 0xF3, 0xF5)) });
-        tile.Children.Add(new TextBlock
+        private readonly TextBlock _value = new()
         {
-            Text = value,
             FontSize = 14,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(0xF2, 0xF3, 0xF5)),
+            Foreground = Primary,
             TextTrimming = TextTrimming.CharacterEllipsis,
-        });
-        AutomationProperties.SetName(tile, $"{spokenLabel}: {value}");
-        return tile;
+        };
+
+        public Tile(string label)
+        {
+            Panel.Children.Add(new TextBlock { Text = label, FontSize = 11, Foreground = Secondary });
+            Panel.Children.Add(_value);
+        }
+
+        public StackPanel Panel { get; } = new() { Margin = new Thickness(0, 0, 8, 0) };
+
+        public void Set(string value, string spokenLabel)
+        {
+            _value.Text = value;
+            AutomationProperties.SetName(Panel, $"{spokenLabel}: {value}");
+        }
     }
 }

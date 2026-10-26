@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using DynamicIsland.Core.PersonalData;
 using DynamicIsland.Core.Settings;
+using DynamicIsland.Core.Shell;
 using DynamicIsland.Widgets;
 
 namespace DynamicIsland.App;
@@ -101,6 +102,8 @@ internal sealed class NotesView : WidgetView
                 HorizontalContentAlignment = HorizontalAlignment.Left,
                 Padding = new Thickness(2),
                 Margin = new Thickness(0, 1, 0, 1),
+                MinHeight = IslandTheme.MinTarget,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 Style = MediaView.IconButtonStyle,
             };
             _open.Click += (_, _) => BeginEdit();

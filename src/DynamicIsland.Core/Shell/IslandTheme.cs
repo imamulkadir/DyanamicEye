@@ -46,6 +46,28 @@ public static class IslandTheme
         FocusRing: 0xFF1B1B1F,
         Placeholder: 0xFFDCDCE0);
 
+    /// <summary>
+    /// Windows high contrast (ADR 0028): only the user's system colors, all opaque (no tints or alpha), so the theme the
+    /// user picked decides every color. Hover shows no fill; focus and selection use the highlight color.
+    /// </summary>
+    public static IslandPalette HighContrast(uint window, uint windowText, uint highlight) => new(
+        "HighContrast",
+        Surface: window | 0xFF000000,
+        TextPrimary: windowText | 0xFF000000,
+        TextSecondary: windowText | 0xFF000000,
+        Accent: highlight | 0xFF000000,
+        AccentFill: 0x00000000,
+        HoverFill: 0x00000000,
+        FieldFill: 0x00000000,
+        FocusRing: highlight | 0xFF000000,
+        Placeholder: window | 0xFF000000);
+
+    /// <summary>Minimum size of any clickable control in the island, in DIPs at 100 % (WCAG 2.2 target size, ADR 0028).</summary>
+    public const double MinTarget = 24;
+
+    /// <summary>Minimum size of the island's main controls: tabs, pin, media and volume buttons.</summary>
+    public const double MinPrimaryTarget = 32;
+
     /// <summary>Shape tokens in DIPs at 100 % (scaled with the island).</summary>
     public const double ShoulderRadius = 6;
     public const double BottomRadius = 16;

@@ -71,11 +71,11 @@ public sealed class NotesAndTasksViewTests : IDisposable
         var (row, check) = _ui.Invoke(() =>
         {
             var c = Descendants(view).OfType<CheckBox>().Single();
-            return ((Grid)c.Parent, c);
+            return ((Grid)((FrameworkElement)c.Parent).Parent, c);
         });
         _ui.Invoke(() => check.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)));
         Assert.True(await RenderUntilAsync(view, () => check.IsChecked == true), "Completing must be saved and shown.");
-        Assert.Same(row, _ui.Invoke(() => (Grid)Descendants(view).OfType<CheckBox>().Single().Parent)); // Row reused.
+        Assert.Same(row, _ui.Invoke(() => (Grid)((FrameworkElement)Descendants(view).OfType<CheckBox>().Single().Parent).Parent)); // Row reused (the check sits in its focus ring).
 
         _ui.Invoke(() =>
         {

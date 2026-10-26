@@ -16,13 +16,20 @@ public sealed class WindowsMediaSessionService : IMediaSessionService
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private GlobalSystemMediaTransportControlsSession? _session;
 
+    /// <summary>
+    /// Bound for each call into Windows media sessions: a player or the media service can stop answering (seen on a dev
+    /// PC: the request never completed), and a widget must then show "no media" rather than wait forever.
+    /// </summary>
+    public static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(5);
+
     public event EventHandler? Changed;
 
     public async Task<bool> StartAsync(CancellationToken cancellationToken)
     {
+        using var bounded = Bounded(cancellationToken);
         try
         {
-            var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AsTask(cancellationToken).ConfigureAwait(false);
+            var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AsTask(bounded.Token).ConfigureAwait(false);
             if (manager is null)
             {
                 return false;
@@ -38,7 +45,7 @@ public sealed class WindowsMediaSessionService : IMediaSessionService
             FollowCurrentSession();
             return true;
         }
-        catch (Exception ex) when (IsWinRtFailure(ex))
+        catch (Exception ex) when (IsWinRtFailure(ex) || TimedOut(ex, cancellationToken))
         {
             return false;
         }
@@ -52,6 +59,7 @@ public sealed class WindowsMediaSessionService : IMediaSessionService
             return null;
         }
 
+        using var bounded = Bounded(cancellationToken);
         try
         {
             var playback = session.GetPlaybackInfo();
@@ -60,7 +68,7 @@ public sealed class WindowsMediaSessionService : IMediaSessionService
                 return null; // A player that is shutting down.
             }
 
-            var properties = await session.TryGetMediaPropertiesAsync().AsTask(cancellationToken).ConfigureAwait(false);
+            var properties = await session.TryGetMediaPropertiesAsync().AsTask(bounded.Token).ConfigureAwait(false);
             var title = properties?.Title?.Trim() ?? string.Empty;
             var artist = properties?.Artist?.Trim() ?? string.Empty;
             if (title.Length == 0 && artist.Length == 0)
@@ -85,7 +93,7 @@ public sealed class WindowsMediaSessionService : IMediaSessionService
             var thumbnailKey = properties?.Thumbnail is null ? null : string.Join('\u001f', title, artist, properties.AlbumTitle ?? string.Empty);
             return new MediaInfo(title, artist, state, allowed, manager.GetSessions().Count, thumbnailKey);
         }
-        catch (Exception ex) when (IsWinRtFailure(ex))
+        catch (Exception ex) when (IsWinRtFailure(ex) || TimedOut(ex, cancellationToken))
         {
             return null;
         }
@@ -100,15 +108,16 @@ public sealed class WindowsMediaSessionService : IMediaSessionService
             return null;
         }
 
+        using var bounded = Bounded(cancellationToken);
         try
         {
-            var properties = await session.TryGetMediaPropertiesAsync().AsTask(cancellationToken).ConfigureAwait(false);
+            var properties = await session.TryGetMediaPropertiesAsync().AsTask(bounded.Token).ConfigureAwait(false);
             if (properties?.Thumbnail is not { } thumbnail)
             {
                 return null;
             }
 
-            using var stream = await thumbnail.OpenReadAsync().AsTask(cancellationToken).ConfigureAwait(false);
+            using var stream = await thumbnail.OpenReadAsync().AsTask(bounded.Token).ConfigureAwait(false);
             if (stream.Size == 0 || stream.Size > (ulong)maxBytes)
             {
                 return null; // Unusually large art is skipped rather than loaded (ADR 0020).
@@ -116,14 +125,25 @@ public sealed class WindowsMediaSessionService : IMediaSessionService
 
             using var input = stream.AsStreamForRead();
             using var buffer = new MemoryStream((int)stream.Size);
-            await input.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+            await input.CopyToAsync(buffer, bounded.Token).ConfigureAwait(false);
             return buffer.Length <= maxBytes ? buffer.ToArray() : null;
         }
-        catch (Exception ex) when (IsWinRtFailure(ex) || ex is IOException)
+        catch (Exception ex) when (IsWinRtFailure(ex) || ex is IOException || TimedOut(ex, cancellationToken))
         {
             return null;
         }
     }
+
+    private static CancellationTokenSource Bounded(CancellationToken cancellationToken)
+    {
+        var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        bounded.CancelAfter(CallTimeout);
+        return bounded;
+    }
+
+    /// <summary>Our own <see cref="CallTimeout"/> fired (not the caller's cancellation).</summary>
+    private static bool TimedOut(Exception ex, CancellationToken cancellationToken) =>
+        ex is OperationCanceledException && !cancellationToken.IsCancellationRequested;
 
     /// <summary>
     /// Players refuse commands for a moment while they switch tracks (seen with Media Player: "next" sent right after a
@@ -143,9 +163,10 @@ public sealed class WindowsMediaSessionService : IMediaSessionService
                 return false;
             }
 
+            using var bounded = Bounded(cancellationToken);
             try
             {
-                if (await SendOnceAsync(session, command, cancellationToken).ConfigureAwait(false))
+                if (await SendOnceAsync(session, command, bounded.Token).ConfigureAwait(false))
                 {
                     return true;
                 }
@@ -155,7 +176,7 @@ public sealed class WindowsMediaSessionService : IMediaSessionService
                     return false;
                 }
             }
-            catch (Exception ex) when (IsWinRtFailure(ex))
+            catch (Exception ex) when (IsWinRtFailure(ex) || TimedOut(ex, cancellationToken))
             {
                 return false;
             }

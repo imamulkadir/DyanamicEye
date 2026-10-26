@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using DynamicIsland.Core.Shell;
 
@@ -44,6 +45,36 @@ public static class ThemeResources
     {
         element.SetResourceReference(property, key);
         return element;
+    }
+
+    /// <summary>
+    /// Wraps a control whose default focus mark (a dotted black rectangle) is invisible on the island in a border that
+    /// shows the theme's focus ring while the control has keyboard focus (ADR 0028).
+    /// </summary>
+    public static Border WithFocusRing(Control control)
+    {
+        ArgumentNullException.ThrowIfNull(control);
+        control.FocusVisualStyle = null;
+        var ring = new Border
+        {
+            BorderThickness = new Thickness(1.5),
+            BorderBrush = Brushes.Transparent,
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(2, 0, 2, 0),
+            Child = control,
+        };
+        control.IsKeyboardFocusedChanged += (_, e) =>
+        {
+            if ((bool)e.NewValue)
+            {
+                ring.SetResourceReference(Border.BorderBrushProperty, FocusRing);
+            }
+            else
+            {
+                ring.BorderBrush = Brushes.Transparent;
+            }
+        };
+        return ring;
     }
 
     public static SolidColorBrush Brush(uint argb)

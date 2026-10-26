@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P05-02 (remembered pin, "Try again" for failed widgets) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. P05-01 committed. G02/G03/P04/P05 manual rows are still owed by the owner.
-- **Active task status:** P05-02 **uncommitted**. Title removal + scroll fix committed as `d5ba82b`; CI run 40356940917 **success** (650/650, 659/659, 0 skipped).
+- **Active task:** P05-03 (accessibility pass) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. P05-01/02 committed. G02/G03/P04/P05 manual rows are still owed by the owner.
+- **Active task status:** P05-03 **uncommitted**. P05-02 committed as `3c2c70f`; CI run 40362826141 **success**. Local real-media test fails on this PC (Windows media service not answering, see BLOCKERS).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -26,8 +26,8 @@
 - **Last updated:** 2026-10-26 (P05-01 IMPLEMENTED_AWAITING_VALIDATION; next: owner commit, CI, then P05-02)
 
 ## NEXT ACTION (ONE task only)
-**Owner:** review and commit P05-02 (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. PN1–PN2 in `docs/TEST_MATRIX.md` are quick manual checks.
-**Then agent:** **P05-03** (guide §5 P05: keyboard-only flow, focus indicators, AutomationProperties, screen reader check, high contrast, reduced motion, minimum touch targets). Start with an audit of what exists (focus rings, UIA names, reduced motion are partly done; high contrast is open per ADR 0026 §6) and fix only the gaps.
+**Owner:** review and commit P05-03 (file list in RECENT VERIFIED CHANGES), push, and check that CI is green (CI should pass the real media test). AX1–AX4 in `docs/TEST_MATRIX.md` are the manual checks (keyboard only, Narrator, contrast themes, reduced motion). If convenient, sign out/in or restart Windows so the local media service answers again, then rerun the integration tests.
+**Then agent:** **P05-04** (guide §5 P05: idle CPU/memory and battery scenarios; caching, adaptive timers, suspension when fullscreen/paused/disabled; log benchmark setup/results), then G05 evidence (idle CPU <= 0.5 %, private memory <= 100 MB as goals).
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -38,7 +38,7 @@
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
-| P05 — Customization/performance | P05-01…P05-04 | IN_PROGRESS (01–02 IMPLEMENTED_AWAITING_VALIDATION) | G05 pending |
+| P05 — Customization/performance | P05-01…P05-04 | IN_PROGRESS (01–03 IMPLEMENTED_AWAITING_VALIDATION) | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
@@ -52,6 +52,17 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **P05-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0028**.
+  - Audit found: no focus mark on the island itself; slider and task check boxes used WPF's dotted black focus rectangle (invisible on black); high contrast ignored; note rows 23 DIP tall, tabs/pin 30; selection shown by color only. Already fine: keyboard flow, UIA patterns and names, reduced motion.
+  - **Core:** `IslandTheme.HighContrast(window, windowText, highlight)` (opaque system colors, no tints), `MinTarget` 24 and `MinPrimaryTarget` 32.
+  - **App:** `IslandSurface.FocusStroke` (2 DIP inner outline while keyboard-focused); `ThemeResources.WithFocusRing` for the volume slider and task check boxes (TasksView edit now swaps the ring, not the check box — the first version threw "already the logical child", caught by `NotesAndTasksViewTests`); tabs 36×32, pin 32×32, note rows and check boxes ≥ 24 high; checked toggles get an accent outline; `IslandWindow` uses the high-contrast palette when `SystemParameters.HighContrast`, re-applied on `WM_SYSCOLORCHANGE`, `SPI_SETHIGHCONTRAST` and "ImmersiveColorSet".
+  - **Media robustness (found while testing):** the integration suite hung because `GlobalSystemMediaTransportControlsSessionManager.RequestAsync` stopped completing on this PC (no player running). `WindowsMediaSessionService` now bounds every WinRT call with `CallTimeout` = 5 s (start → unavailable, reads → no media, commands → false). ADR 0020 amended.
+  - **Tests:** new integration `AccessibilityAuditTests` (every interactive control on every tab of all six real widget views has a UIA name and meets 24/32 DIP; must check ≥ 20 controls — the first version checked none because `IsVisible` is false offscreen, fixed; then found the 23 DIP note row); unit `IslandThemeTests.High_contrast_uses_only_the_users_system_colors_without_tints`; `NotchVisualTests` new `notch-pinned-highcontrast.png` and regenerated pinned/expanded/tabs/light references (checked by eye); helpers in `NotesAndTasksViewTests` and `VolumeAndLayoutTests` follow the focus-ring wrapper.
+  - **Changed files:**
+    - modified: `docs/ADR/{0020-media-widget.md, README.md}`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (AX1–AX4), `docs/WORK_LOG.md`, `src/DynamicIsland.App/{IslandSurface.cs, IslandWindow.xaml.cs, NotchView.xaml, NotchView.xaml.cs, NotesView.cs, TasksView.cs, ThemeResources.cs, VolumeView.cs}`, `src/DynamicIsland.Core/Shell/IslandTheme.cs`, `src/DynamicIsland.Platform.Windows/Media/WindowsMediaSessionService.cs`, `tests/DynamicIsland.IntegrationTests/{NotchVisualTests.cs, NotesAndTasksViewTests.cs, VolumeAndLayoutTests.cs, References/notch-expanded.png, References/notch-pinned.png, References/notch-pinned-light.png, References/notch-pinned-tabs.png}`, `tests/DynamicIsland.UnitTests/Shell/IslandThemeTests.cs`
+    - new: `docs/ADR/0028-accessibility-pass.md`, `tests/DynamicIsland.IntegrationTests/AccessibilityAuditTests.cs`, `tests/DynamicIsland.IntegrationTests/References/notch-pinned-highcontrast.png`
+    - Suggested commit message: `feat: accessibility pass - focus marks, high contrast, target sizes (P05-03, ADR 0028); bound media session calls`
+- 2026-10-26 P05-02 committed by the owner as `3c2c70f`; CI run 40362826141 **success**.
 - 2026-10-26 **P05-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0027**.
   - Audit: widget order/on-off, appearance and behavior already persist and apply without recreating the island; widget settings errors already recover on load (`NormalizeWidgets`). Gaps fixed: the pin was session-only; a Failed widget needed Settings off/on or a restart.
   - **Core:** `BehaviorSettings.Pinned` (+ equality); `SettingsEditor` merge keeps the latest pin; `IslandSnapshot.IsPinned` (pinned, or hidden and returning pinned); `IIslandStateMachine.IsPinned` (default member; the real machine uses the snapshot); `ComponentHost.RetryAsync` (only enabled + Failed + not running + started + not paused + not Safe Mode); `WidgetRegistry.RetryAsync`.
@@ -96,26 +107,6 @@
     - modified: `docs/ADR/0023-notes-and-tasks-storage.md`, `docs/ADR/0025-tabbed-expanded-island.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `docs/WORK_LOG.md`, `src/DynamicIsland.App/NotchView.xaml.cs`, `src/DynamicIsland.Infrastructure/PersonalData/SqlitePersonalDataStore.cs`, `tests/DynamicIsland.IntegrationTests/WidgetPanelTests.cs`, `tests/DynamicIsland.UnitTests/PersonalData/SqlitePersonalDataStoreTests.cs`
     - new: `tests/DynamicIsland.WindowsSmokeTests/RestartSmokeTests.cs`
     - Suggested commit message: `test: G04 evidence (100 restarts, update-shaped migrations); fix first tab selection race`
-- 2026-10-26 P04-07 + tabs committed by the owner as `b1165d1`; CI run 40335768082 **failure**: 1 integration test (`ClockWidgetPresenterTests.Notch_and_expanded_panel_show_the_clock_and_disabling_clears_them`, tab-selection race), unit and smoke passed. Fixed in the entry above.
-- 2026-10-26 **Owner request: tabbed expanded island — IMPLEMENTED_AWAITING_VALIDATION** (uncommitted). Decisions are in **ADR 0025**; ADR 0018 §6 and ADR 0022 §5 are amended.
-  - The owner asked "why everything is shown at once? wasnt the plan to show in individual tabs?". The guide only says "click-to-expand dashboard"; the stacked layout was my reading of that (ADR 0018). Asked with 3 options, the owner chose **one widget per tab**.
-  - **App:**
-    - `NotchView.xaml` has a `TabStrip` row (hidden for 0–1 widgets).
-    - `NotchView.ShowWidgets` builds one icon `RadioButton` tab per widget with content or a failure (reused by id, AutomationId `Tab.<id>`) and shows only the selected widget's element.
-    - New `SelectedWidgetId`, `SelectWidget`, `SelectAdjacentWidget` and `SelectedWidgetChanged`. The selection is kept across updates and falls back to the first tab.
-    - `IslandWindow`: Ctrl+Tab / Ctrl+Shift+Tab cycle tabs.
-    - `WidgetPresenter` routes "expanded" only to the selected widget.
-  - **Core:** `WidgetRegistry.SetExpanded(string? visibleWidgetId)` replaces `SetExpanded(bool)`; stats now sample only while their tab is visible.
-  - **Tests:**
-    - `WidgetPanelTests` rewritten: tabs in order, selection, kept across updates, wrap-around, change events, no strip for one widget.
-    - `VolumeAndLayoutTests`: the height follows the selected tab.
-    - Unit: only the visible tab's widget is expanded.
-    - The visual references did not change (the empty tab strip starts collapsed).
-    - Clock and media tab renderings checked by eye.
-  - **Changed files (tabs):**
-    - modified: `docs/ADR/{0018-widget-registry.md, 0022-volume-widget-and-content-sized-island.md, README.md}`, `docs/TEST_MATRIX.md` (TB1–TB3), `src/DynamicIsland.App/{IslandWindow.xaml.cs, NotchView.xaml, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `tests/DynamicIsland.IntegrationTests/{VolumeAndLayoutTests.cs, WidgetPanelTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/WidgetRegistryTests.cs`
-    - new: `docs/ADR/0025-tabbed-expanded-island.md`
-    - Suggested combined commit message: `feat: backup and restore (P04-07, ADR 0024); one widget per tab in the island (ADR 0025)`
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -124,6 +115,7 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | P05-03 | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | **PASS except 1 environment FAIL** | Release 666/667 ×2, Debug 676/677 ×2, 0 skipped. The 1 failure each time is `Windows_media_sessions_connect_and_read_without_errors`: Windows' `RequestAsync` does not complete on this PC right now (now a clean 5 s failure instead of a hang). Not caused by P05-03 code; CI is the reference. |
 | 2026-10-26 | P05-02 | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | **2 FAILs → fixed** | Release 664/664 ×2; Debug 673/674 ×2: `Try_again_restarts_only_a_failed_enabled_widget` (retry race, product fix) and `TrayActionSmokeTests.Pause…` (menu closed early, driver fix) |
 | 2026-10-26 | P05-02 fixes | same | Rebuild, then the full suite Release ×2 and Debug ×2 | PASS | Release 664/664 ×2, Debug 674/674 ×2, **0 skipped** |
 | 2026-10-26 | title + scroll fix | GitHub Actions `windows-2025` (`d5ba82b`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40356940917; 650/650 and 659/659, 0 skipped |
@@ -176,6 +168,7 @@
 | — | P02-01 | multi-monitor, mixed DPI, 125–200 % | Placement on a secondary or high-DPI monitor, fallback when unplugged | PENDING_WINDOWS | Single 100 % monitor on the dev host; covered by unit tests; G02 matrix in P02-02 || 2026-10-25 | P01-04 | GitHub Actions `windows-2025`, owner push | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40200547110 |
 
 ## BLOCKERS / RISKS
+- 2026-10-26: on the dev PC, Windows media sessions (`GlobalSystemMediaTransportControlsSessionManager.RequestAsync`) stopped answering (no player running); the real-media integration test fails locally after 5 s until Windows recovers (sign-out/restart). The agent does not restart Explorer or system services.
 - Enterprise policy may block an unsigned per-user executable; never bypass it.
 - Self-update and rollback must handle a read-only portable folder and DB schema compatibility (P06).
 - The dev host is one security patch behind (runtime 10.0.12 / SDK 10.0.401 vs 10.0.13 / 10.0.402). The owner should update before any release build.

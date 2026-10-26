@@ -28,6 +28,8 @@ public sealed partial class IslandWindow : Window, IDisposable
     private const int WmActivate = 0x0006;
     private const int WmDisplayChange = 0x007E;
     private const int WmSettingChange = 0x001A;
+    private const int WmSysColorChange = 0x0015;
+    private const int SpiSetHighContrast = 0x0043;
     private const int SpiSetWorkArea = 0x002F;
 
     private readonly ISettingsService _settings;
@@ -291,18 +293,24 @@ public sealed partial class IslandWindow : Window, IDisposable
         {
             _displayChanges.Trigger();
         }
-        else if (message == WmSettingChange && lParam != IntPtr.Zero
-            && Marshal.PtrToStringUni(lParam) == WindowsAppTheme.ChangeMessage)
+        else if (message == WmSysColorChange
+            || (message == WmSettingChange && wParam == SpiSetHighContrast)
+            || (message == WmSettingChange && lParam != IntPtr.Zero && Marshal.PtrToStringUni(lParam) == WindowsAppTheme.ChangeMessage))
         {
-            // Windows switched between light and dark app mode ("Use Windows setting" follows it).
+            // Light/dark app mode, or high contrast turned on, off or changed to another contrast theme.
             Dispatcher.BeginInvoke(ApplyTheme);
         }
 
         return IntPtr.Zero;
     }
 
+    /// <summary>High contrast wins over the Theme setting: the user's contrast colors, nothing else (ADR 0028).</summary>
     private void ApplyTheme() =>
-        Notch.ApplyTheme(IslandTheme.Resolve(_settings.Current.Appearance.Theme, WindowsAppTheme.AppsUseLightTheme()));
+        Notch.ApplyTheme(SystemParameters.HighContrast
+            ? IslandTheme.HighContrast(Argb(SystemColors.WindowColor), Argb(SystemColors.WindowTextColor), Argb(SystemColors.HighlightColor))
+            : IslandTheme.Resolve(_settings.Current.Appearance.Theme, WindowsAppTheme.AppsUseLightTheme()));
+
+    private static uint Argb(System.Windows.Media.Color color) => ((uint)color.A << 24) | ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
 
     private void OnSystemDisplaySettingsChanged(object? sender, EventArgs e) => _displayChanges.Trigger();
 

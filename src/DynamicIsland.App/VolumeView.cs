@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 using DynamicIsland.Core.Settings;
+using DynamicIsland.Core.Shell;
 using DynamicIsland.Widgets;
 
 namespace DynamicIsland.App;
@@ -63,12 +64,14 @@ internal sealed class VolumeView : WidgetView
             LargeChange = 10,
             IsMoveToPointEnabled = true,
             VerticalAlignment = VerticalAlignment.Center,
+            MinHeight = IslandTheme.MinTarget,
         };
         AutomationProperties.SetName(_slider, "Volume");
         AutomationProperties.SetAutomationId(_slider, "Volume.Level");
         _slider.ValueChanged += OnSliderValueChanged;
-        Grid.SetColumn(_slider, 1);
-        _grid.Children.Add(_slider);
+        var sliderRing = ThemeResources.WithFocusRing(_slider);
+        Grid.SetColumn(sliderRing, 1);
+        _grid.Children.Add(sliderRing);
         Grid.SetColumn(_noDevice, 1);
         _grid.Children.Add(_noDevice);
 

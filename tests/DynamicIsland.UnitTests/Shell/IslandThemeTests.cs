@@ -32,6 +32,17 @@ public sealed class IslandThemeTests
     }
 
     [Fact]
+    public void High_contrast_uses_only_the_users_system_colors_without_tints()
+    {
+        // "Aquatic"-like colors, given without alpha as Windows reports them.
+        var palette = IslandTheme.HighContrast(window: 0x202020, windowText: 0xFFFFFF, highlight: 0x8EE3F0);
+
+        Assert.Equal((0xFF202020u, 0xFFFFFFFFu, 0xFFFFFFFFu), (palette.Surface, palette.TextPrimary, palette.TextSecondary));
+        Assert.Equal((0xFF8EE3F0u, 0xFF8EE3F0u), (palette.Accent, palette.FocusRing));
+        Assert.All([palette.AccentFill, palette.HoverFill, palette.FieldFill], fill => Assert.Equal(0u, fill)); // No tints.
+    }
+
+    [Fact]
     public void Contrast_ratio_matches_the_wcag_reference_values()
     {
         Assert.Equal(21, IslandTheme.ContrastRatio(0xFFFFFFFF, 0xFF000000), 3);

@@ -23,6 +23,11 @@ public sealed class IslandSurface : Decorator
         nameof(Fill), typeof(Brush), typeof(IslandSurface),
         new FrameworkPropertyMetadata(Brushes.Black, FrameworkPropertyMetadataOptions.AffectsRender));
 
+    /// <summary>Outline drawn inside the notch while it has keyboard focus (ADR 0028); <c>null</c> draws none.</summary>
+    public static readonly DependencyProperty FocusStrokeProperty = DependencyProperty.Register(
+        nameof(FocusStroke), typeof(Brush), typeof(IslandSurface),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
     /// <summary>Radius of the concave shoulders at the top corners, in DIPs.</summary>
     public static readonly DependencyProperty ShoulderRadiusProperty = DependencyProperty.Register(
         nameof(ShoulderRadius), typeof(double), typeof(IslandSurface),
@@ -37,6 +42,12 @@ public sealed class IslandSurface : Decorator
     {
         get => (Brush)GetValue(FillProperty);
         set => SetValue(FillProperty, value);
+    }
+
+    public Brush? FocusStroke
+    {
+        get => (Brush?)GetValue(FocusStrokeProperty);
+        set => SetValue(FocusStrokeProperty, value);
     }
 
     public double ShoulderRadius
@@ -80,7 +91,22 @@ public sealed class IslandSurface : Decorator
         if (ActualWidth > 0 && ActualHeight > 0)
         {
             drawingContext.DrawGeometry(Fill, null, CreateNotchGeometry(ActualWidth, ActualHeight, ShoulderRadius, BottomRadius));
+            if (IsKeyboardFocused && FocusStroke is { } stroke && ActualWidth > 8 && ActualHeight > 8)
+            {
+                // Inside the outline (2 DIPs), so it is never clipped and never covers what is around the island.
+                const double Width = 2;
+                var inner = CreateNotchGeometry(ActualWidth - (2 * Width), ActualHeight - Width, ShoulderRadius, Math.Max(0, BottomRadius - Width));
+                drawingContext.PushTransform(new TranslateTransform(Width, 0));
+                drawingContext.DrawGeometry(null, new Pen(stroke, Width), inner);
+                drawingContext.Pop();
+            }
         }
+    }
+
+    protected override void OnIsKeyboardFocusedChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnIsKeyboardFocusedChanged(e);
+        InvalidateVisual();
     }
 
     /// <summary>Content lives inside the notch body, between the shoulders.</summary>

@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using DynamicIsland.Core.PersonalData;
 using DynamicIsland.Core.Settings;
+using DynamicIsland.Core.Shell;
 using DynamicIsland.Widgets;
 
 namespace DynamicIsland.App;
@@ -90,6 +91,7 @@ internal sealed class TasksView : WidgetView
         private readonly TasksView _owner;
         private readonly long _id;
         private readonly CheckBox _check;
+        private readonly Border _checkRing; // The check box inside its focus ring; swapped with the editor.
         private readonly TextBlock _text = new TextBlock { FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis }
             .Themed(TextBlock.ForegroundProperty, ThemeResources.TextPrimary);
         private readonly Button _delete;
@@ -103,7 +105,7 @@ internal sealed class TasksView : WidgetView
             Root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             Root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            _check = new CheckBox { Content = _text, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 2, 0, 2) }
+            _check = new CheckBox { Content = _text, VerticalAlignment = VerticalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center, MinHeight = IslandTheme.MinTarget }
                 .Themed(Control.ForegroundProperty, ThemeResources.TextPrimary);
             _check.Click += (_, _) => owner.Send(PersonalDataWidget.Toggle(id));
             _check.PreviewKeyDown += (_, e) =>
@@ -122,7 +124,8 @@ internal sealed class TasksView : WidgetView
                     e.Handled = true;
                 }
             };
-            Root.Children.Add(_check);
+            _checkRing = ThemeResources.WithFocusRing(_check);
+            Root.Children.Add(_checkRing);
 
             _delete = PersonalDataParts.DeleteButton("task", () => owner.Send(PersonalDataWidget.Delete(id)));
             Grid.SetColumn(_delete, 1);
@@ -164,7 +167,7 @@ internal sealed class TasksView : WidgetView
                 _owner.Send(PersonalDataWidget.Edit(_id, text));
                 EndEdit();
             }, EndEdit);
-            Root.Children.Remove(_check);
+            Root.Children.Remove(_checkRing);
             Root.Children.Insert(0, editor);
         }
 
@@ -177,7 +180,7 @@ internal sealed class TasksView : WidgetView
 
             _editing = false;
             Root.Children.RemoveAt(0);
-            Root.Children.Insert(0, _check);
+            Root.Children.Insert(0, _checkRing);
             if (_task is not null)
             {
                 Update(_task, !_check.IsEnabled);

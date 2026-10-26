@@ -59,3 +59,6 @@
 ## Consequences
 - P06 packaging accounts for the WinRT projection assemblies (size, trimming, signing).
 - Manual rows MD1–MD5 in `docs/TEST_MATRIX.md` (real players: browser, Spotify/VLC/Groove-style apps).
+- 2026-10-26: every call into Windows media sessions is bounded by `CallTimeout` (5 s). On the dev PC
+  `GlobalSystemMediaTransportControlsSessionManager.RequestAsync` stopped completing (no player running); without a
+  bound the widget waited forever and the integration suite hung. A timeout now means "no media" (start: unavailable).

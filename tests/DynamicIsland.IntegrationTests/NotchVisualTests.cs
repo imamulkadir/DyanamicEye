@@ -39,6 +39,7 @@ public sealed class NotchVisualTests : IDisposable
         { IslandState.Collapsed, "Light" }, // ADR 0026
         { IslandState.Pinned, "Light" },
         { IslandState.Pinned, "Tabs" }, // Clock, stats and volume tabs, clock selected (ADR 0025).
+        { IslandState.Pinned, "HighContrast" }, // Tabs in a black high-contrast theme (ADR 0028).
     };
 
     [Theory]
@@ -46,7 +47,13 @@ public sealed class NotchVisualTests : IDisposable
     public void Notch_matches_its_reference_rendering(IslandState state, string theme)
     {
         var name = $"notch-{state.ToString().ToLowerInvariant()}{(theme == "Dark" ? string.Empty : "-" + theme.ToLowerInvariant())}.png";
-        var actual = _ui.Invoke(() => Render(state, theme == "Light" ? IslandTheme.Light : IslandTheme.Dark, withTabs: theme == "Tabs"));
+        var palette = theme switch
+        {
+            "Light" => IslandTheme.Light,
+            "HighContrast" => IslandTheme.HighContrast(window: 0x000000, windowText: 0xFFFFFF, highlight: 0x1AEBFF),
+            _ => IslandTheme.Dark,
+        };
+        var actual = _ui.Invoke(() => Render(state, palette, withTabs: theme is "Tabs" or "HighContrast"));
 
         if (Environment.GetEnvironmentVariable(UpdateVariable) == "1")
         {

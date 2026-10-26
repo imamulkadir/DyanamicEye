@@ -29,6 +29,8 @@
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter Property="Foreground" Value="{DynamicResource Island.Accent}" />
                                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Island.AccentFill}" />
+                                <!-- An outline too, so selection never relies on color alone (high contrast, ADR 0028). -->
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Island.Accent}" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Island.FocusRing}" />
@@ -41,6 +43,7 @@
     </UserControl.Resources>
     <local:IslandSurface x:Name="Surface"
                          Fill="{DynamicResource Island.Surface}"
+                         FocusStroke="{DynamicResource Island.FocusRing}"
                          ShoulderRadius="6"
                          BottomRadius="16"
                          SnapsToDevicePixels="True"
@@ -85,7 +88,7 @@
                             AutomationProperties.Name="Widget tabs" AutomationProperties.AutomationId="Tabs" />
                 <ToggleButton x:Name="PinButton"
                               Grid.Column="1"
-                              Width="30" Height="30"
+                              Width="32" Height="32"
                               VerticalAlignment="Center"
                               Style="{StaticResource IslandIconToggle}"
                               Content="&#xE718;"

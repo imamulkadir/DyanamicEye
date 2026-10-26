@@ -2,6 +2,28 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-26 (oldest two RECENT entries at P05-03)
+- 2026-10-26 P04-07 + tabs committed by the owner as `b1165d1`; CI run 40335768082 **failure**: 1 integration test (`ClockWidgetPresenterTests.Notch_and_expanded_panel_show_the_clock_and_disabling_clears_them`, tab-selection race), unit and smoke passed. Fixed in the entry above.
+- 2026-10-26 **Owner request: tabbed expanded island — IMPLEMENTED_AWAITING_VALIDATION** (uncommitted). Decisions are in **ADR 0025**; ADR 0018 §6 and ADR 0022 §5 are amended.
+  - The owner asked "why everything is shown at once? wasnt the plan to show in individual tabs?". The guide only says "click-to-expand dashboard"; the stacked layout was my reading of that (ADR 0018). Asked with 3 options, the owner chose **one widget per tab**.
+  - **App:**
+    - `NotchView.xaml` has a `TabStrip` row (hidden for 0–1 widgets).
+    - `NotchView.ShowWidgets` builds one icon `RadioButton` tab per widget with content or a failure (reused by id, AutomationId `Tab.<id>`) and shows only the selected widget's element.
+    - New `SelectedWidgetId`, `SelectWidget`, `SelectAdjacentWidget` and `SelectedWidgetChanged`. The selection is kept across updates and falls back to the first tab.
+    - `IslandWindow`: Ctrl+Tab / Ctrl+Shift+Tab cycle tabs.
+    - `WidgetPresenter` routes "expanded" only to the selected widget.
+  - **Core:** `WidgetRegistry.SetExpanded(string? visibleWidgetId)` replaces `SetExpanded(bool)`; stats now sample only while their tab is visible.
+  - **Tests:**
+    - `WidgetPanelTests` rewritten: tabs in order, selection, kept across updates, wrap-around, change events, no strip for one widget.
+    - `VolumeAndLayoutTests`: the height follows the selected tab.
+    - Unit: only the visible tab's widget is expanded.
+    - The visual references did not change (the empty tab strip starts collapsed).
+    - Clock and media tab renderings checked by eye.
+  - **Changed files (tabs):**
+    - modified: `docs/ADR/{0018-widget-registry.md, 0022-volume-widget-and-content-sized-island.md, README.md}`, `docs/TEST_MATRIX.md` (TB1–TB3), `src/DynamicIsland.App/{IslandWindow.xaml.cs, NotchView.xaml, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `tests/DynamicIsland.IntegrationTests/{VolumeAndLayoutTests.cs, WidgetPanelTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/WidgetRegistryTests.cs`
+    - new: `docs/ADR/0025-tabbed-expanded-island.md`
+    - Suggested combined commit message: `feat: backup and restore (P04-07, ADR 0024); one widget per tab in the island (ADR 0025)`
+
 ## Archived 2026-10-26 (P04-06 commit, P04-07 implementation)
 - 2026-10-26 **P04-07 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0024**.
   - **Core:** new `PersonalData/DataBackup.cs` (`IDataBackupService` (guide §3), `BackupPreview`, `BackupProblem`, `BackupExportResult`).

@@ -145,7 +145,7 @@ public sealed class VolumeAndLayoutTests : IDisposable
         new(_lifecycle, new InMemoryNotificationService(TimeProvider.System), new DefaultFailureClassifier(), LaunchArguments.Default, TimeProvider.System);
 
     private static Slider FindSlider(DependencyObject root) =>
-        LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>().Select(c => c as Slider ?? (c is Panel ? FindSliderOrNull(c) : null)).First(s => s is not null)!;
+        LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>().Select(c => c as Slider ?? (c is Panel or Decorator ? FindSliderOrNull(c) : null)).First(s => s is not null)!;
 
     private static Slider? FindSliderOrNull(DependencyObject root) =>
         LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>().Select(c => c as Slider ?? FindSliderOrNull(c)).FirstOrDefault(s => s is not null);

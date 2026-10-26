@@ -134,6 +134,14 @@ internal static partial class AppLog
         Message = "First-run choices saved (startup {Startup}, daily update checks {UpdateChecks}, widgets enabled {Widgets})")]
     public static partial void OnboardingCompleted(ILogger logger, bool startup, bool updateChecks, int widgets);
 
+    [LoggerMessage(EventId = 1056, EventName = "ShortcutRegistered", Level = LogLevel.Information,
+        Message = "Global shortcut registered")]
+    public static partial void ShortcutRegistered(ILogger logger);
+
+    [LoggerMessage(EventId = 1057, EventName = "ShortcutUnavailable", Level = LogLevel.Warning,
+        Message = "Global shortcut not registered ({Result}, Win32 error {ErrorCode})")]
+    public static partial void ShortcutUnavailable(ILogger logger, Platform.Windows.Input.HotkeyRegistration result, int errorCode);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

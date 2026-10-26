@@ -109,6 +109,7 @@ public partial class App : Application
         _instance.StartListening(OnActivationRequested, OnActivationUnavailable);
         _host.Services.GetRequiredService<FullscreenCoordinator>().Start();
         _host.Services.GetRequiredService<TrayController>().Start(); // Disposed (icon removed) with the host on exit.
+        _host.Services.GetRequiredService<ShortcutController>().Start(); // Registered only when turned on (ADR 0017).
 
         if (Onboarding.IsNeeded(settingsService.Current, launch))
         {

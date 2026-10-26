@@ -59,6 +59,26 @@ public static class IslandWindowInterop
         return IntPtr.Zero;
     }
 
+    /// <summary>Message-only window (<c>HWND_MESSAGE</c> child) with this exact title owned by <paramref name="processId"/>.</summary>
+    public static IntPtr FindMessageWindow(int processId, string title)
+    {
+        var messageParent = new IntPtr(-3);
+        var current = IntPtr.Zero;
+        while ((current = NativeMethods.FindWindowEx(messageParent, current, null, title)) != IntPtr.Zero)
+        {
+            NativeMethods.GetWindowThreadProcessId(current, out var owner);
+            if (owner == (uint)processId)
+            {
+                return current;
+            }
+        }
+
+        return IntPtr.Zero;
+    }
+
+    /// <summary>Posts a message (tests: simulate shell or system notifications without input injection).</summary>
+    public static bool Post(IntPtr window, int message, IntPtr wParam, IntPtr lParam) => NativeMethods.PostMessage(window, (uint)message, wParam, lParam);
+
     /// <summary>Posts <c>WM_CLOSE</c>, as tools such as taskkill (without /F) do.</summary>
     public static void RequestClose(IntPtr window) => NativeMethods.PostMessage(window, 0x0010, IntPtr.Zero, IntPtr.Zero);
 

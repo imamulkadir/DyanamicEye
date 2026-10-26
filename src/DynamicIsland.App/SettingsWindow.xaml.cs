@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using DynamicIsland.Core.Diagnostics;
 using DynamicIsland.Core.Display;
 using DynamicIsland.Core.Settings;
@@ -18,6 +19,7 @@ namespace DynamicIsland.App;
 /// <summary>What the settings window shows about the app besides the settings themselves.</summary>
 /// <param name="IsShuttingDown">True once the app is exiting: closing then never asks to save.</param>
 /// <param name="StartupState">Current sign-in startup registration (ADR 0015).</param>
+/// <param name="ShortcutState">Current global shortcut registration (ADR 0017).</param>
 public sealed record SettingsWindowContext(
     string Version,
     string Copyright,
@@ -25,7 +27,8 @@ public sealed record SettingsWindowContext(
     string LogsFolder,
     Func<DiagnosticContext> Diagnostics,
     Func<bool> IsShuttingDown,
-    Func<StartupState> StartupState);
+    Func<StartupState> StartupState,
+    Func<ShortcutState> ShortcutState);
 
 /// <summary>
 /// Settings window (guide P03-03, ADR 0014): edits a <see cref="SettingsEditor"/> draft and saves it explicitly through
@@ -91,6 +94,7 @@ public partial class SettingsWindow : Window
         AboutCopyrightText.Text = context.Copyright;
         DataFolderText.Text = context.DataFolder;
         ShowStartupStatus();
+        ShowShortcutStatus();
 
         _editor.PropertyChanged += OnEditorChanged;
         _settings.Changed += OnSettingsChanged;
@@ -163,6 +167,15 @@ public partial class SettingsWindow : Window
 
     private static Choice<T> Option<T>(T value, string label) => new(value, label);
 
+    /// <summary>Whether Windows granted the saved shortcut (ADR 0017).</summary>
+    private void ShowShortcutStatus() => ShortcutStatusText.Text = _context.ShortcutState() switch
+    {
+        ShortcutState.Active => "On. Use letters A–Z, digits, F1–F24 or Space with at least two of Ctrl, Alt, Shift and Win.",
+        ShortcutState.InUse => "Not active: another app or Windows already uses this shortcut. Choose another one and save.",
+        ShortcutState.Failed => "Not active: Windows did not allow this shortcut. Choose another one and save.",
+        _ => "Off. Nothing is registered with Windows until you turn it on.",
+    };
+
     /// <summary>What Windows actually does with the saved startup choice (ADR 0015); the box itself is the draft.</summary>
     private void ShowStartupStatus() => StartupStatusText.Text = _context.StartupState() switch
     {
@@ -192,6 +205,9 @@ public partial class SettingsWindow : Window
         if (e.PropertyName is "")
         {
             ShowStartupStatus();
+
+            // The shortcut is re-registered on the UI thread after the save; show the outcome once that has run.
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, ShowShortcutStatus);
         }
     }
 

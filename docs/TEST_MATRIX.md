@@ -106,6 +106,10 @@ Automated coverage (CI + dev host): placement, click-through, UIA expand/pin/col
 | CK3 | Region change | Windows Settings → Time & language → change the time format to 24-hour (or the region), keep the island open | Within a second the notch follows the new format when "Use Windows setting" is chosen | NOT_RUN |
 | CK4 | Seconds and CPU | Turn on Show seconds; watch Task Manager for a minute | Seconds tick smoothly; Dynamic Island stays near 0 % CPU | NOT_RUN |
 | CK5 | Clock off, scaling, sleep | Turn off "Clock and date" on the Widgets page; then turn it on, set Size to 200 %; then sleep and wake the PC | Off: plain black notch. 200 %: text scales with the notch. After wake: the correct time at once | NOT_RUN |
+| SC1 | Global shortcut (P03-05) | Settings → Behavior → tick "Open and close the island with a global shortcut", keep Ctrl+Alt+I, Save; in another app press Ctrl+Alt+I twice | The status says On; the first press opens the island with keyboard focus on it (Tab reaches the pin button); the second closes it and returns focus to the app | NOT_RUN (automated with a posted WM_HOTKEY) |
+| SC2 | Conflict | Pick a shortcut another running app already registered (or one Windows owns, e.g. Ctrl+Alt+Del is refused as invalid; try Shift+Win+S), Save | The status explains the shortcut is used by another app or Windows; nothing else changes | NOT_RUN (automated with a second registration) |
+| SC3 | Validation and off | Type `Ctrl+C`, then `Alt+F`, then clear the box; then untick the option and Save | Each shows a message and Save is greyed out; when turned off, the status says Off and Ctrl+Alt+I does nothing | NOT_RUN (automated in unit tests) |
+| SC4 | Hidden, paused, fullscreen | Hide the island from the tray and press the shortcut; Pause and press it; start a fullscreen video and press it | Hidden and paused: the island comes back expanded. Fullscreen: nothing appears over the video | NOT_RUN (action unit-tested) |
 
 ## G01 — Reliability (all automated; recorded for completeness)
 | # | Scenario | Status |

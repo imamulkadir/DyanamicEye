@@ -336,6 +336,29 @@ public sealed class SettingsEditorTests
     }
 
     [Fact]
+    public void Shortcut_is_validated_and_merged_and_reset_with_behavior()
+    {
+        var editor = Create();
+        Assert.Equal("Ctrl+Alt+I", editor.ShortcutText);
+
+        editor.ShortcutText = "ctrl + alt + i";
+        Assert.False(editor.IsDirty); // Same shortcut, different spelling.
+
+        editor.ShortcutText = "Win+K";
+        Assert.NotNull(editor.ShortcutError);
+        Assert.False(editor.CanSave);
+
+        editor.ShortcutEnabled = true;
+        editor.ShortcutText = "shift+win+k";
+        Assert.Null(editor.ShortcutError);
+        Assert.Equal(new ShortcutSettings { Enabled = true, Keys = "Shift+Win+K" }, editor.ApplyTo(editor.Saved).Behavior.Shortcut);
+
+        editor.ResetSection(SettingsSection.Behavior);
+        Assert.False(editor.ShortcutEnabled);
+        Assert.Equal("Ctrl+Alt+I", editor.ShortcutText);
+    }
+
+    [Fact]
     public void Loading_never_reports_a_half_loaded_draft_as_dirty()
     {
         var editor = Create();

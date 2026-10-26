@@ -121,7 +121,30 @@ public static class SettingsValidator
             delay = Math.Clamp(delay, MinHoverPreviewDelayMs, MaxHoverPreviewDelayMs);
         }
 
-        return behavior with { HoverPreviewDelayMs = delay, FullscreenExceptions = NormalizeExceptions(behavior.FullscreenExceptions, corrections) };
+        return behavior with
+        {
+            HoverPreviewDelayMs = delay,
+            FullscreenExceptions = NormalizeExceptions(behavior.FullscreenExceptions, corrections),
+            Shortcut = NormalizeShortcut(behavior.Shortcut, corrections),
+        };
+    }
+
+    /// <summary>Keeps a valid shortcut in canonical form; a damaged one falls back to the default keys (still on or off as saved).</summary>
+    private static ShortcutSettings NormalizeShortcut(ShortcutSettings? shortcut, List<string> corrections)
+    {
+        if (shortcut is null)
+        {
+            corrections.Add("behavior.shortcut: missing, defaults used");
+            return new ShortcutSettings();
+        }
+
+        if (Shell.Hotkey.TryParse(shortcut.Keys, out var hotkey, out _))
+        {
+            return shortcut with { Keys = hotkey!.ToString() };
+        }
+
+        corrections.Add("behavior.shortcut.keys: invalid, default used");
+        return shortcut with { Keys = ShortcutSettings.DefaultKeys };
     }
 
     /// <summary>Executable file names only (no paths), trimmed, lower-cased, unique, at most <see cref="MaxFullscreenExceptions"/>.</summary>

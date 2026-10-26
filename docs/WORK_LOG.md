@@ -2,6 +2,61 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-26 (P03-01, P03-02)
+
+### Verified changes
+- 2026-10-26 P03-02 committed by the owner as `ba52b9e` and pushed; CI run 40286979868 **success** (0 skipped).
+- 2026-10-26 **P03-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits).
+  - Wrote ADR 0013 (`docs/ADR/0013-tray-actions-settings-restart.md`, indexed in the ADR README) and TEST_MATRIX rows T1–T10.
+  - Intermittent smoke failures: neither reproduced in 7 full-suite runs (see TEST EVIDENCE). Analysis:
+    - (a) The fullscreen failure took about 10 s. That means the helper window did become foreground (otherwise the test skips at 5 s), but the island did not hide within the next 5 s. The cause is unknown; the test captures the app log tail if it fails again.
+    - (b) The fullscreen detector's out-of-context `EVENT_OBJECT_LOCATIONCHANGE` hook wakes the app for every window or cursor move anywhere on the desktop. It returns early, but idle CPU still depends on other activity on the screen. This dates from P02-04 and is not specific to P03-02. Limit left at 300 ms. Possible later refinement: install the location hook only for the current foreground window's process/thread.
+  - **Changed files for the owner (since P03-01):**
+    - modified: `docs/AGENT_PROGRESS.md`, `docs/ADR/README.md`, `docs/TEST_MATRIX.md`, `src/DynamicIsland.App/{App.xaml, App.xaml.cs, AppHost.cs, AppLog.cs, FullscreenCoordinator.cs, IslandWindow.xaml.cs, MotionGate.cs, TrayController.cs}`, `src/DynamicIsland.Core/Components/{ComponentBoundary.cs, ComponentHost.cs}`, `src/DynamicIsland.Core/Lifecycle/{AppSupervisor.cs, ExitReason.cs}`, `src/DynamicIsland.Launcher/{ProcessAppRunner.cs, Program.cs}`, `src/DynamicIsland.Platform.Windows/Tray/Win32TrayIcon.cs`
+    - deleted: `src/DynamicIsland.App/AppSettingsSnapshot.cs`
+    - new: `docs/ADR/0013-tray-actions-settings-restart.md`, `src/DynamicIsland.App/RestartService.cs`, `src/DynamicIsland.Core/Lifecycle/LauncherArguments.cs`, `src/DynamicIsland.Core/Settings/SettingsService.cs`, `src/DynamicIsland.Core/Shell/TrayMenu.cs`, `tests/DynamicIsland.UnitTests/{Lifecycle/RestartContractTests.cs, Settings/SettingsServiceTests.cs, Shell/TrayMenuModelTests.cs}`, `tests/DynamicIsland.WindowsSmokeTests/{TrayActionSmokeTests.cs, TrayMenuDriver.cs}`
+    - Suggested commit message: `feat(tray): tray actions, settings service, restart contract (P03-02, ADR 0013)`
+  - **Decisions (ADR 0013):**
+    - **Exit codes:** `ExitReason.RestartInSafeMode` with **exit code 4**. The launcher relaunches in Safe Mode on 4 and normally on 3; neither counts as a crash, and both share the existing cap of 5 restart requests per launcher lifetime.
+    - **Launcher contract** (`Core/Lifecycle/ExitReason.cs` → `LauncherContract`):
+      - The launcher sets the env var `DYNAMICISLAND_SUPERVISED=1` for its child.
+      - The launcher accepts the allow-listed `--safe-mode` and `--after-pid N` (`Core/Lifecycle/LauncherArguments.cs`). With `--after-pid` it waits up to 15 s for that process, so the single-instance lock is free.
+    - **Restart** (`App/RestartService.cs`): when supervised, the app exits with 3/4. When started directly, it starts the launcher with `--after-pid <own pid> [--safe-mode]`, then exits. Without a launcher next to the app the restart is refused and logged.
+    - **Settings:** `Core/Settings/SettingsService.cs` (`ISettingsService`: `Current`, `IsReadOnly`, `Changed`, serialized `UpdateAsync` = change → validate → save → publish; a read-only store applies the change for the session only; a failed save keeps the old settings). It replaces `AppSettingsSnapshot`, which was **deleted**. `IslandWindow` re-places itself and re-applies its state on `Changed`.
+    - **Shutdown:** `App.xaml` sets `ShutdownMode="OnExplicitShutdown"`. Closing the island window (Alt+F4 or a close request) is turned into `RequestShutdown(UserExit)` in its `Closing` handler, so future windows such as Settings can close freely.
+    - **Pause:** tray Pause → state machine `Paused` → `ComponentHost.SetPausedAsync(true)` stops optional components (status Stopped, reason `paused`); Resume restarts them. `ComponentBoundary` is now restartable after a stop.
+    - **Tray menu:** a pure model `Core/Shell/TrayMenu.cs` (`TrayMenuModel.Build`) with Show/Hide, Pin (enabled only while visible), Pause/Resume, a Display submenu ("Display N (primary)" ordered left→right, current monitor checked, monitor ids only as arguments), Reset to primary display (also resets offsets: the lost-island recovery), Settings… and Check for updates (both **disabled with tooltips** until P03-03/P06), Open logs folder, Restart in/Leave Safe Mode, Restart and Exit. Every item has an AutomationId `Tray.*`.
+    - `TrayController` was rewritten to render the model and execute commands (settings updates are async with failures logged, never crashing).
+  - **Other changes:**
+    - `AppLog` adds RestartRequested, RestartUnavailable, SettingsNotSaved, OpenLogsFailed and ComponentPauseIncomplete.
+    - `AppHost` registrations: `SettingsService`, `RestartService`, and the `TrayController` factory with the logs folder.
+    - `App.xaml.cs` wires pause to the component host and initializes the settings service after load.
+    - `Win32TrayIcon.RequestContextMenu`.
+  - **Tests added:**
+    - `UnitTests/Shell/TrayMenuModelTests.cs`
+    - `UnitTests/Settings/SettingsServiceTests.cs`
+    - `UnitTests/Lifecycle/RestartContractTests.cs`: launcher args, exit codes, Safe Mode restart, start in Safe Mode, component pause/resume
+    - smoke `TrayMenuDriver.cs`: opens the real tray menu via the callback message and invokes items by AutomationId with UIA, no mouse
+    - smoke `TrayActionSmokeTests.cs`: pause/resume (all configs); reset display saves settings, restart through the launcher (3 → new instance, 4 → Safe Mode), and unsupervised restart handover (Debug-only, isolated data root)
+- 2026-10-25 P03-01 pushed; CI run 40208475923 **success**: Release 350, Debug 351, 0 skipped.
+- 2026-10-25 **Owner approval:** "pushed, proceed" after G02 was set up for owner validation. Recorded as approval to **continue P03 while G02 stays open**; the hardware matrix rows are still owed.
+- 2026-10-25 **P03-01 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). Decisions are in ADR 0012.
+  - **Platform.Windows:**
+    - `Tray/Win32TrayIcon.cs`: `Shell_NotifyIcon` v4, select/keyselect/contextmenu events, `TaskbarCreated` re-add, DPI-sized icon from the exe (group 32512) via `LoadImageW` with a system-icon fallback, `IsRegistered`, `PrepareForMenu`, `SendTaskbarCreated`.
+    - `IslandWindowInterop.FindTopLevelWindow` and `RequestClose`.
+    - New interop.
+  - **App:**
+    - New `TrayController.cs`: hidden top-level owner `HwndSource`, accessible WPF menu (Show/Hide, Exit), left-click toggle, `WM_CLOSE` treated as Exit.
+    - `AppHost` registration; `App.xaml.cs` starts it (disposed with the host); `AppLog.TrayUnavailable`.
+  - **Tests:**
+    - `IntegrationTests/Win32TrayIconTests.cs`: real registration, simulated Explorer restart, removal; v4 event mapping.
+    - Smoke `TraySmokeTests.cs`: real app icon, `TaskbarCreated` recovery, removed on exit, and the WM_CLOSE regression.
+    - `IslandPlacementSmokeTests` click-through now waits for the first paint.
+  - **Bugs found:**
+    - (1) `taskkill` closed the hidden tray window, so the app kept running with an orphaned icon. Fixed and regression-tested.
+    - (2) The intermittent Debug click-through failure was a race with the first WPF paint of the layered window. Fixed in the test, by waiting for the painted state.
+    - Known limitation: a close request while the tray menu is open only dismisses the menu.
+
 ## Archived 2026-10-26 (summary lines P00 … P02-05, moved from RECENT VERIFIED CHANGES)
 
 ### Verified changes

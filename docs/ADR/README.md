@@ -46,5 +46,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0014 — Settings window: navigation, save semantics, validation and reset](0014-settings-window.md) — Accepted (P03-03)
 - [0015 — First-run onboarding and sign-in startup](0015-first-run-and-sign-in-startup.md) — Accepted (P03-04)
 - [0016 — Notch clock](0016-notch-clock.md) — Accepted (owner request; collapsed part of P04-02)
+- [0017 — Optional global shortcut](0017-global-shortcut.md) — Accepted (P03-05)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

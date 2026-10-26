@@ -23,6 +23,7 @@ public sealed class SettingsWindowTests : IDisposable
     private readonly StaDispatcherThread _ui = new();
     private readonly FakeSettingsService _settings = new();
     private StartupState _startupState = StartupState.Off;
+    private ShortcutState _shortcutState = ShortcutState.Off;
 
     public void Dispose()
     {
@@ -174,6 +175,28 @@ public sealed class SettingsWindowTests : IDisposable
     }
 
     [Fact]
+    public async Task Shortcut_is_validated_saved_canonically_and_its_conflict_is_explained()
+    {
+        _shortcutState = ShortcutState.InUse;
+        var window = _ui.Invoke(Open);
+        Assert.Contains("another app or Windows", _ui.Invoke(() => ((TextBlock)window.FindName("ShortcutStatusText")).Text), StringComparison.Ordinal);
+
+        _ui.Invoke(() =>
+        {
+            window.Editor.ShortcutEnabled = true;
+            window.Editor.ShortcutText = "ctrl+i";
+        });
+        Assert.False(_ui.Invoke(() => window.Editor.CanSave));
+        Assert.NotNull(_ui.Invoke(() => window.Editor.ShortcutError));
+
+        _ui.Invoke(() => window.Editor.ShortcutText = "alt + ctrl + f9");
+        Assert.True(await _ui.Invoke(window.SaveAsync));
+
+        Assert.Equal(new ShortcutSettings { Enabled = true, Keys = "Ctrl+Alt+F9" }, _settings.Current.Behavior.Shortcut);
+        _ui.Invoke(window.Close);
+    }
+
+    [Fact]
     public void Read_only_store_shows_the_banner()
     {
         _settings.IsReadOnly = true;
@@ -233,7 +256,8 @@ public sealed class SettingsWindowTests : IDisposable
             Path.Combine(_root, "logs"),
             () => new DiagnosticContext("1.2.3", SafeMode: false, "Loaded", []),
             () => false,
-            () => _startupState);
+            () => _startupState,
+            () => _shortcutState);
         var builder = new DiagnosticBundleBuilder(Path.Combine(_root, "logs"), Path.Combine(_root, "data"), new LogRedactor([]), TimeProvider.System);
         var window = new SettingsWindow(_settings, new FixedMonitors([Primary, Second]), builder, context, NullLogger<SettingsWindow>.Instance)
         {

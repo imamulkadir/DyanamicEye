@@ -232,6 +232,19 @@
                         <TextBlock Style="{StaticResource Error}" Text="{Binding FullscreenExceptionsError}" />
                         <TextBlock Style="{StaticResource Hint}" Text="This list stays on this PC and is never written to logs or diagnostic reports." />
 
+                        <!-- Optional global shortcut (ADR 0017). -->
+                        <CheckBox Content="Open and close the island with a _global shortcut" IsChecked="{Binding ShortcutEnabled}" Margin="0,14,0,2"
+                                  AutomationProperties.AutomationId="Settings.ShortcutEnabled" />
+                        <Label Content="Shortcut (for example Ctrl+Alt+I)" Target="{Binding ElementName=ShortcutBox}" />
+                        <TextBox x:Name="ShortcutBox" Width="200" HorizontalAlignment="Left"
+                                 IsEnabled="{Binding ShortcutEnabled}"
+                                 Text="{Binding ShortcutText, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="Global shortcut" AutomationProperties.AutomationId="Settings.Shortcut"
+                                 AutomationProperties.HelpText="{Binding ShortcutError}" />
+                        <TextBlock Style="{StaticResource Error}" Text="{Binding ShortcutError}" />
+                        <TextBlock x:Name="ShortcutStatusText" Style="{StaticResource Hint}"
+                                   AutomationProperties.AutomationId="Settings.ShortcutStatus" />
+
                         <Button Content="Reset this _page" Margin="0,16,0,0" HorizontalAlignment="Left" Click="OnResetPage" Tag="Behavior"
                                 AutomationProperties.AutomationId="Settings.Reset.Behavior" />
                     </StackPanel>

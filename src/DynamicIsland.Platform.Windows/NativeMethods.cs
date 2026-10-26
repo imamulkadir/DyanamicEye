@@ -224,6 +224,16 @@ internal static unsafe partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint virtualKey);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool UnregisterHotKey(IntPtr window, int id);
+
     [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     public static partial IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);

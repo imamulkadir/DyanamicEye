@@ -3,9 +3,9 @@
 > **Keep this file accurate on every session.** This is the durable checkpoint that lets a new agent resume after a context reset. Update it alongside source changes, and never mark anything DONE without evidence. Move older detail to `docs/WORK_LOG.md` so this file stays short.
 
 ## CURRENT STATUS (read first)
-- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-04 are implemented (awaiting manual validation).
-- **Active task:** next is P03-05 (optional global shortcut). P03-04 (first-run onboarding and sign-in startup; ADR 0015) is IMPLEMENTED_AWAITING_VALIDATION. G02 and the P03 manual rows (Y1–Y7, TA1–TA10, SW1–SW8, ST1–ST7) are owed by the owner.
-- **Active task status:** P03-04 and the owner-requested **notch clock** (ADR 0016) are IMPLEMENTED_AWAITING_VALIDATION (2026-10-26). Both are **uncommitted** in the same working tree (the owner commits). P03-03 is committed as `c7bbbe4`, and CI 40290363463 is green.
+- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**.
+- **Active task:** none in progress. P03-05 (optional global shortcut; ADR 0017) is IMPLEMENTED_AWAITING_VALIDATION, which completes P03. Gates G02 and G03 are owed by the owner (TEST_MATRIX: G02 rows, Y1–Y7, TA1–TA10, SW1–SW8, ST1–ST7, CK1–CK5, SC1–SC4).
+- **Active task status:** P03-05 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P03-04 and the notch clock are committed as `8917a21`, and CI 40296571628 is green with 0 skipped.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,15 +23,19 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P03-04 + notch clock IMPLEMENTED_AWAITING_VALIDATION; next P03-05)
+- **Last updated:** 2026-10-26 (P03-05 IMPLEMENTED_AWAITING_VALIDATION; P03 complete; G02/G03 owner checks next)
 
 ## NEXT ACTION (ONE task only)
-**Owner first:** review and commit the P03-04 and notch-clock changes (file lists in RECENT VERIFIED CHANGES; several files contain both, so one commit is simplest), push, and check that CI is green. The most valuable manual rows are ST2/ST3 (real sign-in, Settings › Apps › Startup) and CK1–CK3 (clock).
-**Then agent: start P03-05** (guide §5 P03-05): an optional, customizable global shortcut.
-- Off by default; turned on and set in Settings → Behavior.
-- Register with `RegisterHotKey` on the UI thread; detect conflicts (registration fails) and tell the user.
-- The shortcut works only if Windows grants the registration; never use low-level keyboard hooks.
-- It needs a new setting, so it is a settings schema change: write an ADR first (ADR 0003 versioning: either a v2 migration, or an additive field with a default that keeps v1 readers working). Decide and record which.
+**Owner:**
+1. Review and commit the P03-05 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green.
+2. Gates: run the G02 and G03 manual rows in `docs/TEST_MATRIX.md` on real hardware. The G03 criteria are: Explorer restart restores the tray; sign-in starts one collapsed island when opted in; the user can fully exit, change monitor and reset an off-screen position. Then do one of these:
+   - record the results;
+   - or explicitly approve continuing to P04 while the gates stay open, as was done for P03.
+
+**Agent, only after that approval:** start **P04-01** (guide §5): the widget registry and lifecycle.
+- Built-in, compiled-in modules as `IIsolatedComponent`s (ADR 0007), using the existing `WidgetSetting` enable/order data.
+- Failures are isolated; memory and background work stop when a widget is disabled.
+- The notch clock (ADR 0016) becomes the clock widget's collapsed view.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -40,7 +44,7 @@
 | P00 — Environment and baseline | P00-01…P00-04 | DONE | **G00 PASS** 2026-10-25, run 40196393380 (`963b01c`) |
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
-| P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–04 IMPLEMENTED_AWAITING_VALIDATION; 05 next; started with owner approval while G02 is open) | G03 pending |
+| P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
@@ -56,6 +60,31 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **P03-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0017**.
+  - **Core:**
+    - New `Shell/Hotkey.cs`: `Hotkey.TryParse`/`ToString`/`VirtualKey` (keys A–Z, 0–9, F1–F24, Space; **at least 2 modifiers**; canonical text "Ctrl+Alt+Shift+Win+Key"; `HotkeyModifiers` = Win32 MOD_* values).
+    - `ShortcutAction.For/Opens`: Hidden → Show+Click; Paused → Resume+Click; Collapsed/Peek → Click; Expanded/Pinned → Escape; fullscreen → nothing.
+    - `BehaviorSettings.Shortcut` (`ShortcutSettings`: `Enabled` false, `Keys` "Ctrl+Alt+I"). Additive, no schema bump. `BehaviorSettings` equality includes it.
+    - `SettingsValidator` canonicalizes the keys or falls back to the default keys.
+    - `SettingsEditor`: `ShortcutEnabled`/`ShortcutText`/`ShortcutError` (merged per field, reset with Behavior).
+  - **Platform.Windows:**
+    - New `Input/Win32Hotkey.cs`: `RegisterHotKey` with MOD_NOREPEAT; `Registered`/`InUse` (error 1409)/`Failed`.
+    - `NativeMethods` Register/UnregisterHotKey; `IslandWindowInterop.FindMessageWindow` and `Post`.
+  - **App:**
+    - New `ShortcutController`: a message-only window, registers only when enabled, re-registers on change, and activates the island before expanding.
+    - `AppLog` 1056/1057, without the key combination.
+    - `AppHost`/`App.xaml.cs` wiring.
+    - `SettingsWindow` Behavior: a check box, a shortcut field with validation, and the registration status (on / in use / failed / off).
+  - **Tests:**
+    - Unit: `Shell/HotkeyTests.cs` (35 cases: parsing, rules, virtual keys, actions end Expanded, validator) and an editor shortcut test.
+    - Integration: `Win32HotkeyTests` (a real registration, a conflict from a second window reported as InUse, release) and a settings window shortcut test.
+    - Smoke (Debug): `ShortcutSmokeTests`. With the shortcut enabled in isolated settings, a second registration from the test is refused (proof that Windows granted it to the app). A posted WM_HOTKEY opens the island ("Dynamic Island, expanded") and the next one closes it. Released on exit.
+  - **Docs:** ADR 0017 (indexed); TEST_MATRIX SC1–SC4.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `docs/WORK_LOG.md` (P03-01/02 entries archived), `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs}`, `src/DynamicIsland.Core/Settings/{AppSettings.cs, SettingsValidator.cs}`, `src/DynamicIsland.Core/Shell/SettingsEditor.cs`, `src/DynamicIsland.Platform.Windows/{Display/IslandWindowInterop.cs, NativeMethods.cs}`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`, `tests/DynamicIsland.UnitTests/Shell/SettingsEditorTests.cs`
+    - new: `docs/ADR/0017-global-shortcut.md`, `src/DynamicIsland.App/ShortcutController.cs`, `src/DynamicIsland.Core/Shell/Hotkey.cs`, `src/DynamicIsland.Platform.Windows/Input/Win32Hotkey.cs`, `tests/DynamicIsland.IntegrationTests/Win32HotkeyTests.cs`, `tests/DynamicIsland.UnitTests/Shell/HotkeyTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/ShortcutSmokeTests.cs`
+    - Suggested commit message: `feat(shortcut): optional global shortcut via RegisterHotKey (P03-05, ADR 0017)`
+- 2026-10-26 P03-04 + notch clock committed by the owner as `8917a21`; CI run 40296571628 **success**: Release 488/488, Debug 494/494, 0 skipped.
 - 2026-10-26 **Owner request: notch clock — IMPLEMENTED_AWAITING_VALIDATION** (uncommitted). Decisions are in **ADR 0016**; the ADR 0009 sensor housing is superseded. This is the collapsed part of P04-02, taken ahead of P03-05 at the owner's request.
   - The owner's words: the notch showed a "dept camera, front camera icon and the front speaker icon", which a Windows PC does not have. Keep the design, but show the time (e.g. 2:42 PM), with options for seconds and for dates in different formats.
   - **Core:**
@@ -139,57 +168,6 @@
     - modified: `docs/ADR/0013-tray-actions-settings-restart.md`, `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `docs/WORK_LOG.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, TrayController.cs}`, `src/DynamicIsland.Core/Shell/TrayMenu.cs`, `tests/DynamicIsland.UnitTests/Shell/TrayMenuModelTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/TrayActionSmokeTests.cs`
     - new: `docs/ADR/0014-settings-window.md`, `src/DynamicIsland.App/{AppInfo.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs, SettingsWindowService.cs, ShellLauncher.cs}`, `src/DynamicIsland.Core/Shell/SettingsEditor.cs`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`, `tests/DynamicIsland.UnitTests/Shell/SettingsEditorTests.cs`
     - Suggested commit message: `feat(settings): settings window with explicit save, validation and reset (P03-03, ADR 0014)`
-- 2026-10-26 P03-02 committed by the owner as `ba52b9e` and pushed; CI run 40286979868 **success** (0 skipped).
-- 2026-10-26 **P03-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits).
-  - Wrote ADR 0013 (`docs/ADR/0013-tray-actions-settings-restart.md`, indexed in the ADR README) and TEST_MATRIX rows T1–T10.
-  - Intermittent smoke failures: neither reproduced in 7 full-suite runs (see TEST EVIDENCE). Analysis:
-    - (a) The fullscreen failure took about 10 s. That means the helper window did become foreground (otherwise the test skips at 5 s), but the island did not hide within the next 5 s. The cause is unknown; the test captures the app log tail if it fails again.
-    - (b) The fullscreen detector's out-of-context `EVENT_OBJECT_LOCATIONCHANGE` hook wakes the app for every window or cursor move anywhere on the desktop. It returns early, but idle CPU still depends on other activity on the screen. This dates from P02-04 and is not specific to P03-02. Limit left at 300 ms. Possible later refinement: install the location hook only for the current foreground window's process/thread.
-  - **Changed files for the owner (since P03-01):**
-    - modified: `docs/AGENT_PROGRESS.md`, `docs/ADR/README.md`, `docs/TEST_MATRIX.md`, `src/DynamicIsland.App/{App.xaml, App.xaml.cs, AppHost.cs, AppLog.cs, FullscreenCoordinator.cs, IslandWindow.xaml.cs, MotionGate.cs, TrayController.cs}`, `src/DynamicIsland.Core/Components/{ComponentBoundary.cs, ComponentHost.cs}`, `src/DynamicIsland.Core/Lifecycle/{AppSupervisor.cs, ExitReason.cs}`, `src/DynamicIsland.Launcher/{ProcessAppRunner.cs, Program.cs}`, `src/DynamicIsland.Platform.Windows/Tray/Win32TrayIcon.cs`
-    - deleted: `src/DynamicIsland.App/AppSettingsSnapshot.cs`
-    - new: `docs/ADR/0013-tray-actions-settings-restart.md`, `src/DynamicIsland.App/RestartService.cs`, `src/DynamicIsland.Core/Lifecycle/LauncherArguments.cs`, `src/DynamicIsland.Core/Settings/SettingsService.cs`, `src/DynamicIsland.Core/Shell/TrayMenu.cs`, `tests/DynamicIsland.UnitTests/{Lifecycle/RestartContractTests.cs, Settings/SettingsServiceTests.cs, Shell/TrayMenuModelTests.cs}`, `tests/DynamicIsland.WindowsSmokeTests/{TrayActionSmokeTests.cs, TrayMenuDriver.cs}`
-    - Suggested commit message: `feat(tray): tray actions, settings service, restart contract (P03-02, ADR 0013)`
-  - **Decisions (ADR 0013):**
-    - **Exit codes:** `ExitReason.RestartInSafeMode` with **exit code 4**. The launcher relaunches in Safe Mode on 4 and normally on 3; neither counts as a crash, and both share the existing cap of 5 restart requests per launcher lifetime.
-    - **Launcher contract** (`Core/Lifecycle/ExitReason.cs` → `LauncherContract`):
-      - The launcher sets the env var `DYNAMICISLAND_SUPERVISED=1` for its child.
-      - The launcher accepts the allow-listed `--safe-mode` and `--after-pid N` (`Core/Lifecycle/LauncherArguments.cs`). With `--after-pid` it waits up to 15 s for that process, so the single-instance lock is free.
-    - **Restart** (`App/RestartService.cs`): when supervised, the app exits with 3/4. When started directly, it starts the launcher with `--after-pid <own pid> [--safe-mode]`, then exits. Without a launcher next to the app the restart is refused and logged.
-    - **Settings:** `Core/Settings/SettingsService.cs` (`ISettingsService`: `Current`, `IsReadOnly`, `Changed`, serialized `UpdateAsync` = change → validate → save → publish; a read-only store applies the change for the session only; a failed save keeps the old settings). It replaces `AppSettingsSnapshot`, which was **deleted**. `IslandWindow` re-places itself and re-applies its state on `Changed`.
-    - **Shutdown:** `App.xaml` sets `ShutdownMode="OnExplicitShutdown"`. Closing the island window (Alt+F4 or a close request) is turned into `RequestShutdown(UserExit)` in its `Closing` handler, so future windows such as Settings can close freely.
-    - **Pause:** tray Pause → state machine `Paused` → `ComponentHost.SetPausedAsync(true)` stops optional components (status Stopped, reason `paused`); Resume restarts them. `ComponentBoundary` is now restartable after a stop.
-    - **Tray menu:** a pure model `Core/Shell/TrayMenu.cs` (`TrayMenuModel.Build`) with Show/Hide, Pin (enabled only while visible), Pause/Resume, a Display submenu ("Display N (primary)" ordered left→right, current monitor checked, monitor ids only as arguments), Reset to primary display (also resets offsets: the lost-island recovery), Settings… and Check for updates (both **disabled with tooltips** until P03-03/P06), Open logs folder, Restart in/Leave Safe Mode, Restart and Exit. Every item has an AutomationId `Tray.*`.
-    - `TrayController` was rewritten to render the model and execute commands (settings updates are async with failures logged, never crashing).
-  - **Other changes:**
-    - `AppLog` adds RestartRequested, RestartUnavailable, SettingsNotSaved, OpenLogsFailed and ComponentPauseIncomplete.
-    - `AppHost` registrations: `SettingsService`, `RestartService`, and the `TrayController` factory with the logs folder.
-    - `App.xaml.cs` wires pause to the component host and initializes the settings service after load.
-    - `Win32TrayIcon.RequestContextMenu`.
-  - **Tests added:**
-    - `UnitTests/Shell/TrayMenuModelTests.cs`
-    - `UnitTests/Settings/SettingsServiceTests.cs`
-    - `UnitTests/Lifecycle/RestartContractTests.cs`: launcher args, exit codes, Safe Mode restart, start in Safe Mode, component pause/resume
-    - smoke `TrayMenuDriver.cs`: opens the real tray menu via the callback message and invokes items by AutomationId with UIA, no mouse
-    - smoke `TrayActionSmokeTests.cs`: pause/resume (all configs); reset display saves settings, restart through the launcher (3 → new instance, 4 → Safe Mode), and unsupervised restart handover (Debug-only, isolated data root)
-- 2026-10-25 P03-01 pushed; CI run 40208475923 **success**: Release 350, Debug 351, 0 skipped.
-- 2026-10-25 **Owner approval:** "pushed, proceed" after G02 was set up for owner validation. Recorded as approval to **continue P03 while G02 stays open**; the hardware matrix rows are still owed.
-- 2026-10-25 **P03-01 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). Decisions are in ADR 0012.
-  - **Platform.Windows:**
-    - `Tray/Win32TrayIcon.cs`: `Shell_NotifyIcon` v4, select/keyselect/contextmenu events, `TaskbarCreated` re-add, DPI-sized icon from the exe (group 32512) via `LoadImageW` with a system-icon fallback, `IsRegistered`, `PrepareForMenu`, `SendTaskbarCreated`.
-    - `IslandWindowInterop.FindTopLevelWindow` and `RequestClose`.
-    - New interop.
-  - **App:**
-    - New `TrayController.cs`: hidden top-level owner `HwndSource`, accessible WPF menu (Show/Hide, Exit), left-click toggle, `WM_CLOSE` treated as Exit.
-    - `AppHost` registration; `App.xaml.cs` starts it (disposed with the host); `AppLog.TrayUnavailable`.
-  - **Tests:**
-    - `IntegrationTests/Win32TrayIconTests.cs`: real registration, simulated Explorer restart, removal; v4 event mapping.
-    - Smoke `TraySmokeTests.cs`: real app icon, `TaskbarCreated` recovery, removed on exit, and the WM_CLOSE regression.
-    - `IslandPlacementSmokeTests` click-through now waits for the first paint.
-  - **Bugs found:**
-    - (1) `taskkill` closed the hidden tray window, so the app kept running with an orphaned icon. Fixed and regression-tested.
-    - (2) The intermittent Debug click-through failure was a race with the first WPF paint of the layered window. Fixed in the test, by waiting for the painted state.
-    - Known limitation: a close request while the tray menu is open only dismisses the menu.
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -198,6 +176,8 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | P03-05 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 523/523 ×2, Debug 530/530 ×2, **0 skipped** |
+| 2026-10-26 | P03-04 + clock | GitHub Actions `windows-2025` (`8917a21`) | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40296571628; 488/488 and 494/494, 0 skipped |
 | 2026-10-26 | notch clock | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 488/488 ×2, Debug 494/494 ×2, **0 skipped** (including the idle-CPU budget and the regenerated visual references). A real Release app on the desktop showed "2:54 PM" and exited 0. |
 | 2026-10-26 | P03-04 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 465/465 ×2 and Debug 471/471 ×2, **0 skipped**. Real HKCU Run key, test keys and real settings checked untouched afterwards. Offscreen renderings of onboarding and the General page checked by eye. |
 | 2026-10-26 | P03-03 | GitHub Actions `windows-2025` (`c7bbbe4`) | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40290363463; 421/421 and 425/425, 0 skipped |

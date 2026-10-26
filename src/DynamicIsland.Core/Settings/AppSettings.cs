@@ -77,15 +77,30 @@ public sealed record BehaviorSettings
     /// </summary>
     public IReadOnlyList<string> FullscreenExceptions { get; init; } = [];
 
+    /// <summary>Optional global shortcut (ADR 0017). Added without a schema bump (ADR 0003 §7).</summary>
+    public ShortcutSettings Shortcut { get; init; } = new();
+
     /// <summary>Value equality including the exceptions list (records compare lists by reference otherwise).</summary>
     public bool Equals(BehaviorSettings? other) =>
         other is not null
         && HoverPreviewEnabled == other.HoverPreviewEnabled
         && HoverPreviewDelayMs == other.HoverPreviewDelayMs
         && AutoHideInFullscreen == other.AutoHideInFullscreen
-        && (FullscreenExceptions ?? []).SequenceEqual(other.FullscreenExceptions ?? [], StringComparer.OrdinalIgnoreCase);
+        && (FullscreenExceptions ?? []).SequenceEqual(other.FullscreenExceptions ?? [], StringComparer.OrdinalIgnoreCase)
+        && Equals(Shortcut, other.Shortcut);
 
-    public override int GetHashCode() => HashCode.Combine(HoverPreviewEnabled, HoverPreviewDelayMs, AutoHideInFullscreen, FullscreenExceptions?.Count ?? 0);
+    public override int GetHashCode() => HashCode.Combine(HoverPreviewEnabled, HoverPreviewDelayMs, AutoHideInFullscreen, FullscreenExceptions?.Count ?? 0, Shortcut);
+}
+
+public sealed record ShortcutSettings
+{
+    public const string DefaultKeys = "Ctrl+Alt+I";
+
+    /// <summary>Off until the user turns it on (nothing is registered with Windows before).</summary>
+    public bool Enabled { get; init; }
+
+    /// <summary>Canonical text such as <c>Ctrl+Alt+I</c> (see <c>Hotkey</c>).</summary>
+    public string Keys { get; init; } = DefaultKeys;
 }
 
 public sealed record UpdateSettings

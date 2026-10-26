@@ -79,6 +79,11 @@ public static class AppHost
         builder.Services.AddSingleton<IMotionGate, MotionGate>();
         builder.Services.AddSingleton<IslandWindow>();
         builder.Services.AddSingleton<RestartService>();
+        builder.Services.AddSingleton(sp => new ShortcutController(
+            sp.GetRequiredService<IslandWindow>(),
+            sp.GetRequiredService<IIslandStateMachine>(),
+            sp.GetRequiredService<ISettingsService>(),
+            sp.GetRequiredService<ILogger<ShortcutController>>()));
         builder.Services.AddSingleton(sp => new NotchClock(
             sp.GetRequiredService<IslandWindow>().NotchView,
             sp.GetRequiredService<ISettingsService>(),
@@ -110,7 +115,8 @@ public static class AppHost
                     sp.GetRequiredService<FileLoggerOptions>().Directory,
                     () => new DiagnosticContext(info.Version, launch.SafeMode, info.SettingsOutcome?.ToString(), components.Statuses),
                     () => lifecycle.Reason is not null,
-                    () => sp.GetRequiredService<StartupCoordinator>().State),
+                    () => sp.GetRequiredService<StartupCoordinator>().State,
+                    () => sp.GetRequiredService<ShortcutController>().State),
                 sp.GetRequiredService<ILogger<SettingsWindow>>());
         }));
         builder.Services.AddSingleton(sp => new TrayController(

@@ -89,6 +89,9 @@ public sealed class SettingsEditor : INotifyPropertyChanged
     private string? _verticalOffsetError;
     private string? _hoverPreviewDelayError;
     private string? _fullscreenExceptionsError;
+    private bool _shortcutEnabled;
+    private string _shortcutText = string.Empty;
+    private string? _shortcutError;
     private bool _loading;
     private bool _startWithWindows;
     private bool _dailyUpdateChecks;
@@ -242,6 +245,26 @@ public sealed class SettingsEditor : INotifyPropertyChanged
         private set => SetField(ref _hoverPreviewDelayError, value);
     }
 
+    /// <summary>Global shortcut on/off (ADR 0017).</summary>
+    public bool ShortcutEnabled
+    {
+        get => _shortcutEnabled;
+        set => Set(ref _shortcutEnabled, value);
+    }
+
+    /// <summary>Shortcut text such as <c>Ctrl+Alt+I</c>; saved in canonical form.</summary>
+    public string ShortcutText
+    {
+        get => _shortcutText;
+        set => Set(ref _shortcutText, value ?? string.Empty);
+    }
+
+    public string? ShortcutError
+    {
+        get => _shortcutError;
+        private set => SetField(ref _shortcutError, value);
+    }
+
     public string? FullscreenExceptionsError
     {
         get => _fullscreenExceptionsError;
@@ -249,7 +272,8 @@ public sealed class SettingsEditor : INotifyPropertyChanged
     }
 
     public bool HasErrors =>
-        HorizontalOffsetError is not null || VerticalOffsetError is not null || HoverPreviewDelayError is not null || FullscreenExceptionsError is not null;
+        HorizontalOffsetError is not null || VerticalOffsetError is not null || HoverPreviewDelayError is not null || FullscreenExceptionsError is not null
+        || ShortcutError is not null;
 
     /// <summary>True when the draft differs from <see cref="Saved"/> (an invalid entry always counts as a change).</summary>
     public bool IsDirty => HasErrors || !SameSettings(BuildDraft(), Saved);
@@ -401,6 +425,11 @@ public sealed class SettingsEditor : INotifyPropertyChanged
                 FullscreenExceptions = SameList(draft.Behavior.FullscreenExceptions, saved.Behavior.FullscreenExceptions, StringComparer.OrdinalIgnoreCase)
                     ? latest.Behavior.FullscreenExceptions
                     : draft.Behavior.FullscreenExceptions,
+                Shortcut = new ShortcutSettings
+                {
+                    Enabled = Pick(latest.Behavior.Shortcut.Enabled, saved.Behavior.Shortcut.Enabled, draft.Behavior.Shortcut.Enabled),
+                    Keys = Pick(latest.Behavior.Shortcut.Keys, saved.Behavior.Shortcut.Keys, draft.Behavior.Shortcut.Keys),
+                },
             },
             Widgets = SameList(draft.Widgets, saved.Widgets, EqualityComparer<WidgetSetting>.Default) ? latest.Widgets : draft.Widgets,
         };
@@ -452,6 +481,8 @@ public sealed class SettingsEditor : INotifyPropertyChanged
         _hoverPreviewDelayText = behavior.HoverPreviewDelayMs.ToString(_culture);
         _autoHideInFullscreen = behavior.AutoHideInFullscreen;
         _fullscreenExceptionsText = string.Join(Environment.NewLine, behavior.FullscreenExceptions);
+        _shortcutEnabled = behavior.Shortcut.Enabled;
+        _shortcutText = behavior.Shortcut.Keys;
     }
 
     private void LoadWidgets(IReadOnlyList<WidgetSetting> widgets)
@@ -491,6 +522,11 @@ public sealed class SettingsEditor : INotifyPropertyChanged
             HoverPreviewDelayMs = ParseDelay(_hoverPreviewDelayText) ?? Saved.Behavior.HoverPreviewDelayMs,
             AutoHideInFullscreen = _autoHideInFullscreen,
             FullscreenExceptions = ParseExceptions(_fullscreenExceptionsText, out _) ?? Saved.Behavior.FullscreenExceptions,
+            Shortcut = new ShortcutSettings
+            {
+                Enabled = _shortcutEnabled,
+                Keys = Hotkey.TryParse(_shortcutText, out var hotkey, out _) ? hotkey!.ToString() : Saved.Behavior.Shortcut.Keys,
+            },
         },
         Widgets = [.. Widgets.Select(w => new WidgetSetting(w.Id, w.Enabled))],
     };
@@ -508,6 +544,7 @@ public sealed class SettingsEditor : INotifyPropertyChanged
             : null;
         ParseExceptions(_fullscreenExceptionsText, out var exceptionsError);
         FullscreenExceptionsError = exceptionsError;
+        ShortcutError = Hotkey.TryParse(_shortcutText, out _, out var shortcutError) ? null : shortcutError;
     }
 
     private double? ParseDouble(string text, double min, double max) =>

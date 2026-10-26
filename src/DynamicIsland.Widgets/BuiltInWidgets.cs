@@ -1,3 +1,4 @@
+using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Widgets;
 
 namespace DynamicIsland.Widgets;
@@ -8,9 +9,10 @@ namespace DynamicIsland.Widgets;
 /// </summary>
 public static class BuiltInWidgets
 {
-    public static IReadOnlyList<IWidget> Create(TimeProvider timeProvider)
+    public static IReadOnlyList<IWidget> Create(ISettingsService settings, TimeProvider timeProvider)
     {
+        ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(timeProvider);
-        return [];
+        return [new ClockWidget(settings, timeProvider)];
     }
 }

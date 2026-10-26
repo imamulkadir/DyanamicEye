@@ -21,6 +21,19 @@ public interface IWidget : IIsolatedComponent
 
     /// <summary>Drops cached content and resources after the widget stopped (disabled). <see cref="Snapshot"/> becomes <c>null</c>.</summary>
     void Release();
+
+    /// <summary>
+    /// Active while the island is on screen; inactive while it is hidden or suspended for a fullscreen app (guide §4.2).
+    /// An inactive widget should skip periodic work. Called from any thread.
+    /// </summary>
+    void SetActive(bool active)
+    {
+    }
+
+    /// <summary>The system time, time zone, region format changed or the PC resumed: refresh now. Called from any thread.</summary>
+    void OnSystemChanged()
+    {
+    }
 }
 
 /// <summary>What the island shows for one enabled widget, in the user's order.</summary>
@@ -35,7 +48,7 @@ public sealed record WidgetSlot(string Id, string Label, ComponentStatus Status,
 /// enabled flags, applies settings changes (enable, disable and release, reorder) and publishes the ordered
 /// <see cref="Slots"/>. Unknown or not-yet-built ids in settings are not shown.
 /// </summary>
-public sealed class WidgetRegistry
+public sealed class WidgetRegistry : IDisposable
 {
     /// <summary>Upper bound for stopping a disabled widget; it is marked timed out by its boundary after that.</summary>
     public static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(3);
@@ -148,6 +161,33 @@ public sealed class WidgetRegistry
         }
 
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Disposes widgets that own resources (after the host stopped them).</summary>
+    public void Dispose()
+    {
+        foreach (var widget in _widgets.Values.OfType<IDisposable>())
+        {
+            widget.Dispose();
+        }
+    }
+
+    /// <summary>Forwards the island's visibility to every widget (guide §4.2 Active/Inactive).</summary>
+    public void SetActive(bool active)
+    {
+        foreach (var widget in _widgets.Values)
+        {
+            widget.SetActive(active);
+        }
+    }
+
+    /// <summary>Forwards a time, time-zone, region or resume change to every widget.</summary>
+    public void NotifySystemChanged()
+    {
+        foreach (var widget in _widgets.Values)
+        {
+            widget.OnSystemChanged();
+        }
     }
 
     /// <summary>A widget missing from settings counts as enabled (the validator appends missing built-ins as enabled).</summary>

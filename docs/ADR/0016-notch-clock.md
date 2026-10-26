@@ -1,6 +1,6 @@
 # 0016 — Notch clock
 
-- Status: Accepted
+- Status: Accepted (§4 and §6 amended by ADR 0019: the clock widget ticks; no clock in Safe Mode)
 - Date: 2026-10-26
 - Task: owner request (2026-10-26), the collapsed-notch part of P04-02 (clock/date widget), taken ahead of P03-05
 

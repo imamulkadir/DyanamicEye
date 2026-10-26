@@ -66,7 +66,7 @@ public static class AppHost
         builder.Services.AddSingleton<ComponentHost>();
         builder.Services.AddSingleton(sp => new WidgetRegistry(
             sp.GetRequiredService<ComponentHost>(),
-            BuiltInWidgets.Create(sp.GetRequiredService<TimeProvider>())));
+            BuiltInWidgets.Create(sp.GetRequiredService<ISettingsService>(), sp.GetRequiredService<TimeProvider>())));
         builder.Services.AddSingleton(sp => new DiagnosticBundleBuilder(
             System.IO.Path.Combine(root, AppDataPaths.LogsFolderName),
             dataDirectory,
@@ -93,13 +93,9 @@ public static class AppHost
             sp.GetRequiredService<WidgetRegistry>(),
             sp.GetRequiredService<IslandWindow>().NotchView,
             sp.GetRequiredService<ISettingsService>(),
+            sp.GetRequiredService<IIslandStateMachine>(),
             sp.GetRequiredService<LifecycleCoordinator>(),
             sp.GetRequiredService<ILogger<WidgetPresenter>>()));
-        builder.Services.AddSingleton(sp => new NotchClock(
-            sp.GetRequiredService<IslandWindow>().NotchView,
-            sp.GetRequiredService<ISettingsService>(),
-            sp.GetRequiredService<IIslandStateMachine>(),
-            sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<AppInfo>();
         builder.Services.AddSingleton<IStartupRegistration>(_ => TestHooks.Get(TestHooks.RegistryRootVariable) is { Length: > 0 } testRoot
             ? new RegistryStartupRegistration(testRoot, checkMachinePolicy: false)

@@ -103,7 +103,6 @@ public partial class App : Application
         }
 
         MainWindow = window;
-        _host.Services.GetRequiredService<NotchClock>().Start(); // Disposed (timer stopped) with the host on exit.
         window.Show();
 
         _instance.StartListening(OnActivationRequested, OnActivationUnavailable);

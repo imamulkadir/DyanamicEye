@@ -48,5 +48,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0016 — Notch clock](0016-notch-clock.md) — Accepted (owner request; collapsed part of P04-02)
 - [0017 — Optional global shortcut](0017-global-shortcut.md) — Accepted (P03-05)
 - [0018 — Widget registry and lifecycle](0018-widget-registry.md) — Accepted (P04-01)
+- [0019 — Clock and date widget](0019-clock-widget.md) — Accepted (P04-02)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

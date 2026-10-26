@@ -86,6 +86,23 @@ public static class SettingsValidator
             HorizontalOffset = Clamp(appearance.HorizontalOffset, -MaxHorizontalOffset, MaxHorizontalOffset, defaults.HorizontalOffset, "appearance.horizontalOffset", corrections),
             VerticalOffset = Clamp(appearance.VerticalOffset, 0, MaxVerticalOffset, defaults.VerticalOffset, "appearance.verticalOffset", corrections),
             Motion = Defined(appearance.Motion, defaults.Motion, "appearance.motion", corrections),
+            Clock = NormalizeClock(appearance.Clock, corrections),
+        };
+    }
+
+    private static ClockSettings NormalizeClock(ClockSettings? clock, List<string> corrections)
+    {
+        var defaults = new ClockSettings();
+        if (clock is null)
+        {
+            corrections.Add("appearance.clock: missing, defaults used");
+            return defaults;
+        }
+
+        return clock with
+        {
+            HourFormat = Defined(clock.HourFormat, defaults.HourFormat, "appearance.clock.hourFormat", corrections),
+            DateFormat = Defined(clock.DateFormat, defaults.DateFormat, "appearance.clock.dateFormat", corrections),
         };
     }
 

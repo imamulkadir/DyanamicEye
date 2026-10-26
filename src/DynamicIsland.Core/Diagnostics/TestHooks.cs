@@ -1,7 +1,7 @@
 namespace DynamicIsland.Core.Diagnostics;
 
 /// <summary>
-/// Environment switches used only by automated tests (fault injection, isolated data folder, no dialogs).
+/// Environment switches used only by automated tests (fault injection, isolated data folder and registry, no dialogs).
 /// Compiled in only when <c>DYNAMICISLAND_TEST_HOOKS</c> is defined (Debug builds); Release builds always return
 /// <c>null</c>, so shipped binaries cannot be steered through these variables.
 /// </summary>
@@ -15,6 +15,9 @@ public static class TestHooks
 
     /// <summary><c>1</c>: suppress modal dialogs (launcher recovery message).</summary>
     public const string NoDialogsVariable = "DYNAMICISLAND_TEST_NO_DIALOGS";
+
+    /// <summary>Key under HKCU used instead of <c>Software\Microsoft\Windows\CurrentVersion</c> for startup registration (ADR 0015).</summary>
+    public const string RegistryRootVariable = "DYNAMICISLAND_TEST_REGISTRY_ROOT";
 
     public static string? Get(string variable)
     {

@@ -3,9 +3,9 @@
 > **Keep this file accurate on every session.** This is the durable checkpoint that lets a new agent resume after a context reset. Update it alongside source changes, and never mark anything DONE without evidence. Move older detail to `docs/WORK_LOG.md` so this file stays short.
 
 ## CURRENT STATUS (read first)
-- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01, P03-02 and P03-03 are implemented (awaiting manual validation).
-- **Active task:** next is P03-04 (first-run onboarding and sign-in startup). P03-03 (settings window; ADR 0014) is IMPLEMENTED_AWAITING_VALIDATION. G02 and the P03 manual rows (Y1–Y7, TA1–TA10, SW1–SW8) are owed by the owner.
-- **Active task status:** P03-03 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P03-02 is committed as `ba52b9e`, and CI 40286979868 is green with 0 skipped.
+- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-04 are implemented (awaiting manual validation).
+- **Active task:** next is P03-05 (optional global shortcut). P03-04 (first-run onboarding and sign-in startup; ADR 0015) is IMPLEMENTED_AWAITING_VALIDATION. G02 and the P03 manual rows (Y1–Y7, TA1–TA10, SW1–SW8, ST1–ST7) are owed by the owner.
+- **Active task status:** P03-04 and the owner-requested **notch clock** (ADR 0016) are IMPLEMENTED_AWAITING_VALIDATION (2026-10-26). Both are **uncommitted** in the same working tree (the owner commits). P03-03 is committed as `c7bbbe4`, and CI 40290363463 is green.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,15 +23,15 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P03-03 IMPLEMENTED_AWAITING_VALIDATION; next P03-04)
+- **Last updated:** 2026-10-26 (P03-04 + notch clock IMPLEMENTED_AWAITING_VALIDATION; next P03-05)
 
 ## NEXT ACTION (ONE task only)
-**Owner first:** review and commit the P03-03 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. Optionally run manual rows SW1–SW8.
-**Then agent: start P03-04** (guide §5 P03-04): first-run onboarding that asks for sign-in startup permission and shows privacy and widget choices.
-- Startup uses HKCU only, with the stable launcher path and a 5 s default delay; a disabled startup is obeyed.
-- Write the consents (`GeneralSettings.StartWithWindows`, `UpdateSettings.AutomaticChecks`) only from an explicit user choice.
-- Replace the read-only consent text on the settings General and Updates pages (ADR 0014 §6) with real controls tied to their effect.
-- Write an ADR for the Run-entry format and the delay mechanism before implementing.
+**Owner first:** review and commit the P03-04 and notch-clock changes (file lists in RECENT VERIFIED CHANGES; several files contain both, so one commit is simplest), push, and check that CI is green. The most valuable manual rows are ST2/ST3 (real sign-in, Settings › Apps › Startup) and CK1–CK3 (clock).
+**Then agent: start P03-05** (guide §5 P03-05): an optional, customizable global shortcut.
+- Off by default; turned on and set in Settings → Behavior.
+- Register with `RegisterHotKey` on the UI thread; detect conflicts (registration fails) and tell the user.
+- The shortcut works only if Windows grants the registration; never use low-level keyboard hooks.
+- It needs a new setting, so it is a settings schema change: write an ADR first (ADR 0003 versioning: either a v2 migration, or an additive field with a default that keeps v1 readers working). Decide and record which.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -40,7 +40,7 @@
 | P00 — Environment and baseline | P00-01…P00-04 | DONE | **G00 PASS** 2026-10-25, run 40196393380 (`963b01c`) |
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
-| P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–03 IMPLEMENTED_AWAITING_VALIDATION; 04 next; started with owner approval while G02 is open) | G03 pending |
+| P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–04 IMPLEMENTED_AWAITING_VALIDATION; 05 next; started with owner approval while G02 is open) | G03 pending |
 | P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
@@ -56,6 +56,64 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **Owner request: notch clock — IMPLEMENTED_AWAITING_VALIDATION** (uncommitted). Decisions are in **ADR 0016**; the ADR 0009 sensor housing is superseded. This is the collapsed part of P04-02, taken ahead of P03-05 at the owner's request.
+  - The owner's words: the notch showed a "dept camera, front camera icon and the front speaker icon", which a Windows PC does not have. Keep the design, but show the time (e.g. 2:42 PM), with options for seconds and for dates in different formats.
+  - **Core:**
+    - `Settings/AppSettings.cs`: `AppearanceSettings.Clock` (`ClockSettings`: `HourFormat` System/TwelveHour/TwentyFourHour, `ShowSeconds`, `DateFormat` None/Weekday/Date/WeekdayAndDate/Numeric). Additive, so no schema bump (ADR 0003 §7).
+    - `SettingsValidator` repairs a null clock or unknown enum values.
+    - New `Shell/ClockFormatter.cs` (`Format`, `DelayUntilNextChange`).
+    - `SettingsEditor`: clock fields (reset with the Appearance page) and `ClockPreview`. The culture parameter is now `CultureInfo`.
+  - **App:**
+    - `NotchView`: the sensor housing is replaced by a centred `ClockText`; the font and the clock row scale with the appearance size; `SetClock`/`ClockDisplay`.
+    - New `NotchClock`: a one-shot `DispatcherTimer` aligned to the next minute or second. It stops while the island is off-screen and refreshes on settings, state, time, time-zone, region and resume changes. It is hidden when the "Clock and date" widget is off.
+    - `IslandWindow.NotchView`; `AppHost` and `App.xaml.cs` wiring.
+    - `SettingsWindow` Appearance → Clock: time format, Show seconds, date, with examples in the user's format and a live preview.
+  - **Tests:**
+    - Unit: `Shell/ClockFormatterTests.cs` (10 cases including de-DE, a region without AM/PM, the tick delay and validation) and an editor clock test.
+    - Integration: `NotchClockTests.cs` (6, real `NotchView` with a fixed `TimeProvider`).
+    - Visual: the 4 notch reference PNGs were **regenerated** (now with a fixed "2:42 PM") and reviewed by eye.
+    - Real desktop: a Release app capture showed "2:54 PM" in the notch, and the app exited 0.
+  - **Changed files (clock):**
+    - modified: `docs/ADR/{0009-island-states-and-interaction.md, README.md}`, `docs/TEST_MATRIX.md` (CK1–CK5), `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, IslandWindow.xaml.cs, NotchView.xaml, NotchView.xaml.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs}`, `src/DynamicIsland.Core/Settings/{AppSettings.cs, SettingsValidator.cs}`, `src/DynamicIsland.Core/Shell/SettingsEditor.cs`, `tests/DynamicIsland.IntegrationTests/NotchVisualTests.cs`, `tests/DynamicIsland.IntegrationTests/References/notch-*.png`, `tests/DynamicIsland.UnitTests/Shell/SettingsEditorTests.cs`
+    - new: `docs/ADR/0016-notch-clock.md`, `src/DynamicIsland.App/NotchClock.cs`, `src/DynamicIsland.Core/Shell/ClockFormatter.cs`, `tests/DynamicIsland.IntegrationTests/NotchClockTests.cs`, `tests/DynamicIsland.UnitTests/Shell/ClockFormatterTests.cs`
+    - Suggested combined commit message: `feat: first-run onboarding, sign-in startup (P03-04, ADR 0015) and notch clock (ADR 0016)`
+- 2026-10-26 **P03-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0015**; ADR 0014 §6 is amended.
+  - **Core:**
+    - New `Startup/StartupPolicy.cs` with `IStartupRegistration` (the guide §3 contract), `StartupRegistrationStatus`, `StartupPolicy.Decide/Describe/BuildCommand/ExecutableOf`, and `StartupState`.
+    - Rule: an entry for another copy is taken over only when the user just enabled startup here, or when that copy's launcher no longer exists.
+    - New `Shell/Onboarding.cs` (`IsNeeded`, `Apply`).
+    - `LaunchArguments` and `LauncherArguments` accept `--startup`; `LauncherContract.StartupDelay` = 5 s; `TestHooks.RegistryRootVariable` added.
+    - `SettingsEditor`: editable `StartWithWindows`/`DailyUpdateChecks` boxes. An untouched box keeps `NotAsked`; Reset never changes them. `WidgetLabel` is now public.
+  - **Platform.Windows:** new `Startup/RegistryStartupRegistration.cs`.
+    - Writes only HKCU `...\CurrentVersion\Run` value `DynamicIsland` = `"<dir>\DynamicIsland.Launcher.exe" --startup`.
+    - Reads but never writes `Explorer\StartupApproved\Run` (odd first byte = turned off) and `DisableCurrentUserRun` (HKCU and HKLM).
+  - **Launcher:** `--startup` waits 5 s and passes `--startup` to the first app start only.
+  - **App:**
+    - New `StartupCoordinator`: reconciles on every start and whenever the consent changes. Registry errors are logged by type.
+    - `App.xaml.cs`:
+      - A `--startup` launch without consent removes the entry and exits with 0.
+      - A `--startup` launch while another instance runs exits without activating it.
+      - Onboarding appears when needed, owned by the island window.
+    - New `OnboardingWindow`: both consent boxes unchecked, privacy summary, widget choices; Continue saves; closing saves nothing.
+    - `SettingsWindow`: real check boxes plus the registration status text (on / turned off in Windows / blocked by policy / another copy / launcher missing / not registered).
+    - `AppLog` events 1050–1055.
+  - **Tests:**
+    - Unit `Startup/StartupPolicyTests.cs` (policy, command parsing, arguments, onboarding) and 3 new consent tests in `SettingsEditorTests`.
+    - Integration:
+      - `RegistryStartupRegistrationTests` (real registry under a scratch HKCU key);
+      - `OnboardingWindowTests` (5);
+      - a settings window startup test.
+    - Smoke (Debug only): `StartupSmokeTests`.
+      - Without permission, the launcher waits at least 5 s, the app exits 0, the stale entry is removed, and there is no relaunch.
+      - Onboarding through UIA registers this copy's launcher; then a `--startup` start is delayed, shows the island and no onboarding.
+    - `RealApp` closes the first-run window in other smoke tests (closing saves nothing) and points the Debug registry hook to a scratch key.
+  - **Safety check:** after all the runs, the real `HKCU\...\Run` has no DynamicIsland value, no `Software\DynamicIsland.Tests` keys are left, and no real settings file was written.
+  - **Docs:** ADR 0015 (indexed); the ADR 0014 status notes the amendment; TEST_MATRIX rows ST1–ST7.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/{0014-settings-window.md, README.md}`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs}`, `src/DynamicIsland.Core/Diagnostics/TestHooks.cs`, `src/DynamicIsland.Core/Lifecycle/{ExitReason.cs, LaunchArguments.cs, LauncherArguments.cs}`, `src/DynamicIsland.Core/Shell/SettingsEditor.cs`, `src/DynamicIsland.Launcher/{ProcessAppRunner.cs, Program.cs}`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`, `tests/DynamicIsland.UnitTests/Shell/SettingsEditorTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/RealApp.cs`
+    - new: `docs/ADR/0015-first-run-and-sign-in-startup.md`, `src/DynamicIsland.App/{OnboardingWindow.xaml, OnboardingWindow.xaml.cs, StartupCoordinator.cs}`, `src/DynamicIsland.Core/Shell/Onboarding.cs`, `src/DynamicIsland.Core/Startup/StartupPolicy.cs`, `src/DynamicIsland.Platform.Windows/Startup/RegistryStartupRegistration.cs`, `tests/DynamicIsland.IntegrationTests/{OnboardingWindowTests.cs, RegistryStartupRegistrationTests.cs}`, `tests/DynamicIsland.UnitTests/Startup/StartupPolicyTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/StartupSmokeTests.cs`
+    - Suggested commit message: `feat(startup): first-run onboarding and per-user sign-in startup (P03-04, ADR 0015)`
+- 2026-10-26 P03-03 committed by the owner as `c7bbbe4` and pushed; CI run 40290363463 **success**: Release 421/421, Debug 425/425, 0 skipped.
 - 2026-10-26 **P03-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0014**.
   - **Core:**
     - New `Shell/SettingsEditor.cs`: the settings-window draft (INotifyPropertyChanged), strict validation with user messages using `SettingsValidator` limits, `IsDirty`/`CanSave`, per-page and full reset (consents are never reset), widget move, and `CreateChange()`/`ApplyTo()`, which merge only the fields the user changed onto the latest settings. Loading suppresses intermediate notifications.
@@ -140,6 +198,9 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | notch clock | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 488/488 ×2, Debug 494/494 ×2, **0 skipped** (including the idle-CPU budget and the regenerated visual references). A real Release app on the desktop showed "2:54 PM" and exited 0. |
+| 2026-10-26 | P03-04 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 465/465 ×2 and Debug 471/471 ×2, **0 skipped**. Real HKCU Run key, test keys and real settings checked untouched afterwards. Offscreen renderings of onboarding and the General page checked by eye. |
+| 2026-10-26 | P03-03 | GitHub Actions `windows-2025` (`c7bbbe4`) | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40290363463; 421/421 and 425/425, 0 skipped |
 | 2026-10-26 | P03-03 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then `dotnet test --solution DynamicIsland.sln -c <cfg> --no-build --max-parallel-test-modules 1`: Release ×2, Debug ×2 | PASS | 0 failed in all runs. Release 421/421 once, and 420 + 1 skipped once (the fullscreen smoke test: Windows refused the helper window foreground, so a skip, not a pass). Debug 425/425 twice. Offscreen renderings of all 8 pages were checked by eye: layout, error message, banner. |
 | 2026-10-26 | P03-02 | GitHub Actions `windows-2025` (`ba52b9e`) | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40286979868; Release 380/380, Debug 384/384, **0 skipped** (fullscreen and idle-CPU smoke tests both ran and passed) |
 | 2026-10-26 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug, then `dotnet test --solution DynamicIsland.sln -c <cfg> --no-build --max-parallel-test-modules 1`: Release ×4, Debug ×3 | PASS | 0 failed in all 7 runs. Release: 380/380 three times and 379 + 1 skipped once. Debug: 384/384 twice and 383 + 1 skipped once. Both skips were the fullscreen smoke test, skipped because Windows refused the helper window foreground; this is a skip, not a pass. The intermittent failures from 2026-10-25 did not reproduce. |

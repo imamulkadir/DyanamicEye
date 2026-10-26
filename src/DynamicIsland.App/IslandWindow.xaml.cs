@@ -88,6 +88,9 @@ public sealed partial class IslandWindow : Window, IDisposable
         Closed += OnClosed;
     }
 
+    /// <summary>The notch visuals (the clock writes its text here).</summary>
+    public NotchView NotchView => Notch;
+
     /// <summary>Last placement, for diagnostics and tests.</summary>
     public PlacementResult? LastPlacement => _placement.Current;
 

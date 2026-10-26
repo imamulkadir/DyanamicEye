@@ -6,6 +6,7 @@ using DynamicIsland.App;
 using DynamicIsland.Core.Diagnostics;
 using DynamicIsland.Core.Display;
 using DynamicIsland.Core.Settings;
+using DynamicIsland.Core.Startup;
 using DynamicIsland.Infrastructure.Diagnostics;
 using DynamicIsland.TestSupport;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,6 +22,7 @@ public sealed class SettingsWindowTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "DynamicIsland.IntegrationTests", Guid.NewGuid().ToString("N"));
     private readonly StaDispatcherThread _ui = new();
     private readonly FakeSettingsService _settings = new();
+    private StartupState _startupState = StartupState.Off;
 
     public void Dispose()
     {
@@ -157,6 +159,21 @@ public sealed class SettingsWindowTests : IDisposable
     }
 
     [Fact]
+    public async Task Startup_box_saves_an_explicit_choice_and_shows_what_windows_does()
+    {
+        _startupState = StartupState.DisabledInWindows;
+        var window = _ui.Invoke(Open);
+        Assert.Contains("Settings › Apps › Startup", _ui.Invoke(() => ((TextBlock)window.FindName("StartupStatusText")).Text), StringComparison.Ordinal);
+
+        _ui.Invoke(() => window.Editor.StartWithWindows = true);
+        Assert.True(await _ui.Invoke(window.SaveAsync));
+
+        Assert.Equal(ConsentState.Granted, _settings.Current.General.StartWithWindows);
+        Assert.Equal(ConsentState.NotAsked, _settings.Current.Updates.AutomaticChecks);
+        _ui.Invoke(window.Close);
+    }
+
+    [Fact]
     public void Read_only_store_shows_the_banner()
     {
         _settings.IsReadOnly = true;
@@ -215,7 +232,8 @@ public sealed class SettingsWindowTests : IDisposable
             _root,
             Path.Combine(_root, "logs"),
             () => new DiagnosticContext("1.2.3", SafeMode: false, "Loaded", []),
-            () => false);
+            () => false,
+            () => _startupState);
         var builder = new DiagnosticBundleBuilder(Path.Combine(_root, "logs"), Path.Combine(_root, "data"), new LogRedactor([]), TimeProvider.System);
         var window = new SettingsWindow(_settings, new FixedMonitors([Primary, Second]), builder, context, NullLogger<SettingsWindow>.Instance)
         {

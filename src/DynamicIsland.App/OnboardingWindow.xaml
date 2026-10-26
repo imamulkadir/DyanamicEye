@@ -1,0 +1,79 @@
+<Window x:Class="DynamicIsland.App.OnboardingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Welcome to Dynamic Island"
+        AutomationProperties.AutomationId="Onboarding.Window"
+        Width="520" SizeToContent="Height" MinWidth="420"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+    <!-- First-run choices (ADR 0015 §5). Both consent boxes start unchecked; nothing is saved until Continue. -->
+    <Window.Resources>
+        <Style x:Key="Heading" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,14,0,4" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+            <Setter Property="Margin" Value="22,0,0,4" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,6,0,2" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="10,2" />
+        </Style>
+    </Window.Resources>
+
+    <StackPanel Margin="20,16,20,16">
+        <TextBlock Text="Welcome to Dynamic Island" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap" Margin="0,6,0,0"
+                   Text="The island sits at the top of your screen. Click it to open it; use the tray icon for more options. Choose how it should behave — you can change everything later in Settings." />
+
+        <TextBlock Text="Start" Style="{StaticResource Heading}" />
+        <CheckBox x:Name="StartupBox" Content="_Start Dynamic Island when I sign in to Windows"
+                  AutomationProperties.AutomationId="Onboarding.Startup" />
+        <TextBlock Style="{StaticResource Hint}"
+                   Text="Only for your Windows account, a few seconds after sign-in. You can also turn it off in Windows Settings › Apps › Startup." />
+
+        <TextBlock Text="Updates" Style="{StaticResource Heading}" />
+        <CheckBox x:Name="UpdatesBox" Content="_Check GitHub for updates once a day"
+                  AutomationProperties.AutomationId="Onboarding.Updates" />
+        <TextBlock Style="{StaticResource Hint}"
+                   Text="Only checks for a new version. Downloading and installing always ask you first." />
+
+        <TextBlock Text="Privacy" Style="{StaticResource Heading}" />
+        <TextBlock TextWrapping="Wrap"
+                   Text="Dynamic Island works offline, needs no account and sends no telemetry. It does not record your activity. Logs stay on this PC with personal details removed." />
+
+        <TextBlock Text="Widgets" Style="{StaticResource Heading}" />
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,4" Text="Choose what the island shows (widgets arrive in a later update; your choice is kept)." />
+        <ItemsControl x:Name="WidgetList" IsTabStop="False" AutomationProperties.Name="Widgets"
+                      AutomationProperties.AutomationId="Onboarding.Widgets">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="2" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <CheckBox Content="{Binding Label}" IsChecked="{Binding Enabled}"
+                              AutomationProperties.AutomationId="{Binding Id, StringFormat=Onboarding.Widget.{0}}" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,12,0,0" Foreground="Firebrick"
+                   AutomationProperties.AutomationId="Onboarding.Status" AutomationProperties.LiveSetting="Assertive" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="ContinueButton" Content="_Continue" IsDefault="True" Click="OnContinue"
+                    AutomationProperties.AutomationId="Onboarding.Continue" />
+        </StackPanel>
+    </StackPanel>
+</Window>

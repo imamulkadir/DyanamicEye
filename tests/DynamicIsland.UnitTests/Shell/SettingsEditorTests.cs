@@ -273,6 +273,69 @@ public sealed class SettingsEditorTests
     }
 
     [Fact]
+    public void Untouched_consent_boxes_keep_not_asked_and_toggles_are_explicit()
+    {
+        var editor = Create();
+        Assert.False(editor.StartWithWindows);
+
+        editor.HoverPreviewEnabled = false;
+        var untouched = editor.ApplyTo(editor.Saved);
+        Assert.Equal(ConsentState.NotAsked, untouched.General.StartWithWindows);
+        Assert.Equal(ConsentState.NotAsked, untouched.Updates.AutomaticChecks);
+
+        editor.StartWithWindows = true;
+        editor.DailyUpdateChecks = true;
+        editor.DailyUpdateChecks = false;
+        var chosen = editor.ApplyTo(editor.Saved);
+        Assert.Equal(ConsentState.Granted, chosen.General.StartWithWindows);
+        Assert.Equal(ConsentState.NotAsked, chosen.Updates.AutomaticChecks);
+    }
+
+    [Fact]
+    public void Clearing_a_granted_consent_declines_it()
+    {
+        var editor = Create(new AppSettings { General = new GeneralSettings { StartWithWindows = ConsentState.Granted } });
+        Assert.True(editor.StartWithWindows);
+
+        editor.StartWithWindows = false;
+
+        Assert.True(editor.IsDirty);
+        Assert.Equal(ConsentState.Declined, editor.ApplyTo(editor.Saved).General.StartWithWindows);
+    }
+
+    [Fact]
+    public void Reset_all_keeps_a_ticked_but_unsaved_consent_box()
+    {
+        var editor = Create();
+        editor.StartWithWindows = true;
+
+        editor.ResetAll();
+
+        Assert.True(editor.StartWithWindows);
+    }
+
+    [Fact]
+    public void Clock_options_are_edited_previewed_merged_and_reset_with_appearance()
+    {
+        var editor = Create(culture: CultureInfo.GetCultureInfo("en-US"));
+        var afternoon = new DateTime(2026, 10, 26, 14, 42, 5, DateTimeKind.Local);
+        Assert.Equal("2:42 PM", editor.ClockPreview(afternoon));
+
+        editor.ClockShowSeconds = true;
+        editor.ClockDateFormat = ClockDateFormat.Weekday;
+        Assert.Equal("Mon · 2:42:05 PM", editor.ClockPreview(afternoon));
+
+        var latest = new AppSettings { Appearance = new AppearanceSettings { Clock = new ClockSettings { HourFormat = ClockHourFormat.TwentyFourHour } } };
+        var result = editor.ApplyTo(latest).Appearance.Clock;
+        Assert.Equal(new ClockSettings { HourFormat = ClockHourFormat.TwentyFourHour, ShowSeconds = true, DateFormat = ClockDateFormat.Weekday }, result);
+
+        editor.ResetSection(SettingsSection.Appearance);
+        Assert.False(editor.ClockShowSeconds);
+        Assert.Equal(ClockDateFormat.None, editor.ClockDateFormat);
+        Assert.False(editor.IsDirty);
+    }
+
+    [Fact]
     public void Loading_never_reports_a_half_loaded_draft_as_dirty()
     {
         var editor = Create();

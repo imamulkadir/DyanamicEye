@@ -7,8 +7,9 @@ using DynamicIsland.Infrastructure.Logging;
 namespace DynamicIsland.Launcher;
 
 /// <summary>
-/// Entry point for sign-in startup, shortcuts and restarts. Accepts only <c>--safe-mode</c> and <c>--after-pid N</c>
-/// (wait for a previous app instance to exit first); anything else is ignored.
+/// Entry point for sign-in startup, shortcuts and restarts. Accepts only <c>--safe-mode</c>, <c>--startup</c> (sign-in
+/// start: wait <see cref="LauncherContract.StartupDelay"/> first, ADR 0015) and <c>--after-pid N</c> (wait for a previous
+/// app instance to exit first); anything else is ignored.
 /// Exit code: 0 after a clean app exit; otherwise the app's last exit code, or 1 when the app cannot be started.
 /// </summary>
 internal static class Program
@@ -37,7 +38,7 @@ internal static class Program
         }
 
         var supervisor = new AppSupervisor(
-            new ProcessAppRunner(appPath),
+            new ProcessAppRunner(appPath, arguments.Startup),
             new JsonCrashStateStore(AppDataPaths.Data),
             notifier,
             TimeProvider.System);
@@ -46,6 +47,12 @@ internal static class Program
         if (arguments.AfterProcessId is { } previous)
         {
             WaitForPreviousInstance(previous);
+        }
+
+        if (arguments.Startup)
+        {
+            // Sign-in: let the shell and the user's other startup apps settle first.
+            Thread.Sleep(LauncherContract.StartupDelay);
         }
 
         try

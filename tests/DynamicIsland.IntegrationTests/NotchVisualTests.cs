@@ -57,6 +57,7 @@ public sealed class NotchVisualTests : IDisposable
         var size = IslandLayout.For(state)!.Value;
         var view = new NotchView { Width = size.Width, Height = size.Height };
         view.ApplyVisualState(state, size.Height, scale: 1.0);
+        view.SetClock("2:42 PM"); // Fixed text: the reference must not depend on the time of the run.
 
         // Black notch on a mid-grey backdrop, so the outline (shoulders, corners) is part of the comparison.
         var backdrop = new System.Windows.Controls.Border

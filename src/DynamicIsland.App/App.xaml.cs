@@ -35,16 +35,21 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        var launch = LaunchArguments.Parse(e.Args);
         _instance = SingleInstanceGuard.TryAcquire(AppId);
         if (_instance is null)
         {
-            // Another instance owns this user session: ask it to show itself and leave quietly.
-            Task.Run(() => SingleInstanceGuard.SignalExistingInstanceAsync(AppId, ActivationTimeout, CancellationToken.None)).GetAwaiter().GetResult();
+            // Another instance owns this user session: ask it to show itself and leave quietly. A sign-in start only
+            // leaves (ADR 0015): it must not pop the running island to the front.
+            if (!launch.Startup)
+            {
+                Task.Run(() => SingleInstanceGuard.SignalExistingInstanceAsync(AppId, ActivationTimeout, CancellationToken.None)).GetAwaiter().GetResult();
+            }
+
             Shutdown(ExitCodes.Success);
             return;
         }
 
-        var launch = LaunchArguments.Parse(e.Args);
         _host = AppHost.CreateBuilder(launchArguments: launch).Build();
         _logger = _host.Services.GetRequiredService<ILogger<App>>();
         _lifecycle = _host.Services.GetRequiredService<LifecycleCoordinator>();
@@ -79,7 +84,18 @@ public partial class App : Application
         AppLog.SettingsLoaded(_logger, settings.Outcome, settings.Corrections.Count, store.IsReadOnly);
         _host.Services.GetRequiredService<AppInfo>().SettingsOutcome = settings.Outcome;
 
-        _host.Services.GetRequiredService<SettingsService>().Initialize(settings.Settings);
+        var settingsService = _host.Services.GetRequiredService<SettingsService>();
+        settingsService.Initialize(settings.Settings);
+
+        // Sign-in startup follows the consent on every start (ADR 0015): register, remove a stale entry or repair a move.
+        _host.Services.GetRequiredService<StartupCoordinator>().Reconcile();
+        if (launch.Startup && settingsService.Current.General.StartWithWindows != ConsentState.Granted)
+        {
+            AppLog.StartupLaunchNotPermitted(_logger);
+            _lifecycle.RequestShutdown(ExitReason.UserExit);
+            return;
+        }
+
         var window = _host.Services.GetRequiredService<IslandWindow>();
         if (launch.SafeMode)
         {
@@ -87,11 +103,18 @@ public partial class App : Application
         }
 
         MainWindow = window;
+        _host.Services.GetRequiredService<NotchClock>().Start(); // Disposed (timer stopped) with the host on exit.
         window.Show();
 
         _instance.StartListening(OnActivationRequested, OnActivationUnavailable);
         _host.Services.GetRequiredService<FullscreenCoordinator>().Start();
         _host.Services.GetRequiredService<TrayController>().Start(); // Disposed (icon removed) with the host on exit.
+
+        if (Onboarding.IsNeeded(settingsService.Current, launch))
+        {
+            // Owned by the island, so it is never taken for the app's main window and closes with it.
+            new OnboardingWindow(settingsService, _host.Services.GetRequiredService<ILogger<OnboardingWindow>>()) { Owner = window }.Show();
+        }
 
         // Optional components (widgets/providers, P04) run isolated; failures surface as status changes and notices.
         var logger = _logger;

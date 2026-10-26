@@ -1,6 +1,6 @@
 # 0009 — Island state machine, interaction and accessibility
 
-- Status: Accepted
+- Status: Accepted (sensor housing replaced by the clock: ADR 0016)
 - Date: 2026-10-25
 - Task: P02-03
 
@@ -37,7 +37,7 @@
 The owner asked for the island to look like a **classic display notch (iPhone 12 Pro era)** rather than a floating pill.
 - **`IslandSurface`** is a custom-drawn `Decorator`. Its shape is a flat top flush with the screen edge, 6 DIP **concave shoulders** at the top corners, straight sides, and rounded bottom corners (`min(height/2, 22 DIP)`). Fill is pure black.
 - **Hit testing** uses the same geometry (`HitTestCore`), so only the notch is clickable. An integration test locks the outline: inside the shoulder curves and outside the bottom corners counts as "outside".
-- **Sensor housing:** a row 32 DIP tall, visible in every state. It has a centered speaker-grille slit, the front-camera lens to its right (dark lens with a small blue glint) and a faint sensor dot to its left. It is drawn from primitives; no images or third-party artwork.
+- **Sensor housing** (superseded by ADR 0016, which shows the clock in this row): a row 32 DIP tall, visible in every state. It has a centered speaker-grille slit, the front-camera lens to its right (dark lens with a small blue glint) and a faint sensor dot to its left. It is drawn from primitives; no images or third-party artwork.
 - **Expanded content** sits below the sensor row, so the notch "grows down" from the top edge.
 - **Sizes** (shoulders included): collapsed 236 × 32, peek 264 × 38, expanded and pinned 420 × 180 DIP.
 - **New defaults:**

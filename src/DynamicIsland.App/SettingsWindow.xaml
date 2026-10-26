@@ -113,9 +113,10 @@
                         <TextBlock Style="{StaticResource Hint}"
                                    Text="Displays are numbered from left to right, as in the tray menu. If the chosen display is missing, the island uses the primary display." />
 
-                        <Label Content="Start with Windows" />
-                        <TextBlock x:Name="StartWithWindowsText" Style="{StaticResource Hint}"
-                                   AutomationProperties.AutomationId="Settings.StartWithWindows" />
+                        <CheckBox Content="Start when I sign in to _Windows" IsChecked="{Binding StartWithWindows}" Margin="0,12,0,2"
+                                  AutomationProperties.AutomationId="Settings.StartWithWindows" />
+                        <TextBlock x:Name="StartupStatusText" Style="{StaticResource Hint}"
+                                   AutomationProperties.AutomationId="Settings.StartupStatus" />
 
                         <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
                             <Button Content="Reset this _page" Click="OnResetPage" Tag="General"
@@ -124,7 +125,7 @@
                                     AutomationProperties.AutomationId="Settings.ResetAll" />
                         </StackPanel>
                         <TextBlock Style="{StaticResource Hint}"
-                                   Text="Reset fills in the defaults; nothing changes until you select Save. Your Start with Windows and update-check choices are never reset." />
+                                   Text="Reset fills in the defaults; nothing changes until you select Save. Your sign-in and update-check choices are never reset." />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -178,6 +179,24 @@
                         <Label Content="_Motion" Target="{Binding ElementName=MotionBox}" />
                         <ComboBox x:Name="MotionBox" SelectedValuePath="Value" DisplayMemberPath="Label"
                                   SelectedValue="{Binding Motion}" AutomationProperties.Name="Motion" AutomationProperties.AutomationId="Settings.Motion" />
+
+                        <!-- Notch clock (ADR 0016). -->
+                        <TextBlock Text="Clock" FontWeight="SemiBold" Margin="0,18,0,0" />
+                        <Label Content="Time _format" Target="{Binding ElementName=HourFormatBox}" />
+                        <ComboBox x:Name="HourFormatBox" SelectedValuePath="Value" DisplayMemberPath="Label"
+                                  SelectedValue="{Binding ClockHourFormat}"
+                                  AutomationProperties.Name="Time format" AutomationProperties.AutomationId="Settings.ClockHourFormat" />
+                        <CheckBox Content="Show seco_nds" IsChecked="{Binding ClockShowSeconds}"
+                                  AutomationProperties.AutomationId="Settings.ClockSeconds" />
+                        <Label Content="_Date" Target="{Binding ElementName=DateFormatBox}" />
+                        <ComboBox x:Name="DateFormatBox" SelectedValuePath="Value" DisplayMemberPath="Label"
+                                  SelectedValue="{Binding ClockDateFormat}"
+                                  AutomationProperties.Name="Date" AutomationProperties.AutomationId="Settings.ClockDate" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0">
+                            <Run Text="Preview: " /><Run x:Name="ClockPreviewRun" FontWeight="SemiBold" />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Turn the clock off with the &quot;Clock and date&quot; widget on the Widgets page." />
 
                         <Button Content="Reset this _page" Margin="0,16,0,0" HorizontalAlignment="Left" Click="OnResetPage" Tag="Appearance"
                                 AutomationProperties.AutomationId="Settings.Reset.Appearance" />
@@ -256,9 +275,10 @@
                         <TextBlock Text="Updates" Style="{StaticResource PageTitle}" />
                         <Label Content="Installed version" />
                         <TextBlock x:Name="UpdatesVersionText" AutomationProperties.AutomationId="Settings.Version" />
-                        <Label Content="Daily update check" Margin="0,12,0,0" />
-                        <TextBlock x:Name="UpdateChecksText" Style="{StaticResource Hint}"
-                                   AutomationProperties.AutomationId="Settings.UpdateChecks" />
+                        <CheckBox Content="Check GitHub for updates once a _day" IsChecked="{Binding DailyUpdateChecks}" Margin="0,12,0,2"
+                                  AutomationProperties.AutomationId="Settings.UpdateChecks" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Saved now; the daily check itself arrives in a later version. It only looks for a new version." />
                         <Button Content="Check for _updates" HorizontalAlignment="Left" IsEnabled="False"
                                 ToolTipService.ShowOnDisabled="True" ToolTip="Update checks arrive in a later version"
                                 AutomationProperties.AutomationId="Settings.CheckForUpdates" />

@@ -1,6 +1,6 @@
 # 0014 — Settings window: navigation, save semantics, validation and reset
 
-- Status: Accepted
+- Status: Accepted (§6 amended by ADR 0015: consents are editable)
 - Date: 2026-10-26
 - Task: P03-03
 

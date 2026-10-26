@@ -53,7 +53,7 @@ public sealed class WidgetOption(string id, string label, bool enabled) : INotif
 /// Draft of the settings window (ADR 0014): typed values are validated strictly with user-facing messages (the loader's
 /// silent clamping is not used for input), Save is possible only without errors, and <see cref="ApplyTo"/> writes only
 /// the fields the user changed so concurrent changes (e.g. a display picked from the tray) are kept. Consent settings
-/// are read-only here and never reset.
+/// change only when the user ticks or clears their box (ADR 0015) and are never reset.
 /// </summary>
 public sealed class SettingsEditor : INotifyPropertyChanged
 {
@@ -67,7 +67,7 @@ public sealed class SettingsEditor : INotifyPropertyChanged
         [WidgetIds.Tasks] = "Tasks",
     };
 
-    private readonly IFormatProvider _culture;
+    private readonly CultureInfo _culture;
     private readonly IReadOnlyList<MonitorInfo> _monitors;
 
     private DisplayOption _selectedDisplay = null!;
@@ -78,6 +78,9 @@ public sealed class SettingsEditor : INotifyPropertyChanged
     private string _horizontalOffsetText = string.Empty;
     private string _verticalOffsetText = string.Empty;
     private MotionPreference _motion;
+    private ClockHourFormat _clockHourFormat;
+    private bool _clockShowSeconds;
+    private ClockDateFormat _clockDateFormat;
     private bool _hoverPreviewEnabled;
     private string _hoverPreviewDelayText = string.Empty;
     private bool _autoHideInFullscreen;
@@ -87,8 +90,10 @@ public sealed class SettingsEditor : INotifyPropertyChanged
     private string? _hoverPreviewDelayError;
     private string? _fullscreenExceptionsError;
     private bool _loading;
+    private bool _startWithWindows;
+    private bool _dailyUpdateChecks;
 
-    public SettingsEditor(AppSettings saved, IReadOnlyList<MonitorInfo> monitors, IFormatProvider culture)
+    public SettingsEditor(AppSettings saved, IReadOnlyList<MonitorInfo> monitors, CultureInfo culture)
     {
         ArgumentNullException.ThrowIfNull(saved);
         ArgumentNullException.ThrowIfNull(monitors);
@@ -109,9 +114,19 @@ public sealed class SettingsEditor : INotifyPropertyChanged
 
     public ObservableCollection<WidgetOption> Widgets { get; } = [];
 
-    public ConsentState StartWithWindows => Saved.General.StartWithWindows;
+    /// <summary>Sign-in startup consent (ADR 0015). Untouched, an unanswered consent stays <see cref="ConsentState.NotAsked"/>; never reset.</summary>
+    public bool StartWithWindows
+    {
+        get => _startWithWindows;
+        set => Set(ref _startWithWindows, value);
+    }
 
-    public ConsentState AutomaticUpdateChecks => Saved.Updates.AutomaticChecks;
+    /// <summary>Daily update check consent; same rules as <see cref="StartWithWindows"/>.</summary>
+    public bool DailyUpdateChecks
+    {
+        get => _dailyUpdateChecks;
+        set => Set(ref _dailyUpdateChecks, value);
+    }
 
     public DisplayOption SelectedDisplay
     {
@@ -161,6 +176,28 @@ public sealed class SettingsEditor : INotifyPropertyChanged
         get => _motion;
         set => Set(ref _motion, value);
     }
+
+    public ClockHourFormat ClockHourFormat
+    {
+        get => _clockHourFormat;
+        set => Set(ref _clockHourFormat, value);
+    }
+
+    public bool ClockShowSeconds
+    {
+        get => _clockShowSeconds;
+        set => Set(ref _clockShowSeconds, value);
+    }
+
+    public ClockDateFormat ClockDateFormat
+    {
+        get => _clockDateFormat;
+        set => Set(ref _clockDateFormat, value);
+    }
+
+    /// <summary>The notch clock as the draft would show it at <paramref name="localTime"/>.</summary>
+    public string ClockPreview(DateTime localTime) =>
+        ClockFormatter.Format(localTime, new ClockSettings { HourFormat = _clockHourFormat, ShowSeconds = _clockShowSeconds, DateFormat = _clockDateFormat }, _culture);
 
     public bool HoverPreviewEnabled
     {
@@ -230,6 +267,8 @@ public sealed class SettingsEditor : INotifyPropertyChanged
             Saved = saved;
             DisplayOptions = BuildDisplayOptions(_monitors, saved.General.PreferredMonitorId);
             LoadGeneral(saved.General);
+            _startWithWindows = saved.General.StartWithWindows == ConsentState.Granted;
+            _dailyUpdateChecks = saved.Updates.AutomaticChecks == ConsentState.Granted;
             LoadAppearance(saved.Appearance);
             LoadBehavior(saved.Behavior);
             LoadWidgets(saved.Widgets);
@@ -332,6 +371,11 @@ public sealed class SettingsEditor : INotifyPropertyChanged
             General = latest.General with
             {
                 PreferredMonitorId = Pick(latest.General.PreferredMonitorId, saved.General.PreferredMonitorId, draft.General.PreferredMonitorId),
+                StartWithWindows = Pick(latest.General.StartWithWindows, saved.General.StartWithWindows, draft.General.StartWithWindows),
+            },
+            Updates = latest.Updates with
+            {
+                AutomaticChecks = Pick(latest.Updates.AutomaticChecks, saved.Updates.AutomaticChecks, draft.Updates.AutomaticChecks),
             },
             Appearance = new AppearanceSettings
             {
@@ -342,6 +386,12 @@ public sealed class SettingsEditor : INotifyPropertyChanged
                 HorizontalOffset = Pick(latest.Appearance.HorizontalOffset, saved.Appearance.HorizontalOffset, draft.Appearance.HorizontalOffset),
                 VerticalOffset = Pick(latest.Appearance.VerticalOffset, saved.Appearance.VerticalOffset, draft.Appearance.VerticalOffset),
                 Motion = Pick(latest.Appearance.Motion, saved.Appearance.Motion, draft.Appearance.Motion),
+                Clock = new ClockSettings
+                {
+                    HourFormat = Pick(latest.Appearance.Clock.HourFormat, saved.Appearance.Clock.HourFormat, draft.Appearance.Clock.HourFormat),
+                    ShowSeconds = Pick(latest.Appearance.Clock.ShowSeconds, saved.Appearance.Clock.ShowSeconds, draft.Appearance.Clock.ShowSeconds),
+                    DateFormat = Pick(latest.Appearance.Clock.DateFormat, saved.Appearance.Clock.DateFormat, draft.Appearance.Clock.DateFormat),
+                },
             },
             Behavior = new BehaviorSettings
             {
@@ -355,6 +405,9 @@ public sealed class SettingsEditor : INotifyPropertyChanged
             Widgets = SameList(draft.Widgets, saved.Widgets, EqualityComparer<WidgetSetting>.Default) ? latest.Widgets : draft.Widgets,
         };
     }
+
+    /// <summary>User-facing name of a built-in widget (settings and onboarding).</summary>
+    public static string WidgetLabel(string id) => WidgetLabels.GetValueOrDefault(id, id);
 
     /// <summary>"Primary display" first, then "Display N (primary)" in tray order; a saved but disconnected display is kept.</summary>
     public static IReadOnlyList<DisplayOption> BuildDisplayOptions(IReadOnlyList<MonitorInfo> monitors, string? preferredMonitorId)
@@ -388,6 +441,9 @@ public sealed class SettingsEditor : INotifyPropertyChanged
         _horizontalOffsetText = Format(appearance.HorizontalOffset);
         _verticalOffsetText = Format(appearance.VerticalOffset);
         _motion = appearance.Motion;
+        _clockHourFormat = appearance.Clock.HourFormat;
+        _clockShowSeconds = appearance.Clock.ShowSeconds;
+        _clockDateFormat = appearance.Clock.DateFormat;
     }
 
     private void LoadBehavior(BehaviorSettings behavior)
@@ -403,7 +459,7 @@ public sealed class SettingsEditor : INotifyPropertyChanged
         Widgets.Clear();
         foreach (var widget in widgets)
         {
-            var option = new WidgetOption(widget.Id, WidgetLabels.GetValueOrDefault(widget.Id, widget.Id), widget.Enabled);
+            var option = new WidgetOption(widget.Id, WidgetLabel(widget.Id), widget.Enabled);
             option.EnabledChanged += (_, _) => OnDraftChanged();
             Widgets.Add(option);
         }
@@ -412,7 +468,12 @@ public sealed class SettingsEditor : INotifyPropertyChanged
     /// <summary>The draft as settings; fields with errors keep their saved value (only used when there are none, or for the dirty check).</summary>
     private AppSettings BuildDraft() => Saved with
     {
-        General = Saved.General with { PreferredMonitorId = _selectedDisplay.Id },
+        General = Saved.General with
+        {
+            PreferredMonitorId = _selectedDisplay.Id,
+            StartWithWindows = Consent(Saved.General.StartWithWindows, _startWithWindows),
+        },
+        Updates = Saved.Updates with { AutomaticChecks = Consent(Saved.Updates.AutomaticChecks, _dailyUpdateChecks) },
         Appearance = new AppearanceSettings
         {
             Theme = _theme,
@@ -422,6 +483,7 @@ public sealed class SettingsEditor : INotifyPropertyChanged
             HorizontalOffset = ParseDouble(_horizontalOffsetText, -SettingsValidator.MaxHorizontalOffset, SettingsValidator.MaxHorizontalOffset) ?? Saved.Appearance.HorizontalOffset,
             VerticalOffset = ParseDouble(_verticalOffsetText, 0, SettingsValidator.MaxVerticalOffset) ?? Saved.Appearance.VerticalOffset,
             Motion = _motion,
+            Clock = new ClockSettings { HourFormat = _clockHourFormat, ShowSeconds = _clockShowSeconds, DateFormat = _clockDateFormat },
         },
         Behavior = new BehaviorSettings
         {
@@ -496,6 +558,10 @@ public sealed class SettingsEditor : INotifyPropertyChanged
     }
 
     private string Format(double value) => value.ToString("0.##", _culture);
+
+    /// <summary>The saved consent while the box is unchanged (keeps <see cref="ConsentState.NotAsked"/>), otherwise the explicit choice.</summary>
+    private static ConsentState Consent(ConsentState saved, bool enabled) =>
+        enabled == (saved == ConsentState.Granted) ? saved : enabled ? ConsentState.Granted : ConsentState.Declined;
 
     private static T Pick<T>(T latest, T saved, T draft) => EqualityComparer<T>.Default.Equals(draft, saved) ? latest : draft;
 

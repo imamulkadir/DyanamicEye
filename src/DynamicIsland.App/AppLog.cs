@@ -110,6 +110,30 @@ internal static partial class AppLog
         Message = "A folder or link could not be opened ({ErrorType})")]
     public static partial void OpenFolderFailed(ILogger logger, string errorType);
 
+    [LoggerMessage(EventId = 1050, EventName = "StartupRegistered", Level = LogLevel.Information,
+        Message = "Sign-in startup registered (replaced an entry for a moved or other copy: {Repaired})")]
+    public static partial void StartupRegistered(ILogger logger, bool repaired);
+
+    [LoggerMessage(EventId = 1051, EventName = "StartupRemoved", Level = LogLevel.Information,
+        Message = "Sign-in startup entry removed because startup is not allowed in settings")]
+    public static partial void StartupRemoved(ILogger logger);
+
+    [LoggerMessage(EventId = 1052, EventName = "StartupRegistrationFailed", Level = LogLevel.Warning,
+        Message = "Sign-in startup could not be read or changed ({ErrorType})")]
+    public static partial void StartupRegistrationFailed(ILogger logger, string errorType);
+
+    [LoggerMessage(EventId = 1053, EventName = "StartupNotActive", Level = LogLevel.Information,
+        Message = "Sign-in startup is allowed but not active ({State})")]
+    public static partial void StartupNotActive(ILogger logger, Core.Startup.StartupState state);
+
+    [LoggerMessage(EventId = 1054, EventName = "StartupLaunchNotPermitted", Level = LogLevel.Information,
+        Message = "Sign-in start without permission in settings; exiting")]
+    public static partial void StartupLaunchNotPermitted(ILogger logger);
+
+    [LoggerMessage(EventId = 1055, EventName = "OnboardingCompleted", Level = LogLevel.Information,
+        Message = "First-run choices saved (startup {Startup}, daily update checks {UpdateChecks}, widgets enabled {Widgets})")]
+    public static partial void OnboardingCompleted(ILogger logger, bool startup, bool updateChecks, int widgets);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

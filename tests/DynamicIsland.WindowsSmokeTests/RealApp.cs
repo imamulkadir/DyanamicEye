@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
+using DynamicIsland.Core.Diagnostics;
+using DynamicIsland.Platform.Windows.Display;
 
 namespace DynamicIsland.WindowsSmokeTests;
 
@@ -16,6 +18,15 @@ internal static class RealApp
     public const string AppExe = "DynamicIsland.exe";
     public const string LauncherExe = "DynamicIsland.Launcher.exe";
     public const string AppProcessName = "DynamicIsland";
+    public const string OnboardingTitle = "Welcome to Dynamic Island";
+
+    /// <summary>
+    /// Scratch key standing for <c>Software\Microsoft\Windows\CurrentVersion</c> in Debug runs, so the app's startup
+    /// check never touches the real Run key (ADR 0015 §7). Release builds ignore the variable.
+    /// </summary>
+    public const string ScratchRegistryRoot = @"Software\DynamicIsland.Tests\Smoke";
+
+    private static readonly TimeSpan OnboardingWait = TimeSpan.FromSeconds(1.5);
 
     public static readonly TimeSpan WindowTimeout = TimeSpan.FromSeconds(30);
     public static readonly TimeSpan ExitTimeout = TimeSpan.FromSeconds(15);
@@ -34,6 +45,8 @@ internal static class RealApp
             startInfo.ArgumentList.Add(argument);
         }
 
+        startInfo.Environment[TestHooks.RegistryRootVariable] = ScratchRegistryRoot;
+
         foreach (var (name, value) in environment ?? new Dictionary<string, string>())
         {
             startInfo.Environment[name] = value;
@@ -42,7 +55,8 @@ internal static class RealApp
         return Process.Start(startInfo) ?? throw new InvalidOperationException("Process.Start returned null.");
     }
 
-    public static async Task WaitForMainWindowAsync(Process process)
+    /// <param name="dismissOnboarding">Close the first-run window (without saving) if it appears, as most tests don't need it.</param>
+    public static async Task WaitForMainWindowAsync(Process process, bool dismissOnboarding = true)
     {
         var stopwatch = Stopwatch.StartNew();
         while (!HasMainWindow(process) && stopwatch.Elapsed < WindowTimeout)
@@ -52,6 +66,32 @@ internal static class RealApp
         }
 
         Assert.True(HasMainWindow(process), $"No main window within {WindowTimeout.TotalSeconds}s.");
+        if (dismissOnboarding)
+        {
+            await DismissOnboardingAsync(process.Id);
+        }
+    }
+
+    /// <summary>Closes the first-run window if it shows up shortly after the island (closing saves nothing).</summary>
+    public static async Task DismissOnboardingAsync(int processId)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < OnboardingWait)
+        {
+            var onboarding = IslandWindowInterop.FindTopLevelWindow(processId, OnboardingTitle);
+            if (onboarding != IntPtr.Zero)
+            {
+                IslandWindowInterop.RequestClose(onboarding);
+                while (IslandWindowInterop.FindTopLevelWindow(processId, OnboardingTitle) != IntPtr.Zero && stopwatch.Elapsed < WindowTimeout)
+                {
+                    await Task.Delay(50, Ct);
+                }
+
+                return;
+            }
+
+            await Task.Delay(50, Ct);
+        }
     }
 
     /// <summary>Finds the app process (started by the launcher) once it shows a window.</summary>
@@ -64,6 +104,7 @@ internal static class RealApp
             {
                 if (candidate.StartTime >= startedAfter && HasMainWindow(candidate))
                 {
+                    await DismissOnboardingAsync(candidate.Id);
                     return candidate;
                 }
 

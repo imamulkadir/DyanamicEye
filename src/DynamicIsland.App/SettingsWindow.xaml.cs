@@ -8,6 +8,7 @@ using DynamicIsland.Core.Diagnostics;
 using DynamicIsland.Core.Display;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Shell;
+using DynamicIsland.Core.Startup;
 using DynamicIsland.Infrastructure.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
@@ -16,13 +17,15 @@ namespace DynamicIsland.App;
 
 /// <summary>What the settings window shows about the app besides the settings themselves.</summary>
 /// <param name="IsShuttingDown">True once the app is exiting: closing then never asks to save.</param>
+/// <param name="StartupState">Current sign-in startup registration (ADR 0015).</param>
 public sealed record SettingsWindowContext(
     string Version,
     string Copyright,
     string DataFolder,
     string LogsFolder,
     Func<DiagnosticContext> Diagnostics,
-    Func<bool> IsShuttingDown);
+    Func<bool> IsShuttingDown,
+    Func<StartupState> StartupState);
 
 /// <summary>
 /// Settings window (guide P03-03, ADR 0014): edits a <see cref="SettingsEditor"/> draft and saves it explicitly through
@@ -67,12 +70,27 @@ public partial class SettingsWindow : Window
             Option(MotionPreference.Off, "Off"),
         };
 
+        // Examples use the user's own region format, so each choice shows what it will look like.
+        var sample = DateTime.Now;
+        HourFormatBox.ItemsSource = new[]
+        {
+            Option(ClockHourFormat.System, $"Use Windows setting ({ClockFormatter.Format(sample, new ClockSettings(), CultureInfo.CurrentCulture)})"),
+            Option(ClockHourFormat.TwelveHour, $"12-hour ({ClockFormatter.Format(sample, new ClockSettings { HourFormat = ClockHourFormat.TwelveHour }, CultureInfo.CurrentCulture)})"),
+            Option(ClockHourFormat.TwentyFourHour, $"24-hour ({ClockFormatter.Format(sample, new ClockSettings { HourFormat = ClockHourFormat.TwentyFourHour }, CultureInfo.CurrentCulture)})"),
+        };
+        DateFormatBox.ItemsSource = new[] { ClockDateFormat.None, ClockDateFormat.Weekday, ClockDateFormat.Date, ClockDateFormat.WeekdayAndDate, ClockDateFormat.Numeric }
+            .Select(f => Option(f, f == ClockDateFormat.None
+                ? "No date"
+                : ClockFormatter.Format(sample, new ClockSettings { DateFormat = f }, CultureInfo.CurrentCulture).Split(ClockFormatter.Separator)[0]))
+            .ToArray();
+        ShowClockPreview();
+
         ReadOnlyBanner.Visibility = settings.IsReadOnly ? Visibility.Visible : Visibility.Collapsed;
         UpdatesVersionText.Text = context.Version;
         AboutVersionText.Text = $"Version {context.Version}";
         AboutCopyrightText.Text = context.Copyright;
         DataFolderText.Text = context.DataFolder;
-        ShowConsents();
+        ShowStartupStatus();
 
         _editor.PropertyChanged += OnEditorChanged;
         _settings.Changed += OnSettingsChanged;
@@ -145,24 +163,27 @@ public partial class SettingsWindow : Window
 
     private static Choice<T> Option<T>(T value, string label) => new(value, label);
 
-    private void ShowConsents()
+    /// <summary>What Windows actually does with the saved startup choice (ADR 0015); the box itself is the draft.</summary>
+    private void ShowStartupStatus() => StartupStatusText.Text = _context.StartupState() switch
     {
-        StartWithWindowsText.Text = _editor.StartWithWindows switch
-        {
-            ConsentState.Granted => "On. You can change this in first-run setup; a switch here arrives in a later update.",
-            ConsentState.Declined => "Off. You can change this in first-run setup; a switch here arrives in a later update.",
-            _ => "Not set up yet. Dynamic Island will ask you once during first-run setup; it never starts with Windows without your permission.",
-        };
-        UpdateChecksText.Text = _editor.AutomaticUpdateChecks switch
-        {
-            ConsentState.Granted => "On: Dynamic Island will check GitHub once a day when update checks arrive.",
-            ConsentState.Declined => "Off: Dynamic Island will not check for updates automatically.",
-            _ => "Not set up yet. You will be asked before any automatic check.",
-        };
-    }
+        StartupState.On => "Starts a few seconds after you sign in, for your account only.",
+        StartupState.DisabledInWindows => "Turned off in Windows. To use it, turn on Dynamic Island in Settings › Apps › Startup.",
+        StartupState.BlockedByPolicy => "Your organization does not allow apps to start at sign-in on this PC.",
+        StartupState.OtherCopy => "Another copy of Dynamic Island starts at sign-in. Clear and tick the box, then Save, to use this copy.",
+        StartupState.LauncherMissing => "Not available: DynamicIsland.Launcher.exe is missing next to the app.",
+        StartupState.NotRegistered => "The sign-in entry could not be created. See the logs folder for details.",
+        _ => "Off. Dynamic Island never starts with Windows without your permission.",
+    };
+
+    private void ShowClockPreview() => ClockPreviewRun.Text = _editor.ClockPreview(DateTime.Now);
 
     private void OnEditorChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(SettingsEditor.ClockHourFormat) or nameof(SettingsEditor.ClockShowSeconds) or nameof(SettingsEditor.ClockDateFormat) or "")
+        {
+            ShowClockPreview();
+        }
+
         if (e.PropertyName is nameof(SettingsEditor.IsDirty) or "" && _editor.IsDirty)
         {
             StatusText.Text = _editor.HasErrors ? $"Fix the value marked on the {PageWithError()} page to save." : string.Empty;
@@ -170,7 +191,7 @@ public partial class SettingsWindow : Window
 
         if (e.PropertyName is "")
         {
-            ShowConsents();
+            ShowStartupStatus();
         }
     }
 

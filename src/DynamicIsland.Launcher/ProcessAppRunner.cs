@@ -4,8 +4,11 @@ using DynamicIsland.Core.Lifecycle;
 namespace DynamicIsland.Launcher;
 
 /// <summary>Starts the app as a child process with only allow-listed arguments and waits for it to exit.</summary>
-internal sealed class ProcessAppRunner(string appPath) : IAppProcessRunner
+/// <param name="startupLaunch">Sign-in start: only the first app start gets <c>--startup</c>; crash restarts do not (ADR 0015).</param>
+internal sealed class ProcessAppRunner(string appPath, bool startupLaunch = false) : IAppProcessRunner
 {
+    private bool _startupPending = startupLaunch;
+
     public async Task<int> RunAsync(bool safeMode, CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo(appPath)
@@ -18,6 +21,12 @@ internal sealed class ProcessAppRunner(string appPath) : IAppProcessRunner
         if (safeMode)
         {
             startInfo.ArgumentList.Add(LaunchArguments.SafeModeSwitch);
+        }
+
+        if (_startupPending)
+        {
+            startInfo.ArgumentList.Add(LaunchArguments.StartupSwitch);
+            _startupPending = false;
         }
 
         using var process = Process.Start(startInfo)

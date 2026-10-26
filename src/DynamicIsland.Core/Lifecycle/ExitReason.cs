@@ -46,4 +46,7 @@ public static class LauncherContract
     public const string AfterPidSwitch = "--after-pid";
 
     public const string LauncherExecutable = "DynamicIsland.Launcher.exe";
+
+    /// <summary>App-side delay before a sign-in start (<c>--startup</c>, ADR 0015); the OS adds its own, unknown delay.</summary>
+    public static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(5);
 }

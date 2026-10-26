@@ -44,5 +44,7 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0012 — Notification-area (tray) icon](0012-tray-icon.md) — Accepted (P03-01)
 - [0013 — Tray actions, settings service, restart contract and shutdown mode](0013-tray-actions-settings-restart.md) — Accepted (P03-02)
 - [0014 — Settings window: navigation, save semantics, validation and reset](0014-settings-window.md) — Accepted (P03-03)
+- [0015 — First-run onboarding and sign-in startup](0015-first-run-and-sign-in-startup.md) — Accepted (P03-04)
+- [0016 — Notch clock](0016-notch-clock.md) — Accepted (owner request; collapsed part of P04-02)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

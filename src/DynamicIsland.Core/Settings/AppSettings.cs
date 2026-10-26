@@ -48,6 +48,18 @@ public sealed record AppearanceSettings
     public double VerticalOffset { get; init; }
 
     public MotionPreference Motion { get; init; } = MotionPreference.System;
+
+    /// <summary>The clock shown in the notch (ADR 0016). Added without a schema bump (ADR 0003 §7: new property with a default).</summary>
+    public ClockSettings Clock { get; init; } = new();
+}
+
+public sealed record ClockSettings
+{
+    public ClockHourFormat HourFormat { get; init; } = ClockHourFormat.System;
+
+    public bool ShowSeconds { get; init; }
+
+    public ClockDateFormat DateFormat { get; init; } = ClockDateFormat.None;
 }
 
 public sealed record BehaviorSettings
@@ -104,6 +116,32 @@ public enum IslandPlacement
     TopCenter,
     TopLeft,
     TopRight,
+}
+
+public enum ClockHourFormat
+{
+    /// <summary>Follow the Windows time format.</summary>
+    System,
+    TwelveHour,
+    TwentyFourHour,
+}
+
+/// <summary>Date shown before the time; texts follow the Windows region format.</summary>
+public enum ClockDateFormat
+{
+    None,
+
+    /// <summary>"Mon".</summary>
+    Weekday,
+
+    /// <summary>"Oct 26".</summary>
+    Date,
+
+    /// <summary>"Mon Oct 26".</summary>
+    WeekdayAndDate,
+
+    /// <summary>The Windows short date, e.g. "10/26/2026".</summary>
+    Numeric,
 }
 
 public enum MotionPreference

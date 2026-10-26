@@ -5,12 +5,14 @@ using DynamicIsland.Core.Lifecycle;
 using DynamicIsland.Core.Notifications;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Shell;
+using DynamicIsland.Core.Startup;
 using DynamicIsland.Infrastructure;
 using DynamicIsland.Infrastructure.Diagnostics;
 using DynamicIsland.Infrastructure.Lifecycle;
 using DynamicIsland.Infrastructure.Logging;
 using DynamicIsland.Infrastructure.Settings;
 using DynamicIsland.Platform.Windows.Display;
+using DynamicIsland.Platform.Windows.Startup;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -77,7 +79,20 @@ public static class AppHost
         builder.Services.AddSingleton<IMotionGate, MotionGate>();
         builder.Services.AddSingleton<IslandWindow>();
         builder.Services.AddSingleton<RestartService>();
+        builder.Services.AddSingleton(sp => new NotchClock(
+            sp.GetRequiredService<IslandWindow>().NotchView,
+            sp.GetRequiredService<ISettingsService>(),
+            sp.GetRequiredService<IIslandStateMachine>(),
+            sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<AppInfo>();
+        builder.Services.AddSingleton<IStartupRegistration>(_ => TestHooks.Get(TestHooks.RegistryRootVariable) is { Length: > 0 } testRoot
+            ? new RegistryStartupRegistration(testRoot, checkMachinePolicy: false)
+            : new RegistryStartupRegistration());
+        builder.Services.AddSingleton(sp => new StartupCoordinator(
+            sp.GetRequiredService<IStartupRegistration>(),
+            sp.GetRequiredService<ISettingsService>(),
+            System.IO.Path.Combine(AppContext.BaseDirectory, LauncherContract.LauncherExecutable),
+            sp.GetRequiredService<ILogger<StartupCoordinator>>()));
         builder.Services.AddSingleton(sp => new SettingsWindowService(() =>
         {
             var info = sp.GetRequiredService<AppInfo>();
@@ -94,7 +109,8 @@ public static class AppHost
                     root,
                     sp.GetRequiredService<FileLoggerOptions>().Directory,
                     () => new DiagnosticContext(info.Version, launch.SafeMode, info.SettingsOutcome?.ToString(), components.Statuses),
-                    () => lifecycle.Reason is not null),
+                    () => lifecycle.Reason is not null,
+                    () => sp.GetRequiredService<StartupCoordinator>().State),
                 sp.GetRequiredService<ILogger<SettingsWindow>>());
         }));
         builder.Services.AddSingleton(sp => new TrayController(

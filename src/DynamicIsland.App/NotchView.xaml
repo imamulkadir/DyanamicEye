@@ -4,7 +4,7 @@
              xmlns:local="clr-namespace:DynamicIsland.App"
              Width="236" Height="32">
     <!--
-      The island's visuals: a classic display notch (IslandSurface) with its sensor housing and the expanded panel.
+      The island's visuals: a classic display notch (IslandSurface) with the clock and the expanded panel.
       Separate from the window so it can be rendered offscreen for visual regression tests (ADR 0011).
       Original artwork drawn from simple geometry; no third-party assets.
     -->
@@ -50,36 +50,24 @@
                          AutomationProperties.HelpText="Press Enter to expand, Escape to collapse, Ctrl+P to pin.">
         <Grid>
             <Grid.RowDefinitions>
-                <!-- Sensor housing: always visible at the top of the notch. -->
-                <RowDefinition x:Name="SensorRow" Height="32" />
+                <!-- Clock row: the collapsed notch's height (scaled in ApplyVisualState). -->
+                <RowDefinition x:Name="ClockRow" Height="32" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Grid x:Name="SensorHousing" AutomationProperties.Name="Sensor housing" IsHitTestVisible="False">
-                <!-- Proximity / ambient sensor: barely visible, left of the speaker. -->
-                <Ellipse Width="5" Height="5" Fill="#FF15151A"
-                         HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Ellipse.RenderTransform>
-                        <TranslateTransform X="-40" />
-                    </Ellipse.RenderTransform>
-                </Ellipse>
-
-                <!-- Speaker grille: centered slit. -->
-                <Border Width="52" Height="5" CornerRadius="2.5"
-                        Background="#FF1E1E22"
-                        HorizontalAlignment="Center" VerticalAlignment="Center" />
-
-                <!-- Front camera: dark lens with a blue glint, right of the speaker. -->
-                <Grid Width="11" Height="11" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Grid.RenderTransform>
-                        <TranslateTransform X="46" />
-                    </Grid.RenderTransform>
-                    <Ellipse Fill="#FF0B0B10" Stroke="#FF1C1C24" StrokeThickness="1" />
-                    <Ellipse Width="5" Height="5" Fill="#FF16243F" />
-                    <Ellipse Width="2" Height="2" Fill="#FF6F8FD6" Margin="0,0,2,2"
-                             HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Grid>
-            </Grid>
+            <!-- Clock (ADR 0016): replaces the earlier decorative sensor housing; always visible at the top of the notch. -->
+            <TextBlock x:Name="ClockText"
+                       Foreground="#FFF2F3F5"
+                       FontFamily="Segoe UI Variable Text, Segoe UI"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="14,0"
+                       IsHitTestVisible="False"
+                       Typography.NumeralAlignment="Tabular"
+                       AutomationProperties.Name="Time" />
 
             <!-- Expanded content placeholder: widgets arrive in P04. -->
             <Grid x:Name="ExpandedPanel" Grid.Row="1" Margin="18,4,18,16" Visibility="Collapsed">

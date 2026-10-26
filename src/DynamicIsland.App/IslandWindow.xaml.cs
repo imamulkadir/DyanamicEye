@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -36,6 +37,7 @@ public sealed partial class IslandWindow : Window, IDisposable
     private readonly LifecycleCoordinator _lifecycle;
     private readonly IslandPlacementController _placement;
     private readonly Debouncer _displayChanges;
+    private double _scale = 1;
     private IntPtr _handle;
     private IntPtr _previousForeground;
 
@@ -79,6 +81,7 @@ public sealed partial class IslandWindow : Window, IDisposable
 
         _settings.Changed += (_, _) => Dispatcher.BeginInvoke(() =>
         {
+            ApplyTheme();
             Reposition();
             ApplyState(_state.State, _state.State, animate: false);
         });
@@ -101,6 +104,12 @@ public sealed partial class IslandWindow : Window, IDisposable
 
     /// <summary>The notch visuals (the clock writes its text here).</summary>
     public NotchView NotchView => Notch;
+
+    /// <summary>
+    /// The island's size factor in use: the user's size, reduced when the island would not fit this monitor
+    /// (<see cref="IslandLayout.SafeScale"/>, ADR 0026).
+    /// </summary>
+    public double EffectiveScale => _scale;
 
     /// <summary>Last placement, for diagnostics and tests.</summary>
     public PlacementResult? LastPlacement => _placement.Current;
@@ -134,6 +143,9 @@ public sealed partial class IslandWindow : Window, IDisposable
         }
 
         var appearance = _settings.Current.Appearance;
+        var monitor = update.Result.Monitor;
+        var dpi = monitor.DpiScale > 0 ? monitor.DpiScale : 1;
+        _scale = IslandLayout.SafeScale(appearance.Scale, monitor.WorkArea.Width / dpi, monitor.WorkArea.Height / dpi);
         Opacity = appearance.Opacity;
         Notch.HorizontalAlignment = appearance.Placement switch
         {
@@ -168,7 +180,7 @@ public sealed partial class IslandWindow : Window, IDisposable
             Reposition();
         }
 
-        var scale = _settings.Current.Appearance.Scale;
+        var scale = _scale;
         var (width, height) = (size.Value.Width * scale, size.Value.Height * scale);
         var expanded = current is IslandState.Expanded or IslandState.Pinned;
 
@@ -205,7 +217,7 @@ public sealed partial class IslandWindow : Window, IDisposable
             return;
         }
 
-        var scale = _settings.Current.Appearance.Scale;
+        var scale = _scale;
         var height = ExpandedHeight(IslandLayout.Expanded.Width * scale, scale);
         if (Math.Abs(height - Notch.Height) >= 1)
         {
@@ -255,6 +267,7 @@ public sealed partial class IslandWindow : Window, IDisposable
         HwndSource.FromHwnd(_handle)?.AddHook(WndProc);
         SystemEvents.DisplaySettingsChanged += OnSystemDisplaySettingsChanged;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        ApplyTheme();
         Reposition();
         ApplyState(_state.State, _state.State, animate: false);
     }
@@ -279,9 +292,18 @@ public sealed partial class IslandWindow : Window, IDisposable
         {
             _displayChanges.Trigger();
         }
+        else if (message == WmSettingChange && lParam != IntPtr.Zero
+            && Marshal.PtrToStringUni(lParam) == WindowsAppTheme.ChangeMessage)
+        {
+            // Windows switched between light and dark app mode ("Use Windows setting" follows it).
+            Dispatcher.BeginInvoke(ApplyTheme);
+        }
 
         return IntPtr.Zero;
     }
+
+    private void ApplyTheme() =>
+        Notch.ApplyTheme(IslandTheme.Resolve(_settings.Current.Appearance.Theme, WindowsAppTheme.AppsUseLightTheme()));
 
     private void OnSystemDisplaySettingsChanged(object? sender, EventArgs e) => _displayChanges.Trigger();
 

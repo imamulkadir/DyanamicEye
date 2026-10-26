@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using DynamicIsland.Core.PersonalData;
@@ -10,8 +11,6 @@ namespace DynamicIsland.App;
 /// <summary>Pieces shared by the notes and tasks views (ADR 0023): the add box, item buttons and result messages.</summary>
 internal static class PersonalDataParts
 {
-    public static readonly Brush FieldBackground = Frozen(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF));
-
     /// <summary>
     /// A dark single-line text box with a placeholder drawn behind it; Enter submits, Esc clears. Returns the field to
     /// place in the layout and the text box inside it.
@@ -21,22 +20,19 @@ internal static class PersonalDataParts
         var hint = new TextBlock
         {
             Text = placeholder,
-            Foreground = WidgetView.Secondary,
             FontSize = 13,
             Margin = new Thickness(8, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
             IsHitTestVisible = false,
-        };
+        }.Themed(TextBlock.ForegroundProperty, ThemeResources.TextSecondary);
         var box = new TextBox
         {
             Background = Brushes.Transparent,
-            Foreground = WidgetView.Primary,
-            CaretBrush = WidgetView.Primary,
             BorderThickness = new Thickness(0),
             Padding = new Thickness(4, 4, 4, 4),
             FontSize = 13,
             MaxLength = PersonalDataRules.MaxNoteLength,
-        };
+        }.Themed(Control.ForegroundProperty, ThemeResources.TextPrimary).Themed(TextBoxBase.CaretBrushProperty, ThemeResources.TextPrimary);
         AutomationProperties.SetName(box, placeholder);
         AutomationProperties.SetAutomationId(box, automationId);
         box.TextChanged += (_, _) => hint.Visibility = box.Text.Length == 0 ? Visibility.Visible : Visibility.Hidden;
@@ -55,7 +51,7 @@ internal static class PersonalDataParts
             }
         };
 
-        var field = new Grid { Background = FieldBackground, Margin = new Thickness(0, 0, 0, 4) };
+        var field = new Grid { Margin = new Thickness(0, 0, 0, 4) }.Themed(Panel.BackgroundProperty, ThemeResources.FieldFill);
         field.Children.Add(hint);
         field.Children.Add(box);
         return (field, box);
@@ -90,7 +86,8 @@ internal static class PersonalDataParts
             _ => string.Empty,
         };
 
-    public static TextBlock MessageLine() => new() { Foreground = WidgetView.Secondary, FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
+    public static TextBlock MessageLine() => new TextBlock { FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) }
+        .Themed(TextBlock.ForegroundProperty, ThemeResources.TextSecondary);
 
     /// <summary>Inline editor (F2, double-click or Enter on a note): Enter saves (Shift+Enter: new line in notes), Esc or leaving cancels.</summary>
     public static TextBox Editor(string text, bool multiLine, int maxLength, Action<string> save, Action cancel)
@@ -98,16 +95,15 @@ internal static class PersonalDataParts
         var editor = new TextBox
         {
             Text = text,
-            Background = FieldBackground,
-            Foreground = WidgetView.Primary,
-            CaretBrush = WidgetView.Primary,
             BorderThickness = new Thickness(0),
             Padding = new Thickness(4, 2, 4, 2),
             FontSize = 13,
             MaxLength = maxLength,
             AcceptsReturn = false,
             TextWrapping = multiLine ? TextWrapping.Wrap : TextWrapping.NoWrap,
-        };
+        }.Themed(Control.BackgroundProperty, ThemeResources.FieldFill)
+            .Themed(Control.ForegroundProperty, ThemeResources.TextPrimary)
+            .Themed(TextBoxBase.CaretBrushProperty, ThemeResources.TextPrimary);
         AutomationProperties.SetName(editor, "Edit");
         var done = false;
         editor.PreviewKeyDown += (_, e) =>
@@ -146,12 +142,5 @@ internal static class PersonalDataParts
             editor.SelectAll();
         };
         return editor;
-    }
-
-    private static SolidColorBrush Frozen(Color color)
-    {
-        var brush = new SolidColorBrush(color);
-        brush.Freeze();
-        return brush;
     }
 }

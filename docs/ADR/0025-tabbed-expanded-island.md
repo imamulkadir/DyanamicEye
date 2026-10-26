@@ -24,6 +24,9 @@
    disappears (turned off or no content), the pick is forgotten and the first tab is shown. Session only (not saved).
 4. **Work only for the visible tab:** `WidgetRegistry.SetExpanded(visibleWidgetId)` tells only the selected widget that
    its expanded view is on screen, so the system stats widget samples only while its tab is shown (ADR 0021).
+   Because a tab exists only for a widget with content, the stats widget publishes a placeholder without readings
+   (up time only, from the tick count) when it starts; without it the stats tab never appeared (owner report,
+   2026-10-26).
 5. **Clock:** the notch's top-row time is hidden only while the clock tab is shown (ADR 0016/0019 "never twice").
 6. Views stay persistent (ADR 0022): switching tabs re-parents one element; focus inside a widget survives updates.
 

@@ -2,6 +2,41 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-26 (P04-05)
+- 2026-10-26 P04-05 committed by the owner as `6ab223e`; CI run 40313608497 **success**: Release 582/582, Debug 589/589, 0 skipped.
+- 2026-10-26 **P04-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0022**.
+  - **Core:**
+    - New `Audio/AudioContracts.cs` (`IAudioService`, `AudioState`).
+    - `IslandLayout`: `Expanded` = 420×**180 minimum**; `ExpandedMaxHeight` 360; `Max` = 420×360; `ExpandedHeightFor`.
+  - **Platform.Windows:**
+    - New `Audio/CoreAudioInterop.cs`: classic `ComImport` declarations for MMDeviceEnumerator, IMMDevice, IMMNotificationClient, IAudioEndpointVolume and its callback, in exact vtable order.
+    - New `Audio/CoreAudioService.cs`: default render endpoint; endpoint and device callbacks re-bind off the callback thread; every COM failure means no device or not changed.
+  - **Widgets:** new `VolumeWidget` + `VolumeSnapshot`, event-driven, with commands `mute-toggle` and `set:N` (validated 0–100).
+  - **App:**
+    - **Persistent views:** new `WidgetView` base; `ClockView`; `MediaView` and `MetricsView` rewritten as persistent views; new `VolumeView` (mute toggle, slider, %; sends at most every 50 ms; ignores echoes for 400 ms after a user change).
+    - `WidgetPresenter.ViewFactories`/`ViewFor` (per-widget cache) replace `Views`.
+    - `NotchView.ShowWidgets` re-parents only when the visible set or order changes and caches "unavailable" notes; adds `ContentChanged` and `MeasureExpandedHeight` (UpdateLayout, then an unbounded measure).
+    - `IslandWindow` expands to the measured content height (clamped 180–360 × scale) and follows content changes without moving focus.
+  - **Bugs found while testing:**
+    - The first measure returned a stale size; WPF skips re-measuring clean ancestors, so the measure now runs a layout pass first.
+    - Parallel integration test classes hit a WPF XAML-parsing race (`XamlParseException ... 'RowDefinitions'`). New `tests/DynamicIsland.IntegrationTests/AssemblyInfo.cs` runs that assembly as one collection.
+  - **Tests:**
+    - Unit: `Widgets/VolumeWidgetTests.cs` (state/external change, no device, unavailable, commands valid and invalid, mute, height clamp).
+    - Integration: `VolumeAndLayoutTests`:
+      - real Core Audio, read-only (writes the same level back);
+      - the slider sends values and is not overwritten while adjusting, through the same element instance;
+      - no device;
+      - the height grows with the widget count.
+    - Media, metrics and clock presenter tests adapted to `ViewFor`.
+    - The expanded smoke test now checks the width plus a 180–360 height range.
+    - Visual references notch-expanded/pinned **regenerated** at the 180 px minimum.
+    - A 4-widget rendering was checked by eye (measured 284 px).
+    - Real Release app: widget-volume Healthy; exit 0.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (VO1–VO5), `src/DynamicIsland.App/{AppHost.cs, IslandWindow.xaml.cs, MediaView.cs, MetricsView.cs, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, MediaWidgetIntegrationTests.cs, MetricsIntegrationTests.cs, References/notch-expanded.png, References/notch-pinned.png}`, `tests/DynamicIsland.WindowsSmokeTests/IslandInteractionSmokeTests.cs`
+    - new: `docs/ADR/0022-volume-widget-and-content-sized-island.md`, `src/DynamicIsland.App/{ClockView.cs, VolumeView.cs, WidgetView.cs}`, `src/DynamicIsland.Core/Audio/AudioContracts.cs`, `src/DynamicIsland.Platform.Windows/Audio/{CoreAudioInterop.cs, CoreAudioService.cs}`, `src/DynamicIsland.Widgets/VolumeWidget.cs`, `tests/DynamicIsland.IntegrationTests/{AssemblyInfo.cs, VolumeAndLayoutTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/VolumeWidgetTests.cs`
+    - Suggested commit message: `feat(widgets): volume widget, persistent widget views and content-sized island (P04-05, ADR 0022)`
+
 ## Archived 2026-10-26 (P04-04, P04-03 commit line)
 - 2026-10-26 P04-04 committed by the owner as `5f13f25`; CI run 40310973120 **success**: Release 562/562, Debug 569/569, 0 skipped.
 - 2026-10-26 **P04-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0021**.

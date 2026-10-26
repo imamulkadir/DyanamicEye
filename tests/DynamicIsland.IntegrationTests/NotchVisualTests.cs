@@ -23,14 +23,22 @@ public sealed class NotchVisualTests : IDisposable
 
     public void Dispose() => _ui.Dispose();
 
-    public static TheoryData<IslandState> States => new([IslandState.Collapsed, IslandState.Peek, IslandState.Expanded, IslandState.Pinned]);
+    public static TheoryData<IslandState, string> States => new()
+    {
+        { IslandState.Collapsed, "Dark" },
+        { IslandState.Peek, "Dark" },
+        { IslandState.Expanded, "Dark" },
+        { IslandState.Pinned, "Dark" },
+        { IslandState.Collapsed, "Light" }, // ADR 0026
+        { IslandState.Pinned, "Light" },
+    };
 
     [Theory]
     [MemberData(nameof(States))]
-    public void Notch_matches_its_reference_rendering(IslandState state)
+    public void Notch_matches_its_reference_rendering(IslandState state, string theme)
     {
-        var name = $"notch-{state.ToString().ToLowerInvariant()}.png";
-        var actual = _ui.Invoke(() => Render(state));
+        var name = $"notch-{state.ToString().ToLowerInvariant()}{(theme == "Dark" ? string.Empty : "-" + theme.ToLowerInvariant())}.png";
+        var actual = _ui.Invoke(() => Render(state, theme == "Light" ? IslandTheme.Light : IslandTheme.Dark));
 
         if (Environment.GetEnvironmentVariable(UpdateVariable) == "1")
         {
@@ -52,14 +60,15 @@ public sealed class NotchVisualTests : IDisposable
         }
     }
 
-    private static RenderTargetBitmap Render(IslandState state)
+    private static RenderTargetBitmap Render(IslandState state, IslandPalette palette)
     {
         var size = IslandLayout.For(state)!.Value;
         var view = new NotchView { Width = size.Width, Height = size.Height };
+        view.ApplyTheme(palette);
         view.ApplyVisualState(state, size.Height, scale: 1.0);
         view.SetClock("2:42 PM"); // Fixed text: the reference must not depend on the time of the run.
 
-        // Black notch on a mid-grey backdrop, so the outline (shoulders, corners) is part of the comparison.
+        // The notch on a mid-grey backdrop, so the outline (shoulders, corners) is part of the comparison.
         var backdrop = new System.Windows.Controls.Border
         {
             Background = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80)),

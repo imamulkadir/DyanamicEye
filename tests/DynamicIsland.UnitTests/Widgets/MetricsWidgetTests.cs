@@ -74,7 +74,9 @@ public sealed class MetricsWidgetTests : IDisposable
         await Task.Delay(700, Ct);
 
         Assert.Equal(0, _widget.Samples);
-        Assert.Null(_widget.Snapshot);
+
+        // Only a placeholder, so the widget gets a tab (ADR 0025): no readings, up time from the tick count.
+        Assert.Equal(new MetricsSnapshot(null, null, null, TimeSpan.FromHours(3)), _widget.Snapshot);
     }
 
     [Fact]

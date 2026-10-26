@@ -11,8 +11,9 @@ public sealed record MetricsSnapshot(double? CpuPercent, MemoryStatus? Memory, B
 
 /// <summary>
 /// CPU, memory, battery and uptime (guide P04-04, ADR 0021). Samples every <see cref="Interval"/> only while the island
-/// is expanded and on screen; otherwise it does nothing. On expanding it shows memory, battery and uptime at once and
-/// CPU after <see cref="BaselineDelay"/>, so CPU is never an average over a long idle gap.
+/// is expanded and its tab is on screen (ADR 0025); otherwise it only shows a placeholder without readings. On showing
+/// it shows memory, battery and uptime at once and CPU after <see cref="BaselineDelay"/>, so CPU is never an average
+/// over a long idle gap.
 /// </summary>
 public sealed class MetricsWidget(ISystemMetricsService metrics, TimeProvider timeProvider) : IWidget, IDisposable
 {
@@ -41,6 +42,14 @@ public sealed class MetricsWidget(ISystemMetricsService metrics, TimeProvider ti
     {
         ArgumentNullException.ThrowIfNull(context);
         context.ReportHealthy();
+
+        // A placeholder without readings, so the widget has a tab (ADR 0025): sampling starts only once that tab is
+        // shown, which needs content first. Up time is a tick count, not a sample.
+        if (Volatile.Read(ref _snapshot) is null)
+        {
+            Volatile.Write(ref _snapshot, new MetricsSnapshot(null, null, null, metrics.GetUptime()));
+            SnapshotChanged?.Invoke(this, EventArgs.Empty);
+        }
 
         while (!cancellationToken.IsCancellationRequested)
         {

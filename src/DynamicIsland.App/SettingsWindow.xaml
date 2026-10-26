@@ -148,6 +148,8 @@
                                     TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding Scale}"
                                     AutomationProperties.Name="Size" AutomationProperties.AutomationId="Settings.Scale" />
                         </DockPanel>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="On a small screen the island is made smaller so it fits; your size comes back on a bigger screen." />
 
                         <Label Content="_Opacity" Target="{Binding ElementName=OpacitySlider}" />
                         <DockPanel>

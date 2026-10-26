@@ -81,7 +81,8 @@ internal sealed class NotesView : WidgetView
         private readonly NotesView _owner;
         private readonly long _id;
         private readonly Button _open;
-        private readonly TextBlock _text = new() { Foreground = Primary, FontSize = 13, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 36 };
+        private readonly TextBlock _text = new TextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 36 }
+            .Themed(TextBlock.ForegroundProperty, ThemeResources.TextPrimary);
         private readonly Button _delete;
         private Note? _note;
         private bool _editing;

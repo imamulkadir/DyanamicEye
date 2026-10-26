@@ -23,7 +23,25 @@ public partial class NotchView : UserControl
     private string? _chosenId; // The user's pick; an automatic pick never sticks.
     private bool _selecting;
 
-    public NotchView() => InitializeComponent();
+    public NotchView()
+    {
+        ThemeResources.Apply(Resources, IslandTheme.Dark);
+        InitializeComponent();
+    }
+
+    /// <summary>The palette in use (ADR 0026).</summary>
+    public IslandPalette Palette { get; private set; } = IslandTheme.Dark;
+
+    /// <summary>Restyles the notch and every widget view in place (they refer to the token brushes by key).</summary>
+    public void ApplyTheme(IslandPalette palette)
+    {
+        ArgumentNullException.ThrowIfNull(palette);
+        if (palette != Palette)
+        {
+            Palette = palette;
+            ThemeResources.Apply(Resources, palette);
+        }
+    }
 
     /// <summary>The interactive notch surface (input, focus, UI Automation).</summary>
     public IslandSurface IslandSurface => Surface;
@@ -242,11 +260,10 @@ public partial class NotchView : UserControl
             note = new TextBlock
             {
                 Text = $"{slot.Label} isn't available right now.",
-                Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(0xB3, 0xF2, 0xF3, 0xF5)),
                 FontSize = 12,
                 Margin = new Thickness(0, 2, 0, 2),
                 TextTrimming = TextTrimming.CharacterEllipsis,
-            };
+            }.Themed(TextBlock.ForegroundProperty, ThemeResources.TextSecondary);
             _notes.Add(slot.Id, note);
         }
 

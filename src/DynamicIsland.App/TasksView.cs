@@ -90,7 +90,8 @@ internal sealed class TasksView : WidgetView
         private readonly TasksView _owner;
         private readonly long _id;
         private readonly CheckBox _check;
-        private readonly TextBlock _text = new() { Foreground = Primary, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis };
+        private readonly TextBlock _text = new TextBlock { FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis }
+            .Themed(TextBlock.ForegroundProperty, ThemeResources.TextPrimary);
         private readonly Button _delete;
         private TaskItem? _task;
         private bool _editing;
@@ -102,7 +103,8 @@ internal sealed class TasksView : WidgetView
             Root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             Root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            _check = new CheckBox { Content = _text, Foreground = Primary, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 2, 0, 2) };
+            _check = new CheckBox { Content = _text, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 2, 0, 2) }
+                .Themed(Control.ForegroundProperty, ThemeResources.TextPrimary);
             _check.Click += (_, _) => owner.Send(PersonalDataWidget.Toggle(id));
             _check.PreviewKeyDown += (_, e) =>
             {

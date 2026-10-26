@@ -140,6 +140,33 @@ public static class IslandLayout
     public static double ExpandedHeightFor(double contentHeight) =>
         double.IsFinite(contentHeight) ? Math.Clamp(Math.Ceiling(contentHeight), Expanded.Height, ExpandedMaxHeight) : Expanded.Height;
 
+    /// <summary>Share of the monitor's work area the largest (expanded) island may cover (ADR 0026).</summary>
+    public const double MaxWorkAreaWidthShare = 0.9;
+    public const double MaxWorkAreaHeightShare = 0.6;
+
+    /// <summary>Never shrink below this, even on a tiny screen: smaller text would not be readable.</summary>
+    public const double MinSafeScale = 0.5;
+
+    /// <summary>
+    /// The user's size, reduced if needed so the largest island fits the monitor's work area (given in DIPs at that
+    /// monitor's DPI). The saved setting is never changed: on a bigger monitor the chosen size comes back.
+    /// </summary>
+    public static double SafeScale(double requested, double workAreaWidthDip, double workAreaHeightDip)
+    {
+        if (!double.IsFinite(requested) || requested <= 0)
+        {
+            requested = 1;
+        }
+
+        if (!double.IsFinite(workAreaWidthDip) || !double.IsFinite(workAreaHeightDip) || workAreaWidthDip <= 0 || workAreaHeightDip <= 0)
+        {
+            return requested;
+        }
+
+        var fit = Math.Min(workAreaWidthDip * MaxWorkAreaWidthShare / Max.Width, workAreaHeightDip * MaxWorkAreaHeightShare / Max.Height);
+        return Math.Max(Math.Min(requested, fit), Math.Min(requested, MinSafeScale));
+    }
+
     /// <returns><c>null</c> for states in which the window is hidden.</returns>
     public static (double Width, double Height)? For(IslandState state) => state switch
     {

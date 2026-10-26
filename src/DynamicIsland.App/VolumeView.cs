@@ -23,8 +23,10 @@ internal sealed class VolumeView : WidgetView
     private readonly Grid _grid = new() { Margin = new Thickness(0, 6, 0, 2) };
     private readonly ToggleButton _mute;
     private readonly Slider _slider;
-    private readonly TextBlock _percent = new() { Foreground = Primary, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, MinWidth = 38, TextAlignment = TextAlignment.Right };
-    private readonly TextBlock _noDevice = new() { Text = "No audio output", Foreground = Secondary, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+    private readonly TextBlock _percent = new TextBlock { FontSize = 13, VerticalAlignment = VerticalAlignment.Center, MinWidth = 38, TextAlignment = TextAlignment.Right }
+        .Themed(TextBlock.ForegroundProperty, ThemeResources.TextPrimary);
+    private readonly TextBlock _noDevice = new TextBlock { Text = "No audio output", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed }
+        .Themed(TextBlock.ForegroundProperty, ThemeResources.TextSecondary);
     private readonly DispatcherTimer _sendTimer;
     private bool _applying;
     private int? _pending;

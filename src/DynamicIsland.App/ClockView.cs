@@ -10,15 +10,15 @@ namespace DynamicIsland.App;
 internal sealed class ClockView : WidgetView
 {
     private readonly StackPanel _panel = new() { Margin = new Thickness(0, 2, 0, 6) };
-    private readonly TextBlock _time = new()
+    private readonly TextBlock _time = new TextBlock
     {
-        Foreground = Primary,
         FontSize = 34,
         FontWeight = FontWeights.Light,
         FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI"),
-    };
+    }.Themed(TextBlock.ForegroundProperty, ThemeResources.TextPrimary);
 
-    private readonly TextBlock _date = new() { Foreground = Secondary, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis };
+    private readonly TextBlock _date = new TextBlock { FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis }
+        .Themed(TextBlock.ForegroundProperty, ThemeResources.TextSecondary);
 
     public ClockView()
     {

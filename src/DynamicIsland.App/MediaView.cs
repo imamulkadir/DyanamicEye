@@ -24,19 +24,18 @@ internal sealed class MediaView : WidgetView
     private readonly WidgetPresenter _presenter;
     private readonly Grid _grid = new() { Margin = new Thickness(0, 4, 0, 4) };
     private readonly Border _art;
-    private readonly TextBlock _placeholder = new()
+    private readonly TextBlock _placeholder = new TextBlock
     {
         Text = "",
         FontFamily = new FontFamily(IconFont),
         FontSize = 18,
-        Foreground = Brushes.Gray,
         HorizontalAlignment = HorizontalAlignment.Center,
         VerticalAlignment = VerticalAlignment.Center,
-    };
+    }.Themed(TextBlock.ForegroundProperty, ThemeResources.TextSecondary);
 
     private readonly Image _image = new() { Stretch = Stretch.UniformToFill };
-    private readonly TextBlock _title = Line(14, FontWeights.SemiBold, Primary);
-    private readonly TextBlock _detail = Line(12, FontWeights.Normal, Secondary);
+    private readonly TextBlock _title = Line(14, FontWeights.SemiBold, ThemeResources.TextPrimary);
+    private readonly TextBlock _detail = Line(12, FontWeights.Normal, ThemeResources.TextSecondary);
     private readonly Button _previous;
     private readonly Button _playPause;
     private readonly Button _next;
@@ -54,10 +53,9 @@ internal sealed class MediaView : WidgetView
             Height = 44,
             CornerRadius = new CornerRadius(8),
             Margin = new Thickness(0, 0, 10, 0),
-            Background = new SolidColorBrush(Color.FromRgb(0x26, 0x26, 0x2B)),
             Clip = new RectangleGeometry(new Rect(0, 0, 44, 44), 8, 8),
             Child = _placeholder,
-        };
+        }.Themed(Border.BackgroundProperty, ThemeResources.Placeholder);
         AutomationProperties.SetName(_art, "Album art");
         _grid.Children.Add(_art);
 
@@ -104,13 +102,12 @@ internal sealed class MediaView : WidgetView
         AutomationProperties.SetName(_grid, $"Now playing: {media.Title}, {media.Artist}");
     }
 
-    private static TextBlock Line(double size, FontWeight weight, Brush brush) => new()
+    private static TextBlock Line(double size, FontWeight weight, string brushKey) => new TextBlock
     {
         FontSize = size,
         FontWeight = weight,
-        Foreground = brush,
         TextTrimming = TextTrimming.CharacterEllipsis,
-    };
+    }.Themed(TextBlock.ForegroundProperty, brushKey);
 
     private static void SetButton(Button button, string glyph, string name, bool enabled)
     {
@@ -155,9 +152,9 @@ internal sealed class MediaView : WidgetView
 
         var template = new ControlTemplate(typeof(ButtonBase)) { VisualTree = chrome };
         var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
-        hover.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)), "Chrome"));
+        hover.Setters.Add(new Setter(Border.BackgroundProperty, new DynamicResourceExtension(ThemeResources.HoverFill), "Chrome"));
         var focus = new Trigger { Property = UIElement.IsKeyboardFocusedProperty, Value = true };
-        focus.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0xF2, 0xF3, 0xF5)), "Chrome"));
+        focus.Setters.Add(new Setter(Border.BorderBrushProperty, new DynamicResourceExtension(ThemeResources.FocusRing), "Chrome"));
         var disabled = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };
         disabled.Setters.Add(new Setter(UIElement.OpacityProperty, 0.35));
         template.Triggers.Add(hover);
@@ -165,7 +162,7 @@ internal sealed class MediaView : WidgetView
         template.Triggers.Add(disabled);
 
         var style = new Style(typeof(ButtonBase));
-        style.Setters.Add(new Setter(Control.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0xF2, 0xF3, 0xF5))));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension(ThemeResources.TextPrimary)));
         style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
         style.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));

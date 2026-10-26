@@ -11,7 +11,7 @@
     <UserControl.Resources>
         <!-- Minimal dark icon button: no default light chrome; visible focus ring for keyboard users. -->
         <Style x:Key="IslandIconToggle" TargetType="ToggleButton">
-            <Setter Property="Foreground" Value="#B3F2F3F5" />
+            <Setter Property="Foreground" Value="{DynamicResource Island.TextSecondary}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -24,14 +24,14 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#26FFFFFF" />
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Island.HoverFill}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter Property="Foreground" Value="#FF3DDC84" />
-                                <Setter TargetName="Chrome" Property="Background" Value="#1F3DDC84" />
+                                <Setter Property="Foreground" Value="{DynamicResource Island.Accent}" />
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Island.AccentFill}" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#FFF2F3F5" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Island.FocusRing}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -40,7 +40,7 @@
         </Style>
     </UserControl.Resources>
     <local:IslandSurface x:Name="Surface"
-                         Fill="Black"
+                         Fill="{DynamicResource Island.Surface}"
                          ShoulderRadius="6"
                          BottomRadius="16"
                          SnapsToDevicePixels="True"
@@ -57,7 +57,7 @@
 
             <!-- Clock (ADR 0016): replaces the earlier decorative sensor housing; always visible at the top of the notch. -->
             <TextBlock x:Name="ClockText"
-                       Foreground="#FFF2F3F5"
+                       Foreground="{DynamicResource Island.TextPrimary}"
                        FontFamily="Segoe UI Variable Text, Segoe UI"
                        FontSize="13"
                        FontWeight="SemiBold"
@@ -87,7 +87,7 @@
                                   ToolTip="Keep the island open"
                                   AutomationProperties.Name="Pin island" />
                     <TextBlock Text="Dynamic Island"
-                               Foreground="#FFF2F3F5" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Island.TextPrimary}" FontSize="14" FontWeight="SemiBold"
                                VerticalAlignment="Center" />
                 </DockPanel>
                 <!-- Tabs in the user's widget order; arrow keys move between them, Ctrl+Tab cycles from anywhere. -->
@@ -98,7 +98,7 @@
                 <Grid Grid.Row="2">
                     <TextBlock x:Name="WidgetPlaceholder"
                                Text="Widgets will appear here."
-                               Foreground="#B3F2F3F5" FontSize="12"
+                               Foreground="{DynamicResource Island.TextSecondary}" FontSize="12"
                                VerticalAlignment="Center" HorizontalAlignment="Center" />
                     <!-- Scrolls only when the content is taller than the expanded maximum (ADR 0022/0023). -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"

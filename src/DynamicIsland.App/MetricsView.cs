@@ -51,17 +51,16 @@ internal sealed class MetricsView : WidgetView
 
     private sealed class Tile
     {
-        private readonly TextBlock _value = new()
+        private readonly TextBlock _value = new TextBlock
         {
             FontSize = 14,
             FontWeight = FontWeights.SemiBold,
-            Foreground = Primary,
             TextTrimming = TextTrimming.CharacterEllipsis,
-        };
+        }.Themed(TextBlock.ForegroundProperty, ThemeResources.TextPrimary);
 
         public Tile(string label)
         {
-            Panel.Children.Add(new TextBlock { Text = label, FontSize = 11, Foreground = Secondary });
+            Panel.Children.Add(new TextBlock { Text = label, FontSize = 11 }.Themed(TextBlock.ForegroundProperty, ThemeResources.TextSecondary));
             Panel.Children.Add(_value);
         }
 

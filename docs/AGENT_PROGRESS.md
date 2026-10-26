@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** G04 gate evidence done locally (100-restart smoke test, update-shaped migration tests) plus a tab-selection race fix; awaiting the owner's commit and CI. Then P05-01. G02/G03/P04 manual rows are still owed by the owner.
-- **Active task status:** G04 evidence **uncommitted** (the owner commits). P04-07 + tabs are committed as `b1165d1`; its CI run 40335768082 **failed** (1 integration test, a tab-selection race), fixed in this change.
+- **Active task:** P05-01 (theme tokens, light/dark island, safe size) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. G04 automated evidence PASS on CI. G02/G03/P04 manual rows are still owed by the owner.
+- **Active task status:** P05-01 **uncommitted** (the owner commits). G04 evidence + tab fix committed as `706daf7`; CI run 40342549483 **success** (624/624, 633/633, 0 skipped).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,11 +23,11 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (G04 evidence + tab race fix; next: owner commit, CI, then P05-01)
+- **Last updated:** 2026-10-26 (P05-01 IMPLEMENTED_AWAITING_VALIDATION; next: owner commit, CI, then P05-02)
 
 ## NEXT ACTION (ONE task only)
-**Owner:** review and commit the G04 evidence + tab-selection fix (file list in RECENT VERIFIED CHANGES), push, and check that CI is green (CI run 40335768082 on `b1165d1` **failed** on the tab race this fixes). Note the new 100-restart smoke test adds about 2–4 minutes to the Debug CI job.
-**Then agent:** if CI is green, record **G04 automated PASS** with the CI run, then start **P05-01** (guide §5 P05: theme tokens/colors, radius/size/opacity/placement, visual hierarchy; min/max safe dimensions). Real-hardware rows MD, SM, VO, NT, BK, TB (and G02/G03) stay owed by the owner.
+**Owner:** review and commit P05-01 and the system-stats tab fix (file lists in RECENT VERIFIED CHANGES), push, and check that CI is green. TH1–TH3 in `docs/TEST_MATRIX.md` are quick manual checks (Light/Dark, follow Windows, 200 % on a laptop).
+**Then agent:** **P05-02** (guide §5 P05: persist reorder/pin/preferences; widget configuration errors recover; update UI without full shell recreation). Start by checking what already persists (widget order/enabled in settings, ADR 0003/0018; pin is session-only) and list only the gaps.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -37,8 +37,8 @@
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
-| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–07 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02/G03 are open) | **G04 automated evidence PASS locally** (2026-10-26; `TEST_MATRIX.md` G04); awaiting CI; hardware rows owed |
-| P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
+| P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
+| P05 — Customization/performance | P05-01…P05-04 | IN_PROGRESS (01 IMPLEMENTED_AWAITING_VALIDATION) | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
@@ -52,6 +52,22 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **Owner report: "system stats widget is checked but not shown" — fixed** (uncommitted, with P05-01).
+  - Cause (from the tabs change, ADR 0025 §4): stats sample only while their tab is shown, but a tab exists only for a widget with content, so the stats widget never got a tab. Only `MetricsWidget` is gated this way.
+  - Fix: `MetricsWidget.RunAsync` publishes a placeholder snapshot on start (no readings; up time from the tick count, not a sample); sampling still starts only when its tab is shown. ADR 0025 §4 amended.
+  - Tests: `MetricsWidgetTests.Collapsed_island_takes_no_samples` now expects the placeholder (0 samples). New integration `ClockWidgetPresenterTests.System_stats_get_a_tab_before_their_tab_was_ever_shown` (real registry, presenter, Win32 metrics): **failed on the old `MetricsWidget`** ("The system stats tab must appear…"), passes with the fix.
+  - Changed files: `src/DynamicIsland.Widgets/MetricsWidget.cs`, `tests/DynamicIsland.UnitTests/Widgets/MetricsWidgetTests.cs`, `tests/DynamicIsland.IntegrationTests/ClockWidgetPresenterTests.cs`, `docs/ADR/0025-tabbed-expanded-island.md`. Suggested commit message (one commit with P05-01 is fine): `fix: system stats tab missing until shown (ADR 0025)`
+- 2026-10-26 **P05-01 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0026**.
+  - Found: the Theme setting (Use Windows setting / Light / Dark) was saved since P03-03 but never applied; colors were literals in XAML and in every widget view. At 200 % size on a small screen the expanded island could be cut off (only the window rectangle was clamped).
+  - **Core:** `Shell/IslandTheme.cs`: `IslandPalette` tokens (surface, primary/secondary text, accent, fills, focus ring, placeholder), `Dark` (identical to the old colors) and `Light` palettes, shape tokens, `Resolve(mode, windowsLight)`, WCAG `ContrastRatio`. `IslandLayout.SafeScale`: the largest island fits 90 % × 60 % of the work area, never below 0.5; the setting itself is untouched.
+  - **Platform.Windows:** `Display/WindowsAppTheme.cs` reads `AppsUseLightTheme` (HKCU); change message "ImmersiveColorSet".
+  - **App:** `ThemeResources.cs` (token keys, `Apply`, `Themed` extension). `NotchView` applies Dark in its constructor and has `ApplyTheme`/`Palette`; XAML uses `DynamicResource`. Clock, media (incl. the shared icon-button style), metrics, volume, tasks, notes and shared parts use resource references instead of literals (`WidgetView.Primary/Secondary` and `PersonalDataParts.FieldBackground` removed). `IslandWindow`: `EffectiveScale` from `SafeScale` on each placement; theme applied on start, on settings change and on `WM_SETTINGCHANGE` "ImmersiveColorSet". Settings › Appearance: hint under Size.
+  - **Tests:** unit `IslandThemeTests` (resolve, contrast ≥ 4.5 text / ≥ 3 accent and focus in both palettes, WCAG reference values, safe-scale cases and bad input); integration `ThemeTests` (switching restyles the notch and an existing widget view in place); `NotchVisualTests` now also renders Light collapsed and pinned (new references, checked by eye); the 4 dark references regenerated **byte-identical**.
+  - **Changed files:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (TH1–TH3), `docs/WORK_LOG.md`, `src/DynamicIsland.App/{ClockView.cs, IslandWindow.xaml.cs, MediaView.cs, MetricsView.cs, NotchView.xaml, NotchView.xaml.cs, NotesView.cs, PersonalDataViews.cs, SettingsWindow.xaml, TasksView.cs, VolumeView.cs, WidgetView.cs}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `tests/DynamicIsland.IntegrationTests/NotchVisualTests.cs`
+    - new: `docs/ADR/0026-theme-tokens-and-safe-size.md`, `src/DynamicIsland.App/ThemeResources.cs`, `src/DynamicIsland.Core/Shell/IslandTheme.cs`, `src/DynamicIsland.Platform.Windows/Display/WindowsAppTheme.cs`, `tests/DynamicIsland.IntegrationTests/ThemeTests.cs`, `tests/DynamicIsland.IntegrationTests/References/{notch-collapsed-light.png, notch-pinned-light.png}`, `tests/DynamicIsland.UnitTests/Shell/IslandThemeTests.cs`
+    - Suggested commit message: `feat: theme tokens, light/dark island and safe size (P05-01, ADR 0026)`
+- 2026-10-26 G04 evidence + tab fix committed by the owner as `706daf7`; CI run 40342549483 **success**: Release 624/624, Debug 633/633, 0 skipped (includes the 100-restart smoke test). **G04 automated PASS.**
 - 2026-10-26 **G04 gate evidence + tab-selection fix** (uncommitted; the owner commits).
   - **Tab race (CI run 40335768082 failure):** `ClockWidgetPresenterTests` failed on CI with "Sequence contains no elements": another widget published before the clock, became the automatic selection and kept it, so the clock view was not shown. Product bug too: the island could open on whichever widget loaded first. Fix in `NotchView`: only a tab the **user** picks (click, arrows, Ctrl+Tab, `SelectWidget`) sticks; otherwise the first tab in the user's order is shown; a pick is forgotten when its widget disappears. ADR 0025 §3 amended. New test `Until_the_user_picks_a_tab_the_first_tab_in_order_is_shown` (fails on the old code: the automatic pick stayed on "system").
   - **100 restarts:** new `tests/DynamicIsland.WindowsSmokeTests/RestartSmokeTests.cs` (Debug only, isolated data folder): seeds settings (consents answered, so no first-run window) and notes/tasks, then starts and closes the real app 100 times. Each run: exit 0, notes/tasks unchanged, `settings.json` byte-identical, no `*corrupt*` or temp files. Afterwards the logs must show no Failed widget, no Error/Critical entry and no `PreviousSessionUnclean`, and the clock widget reported Healthy. 1 m 45 s locally.
@@ -146,39 +162,6 @@
     - modified: `Directory.Packages.props`, `THIRD_PARTY_NOTICES.md`, `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (NT1–NT6), `docs/WORK_LOG.md` (older entries archived), `src/DynamicIsland.App/{AppHost.cs, IslandWindow.xaml.cs, MediaView.cs, NotchView.xaml, WidgetPresenter.cs, packages.lock.json}`, `src/DynamicIsland.Infrastructure/{DynamicIsland.Infrastructure.csproj, packages.lock.json}`, `src/DynamicIsland.Launcher/packages.lock.json`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, packages.lock.json}`, `tests/DynamicIsland.UnitTests/packages.lock.json`, `tests/DynamicIsland.WindowsSmokeTests/packages.lock.json`
     - new: `docs/ADR/0023-notes-and-tasks-storage.md`, `src/DynamicIsland.App/{NotesView.cs, PersonalDataViews.cs, TasksView.cs}`, `src/DynamicIsland.Core/PersonalData/PersonalData.cs`, `src/DynamicIsland.Infrastructure/PersonalData/SqlitePersonalDataStore.cs`, `src/DynamicIsland.Widgets/NotesAndTasksWidgets.cs`, `tests/DynamicIsland.IntegrationTests/NotesAndTasksViewTests.cs`, `tests/DynamicIsland.UnitTests/PersonalData/SqlitePersonalDataStoreTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/NotesAndTasksWidgetTests.cs`
     - Suggested commit message: `feat(widgets): SQLite notes and tasks with transactional store (P04-06, ADR 0023)`
-- 2026-10-26 P04-05 committed by the owner as `6ab223e`; CI run 40313608497 **success**: Release 582/582, Debug 589/589, 0 skipped.
-- 2026-10-26 **P04-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0022**.
-  - **Core:**
-    - New `Audio/AudioContracts.cs` (`IAudioService`, `AudioState`).
-    - `IslandLayout`: `Expanded` = 420×**180 minimum**; `ExpandedMaxHeight` 360; `Max` = 420×360; `ExpandedHeightFor`.
-  - **Platform.Windows:**
-    - New `Audio/CoreAudioInterop.cs`: classic `ComImport` declarations for MMDeviceEnumerator, IMMDevice, IMMNotificationClient, IAudioEndpointVolume and its callback, in exact vtable order.
-    - New `Audio/CoreAudioService.cs`: default render endpoint; endpoint and device callbacks re-bind off the callback thread; every COM failure means no device or not changed.
-  - **Widgets:** new `VolumeWidget` + `VolumeSnapshot`, event-driven, with commands `mute-toggle` and `set:N` (validated 0–100).
-  - **App:**
-    - **Persistent views:** new `WidgetView` base; `ClockView`; `MediaView` and `MetricsView` rewritten as persistent views; new `VolumeView` (mute toggle, slider, %; sends at most every 50 ms; ignores echoes for 400 ms after a user change).
-    - `WidgetPresenter.ViewFactories`/`ViewFor` (per-widget cache) replace `Views`.
-    - `NotchView.ShowWidgets` re-parents only when the visible set or order changes and caches "unavailable" notes; adds `ContentChanged` and `MeasureExpandedHeight` (UpdateLayout, then an unbounded measure).
-    - `IslandWindow` expands to the measured content height (clamped 180–360 × scale) and follows content changes without moving focus.
-  - **Bugs found while testing:**
-    - The first measure returned a stale size; WPF skips re-measuring clean ancestors, so the measure now runs a layout pass first.
-    - Parallel integration test classes hit a WPF XAML-parsing race (`XamlParseException ... 'RowDefinitions'`). New `tests/DynamicIsland.IntegrationTests/AssemblyInfo.cs` runs that assembly as one collection.
-  - **Tests:**
-    - Unit: `Widgets/VolumeWidgetTests.cs` (state/external change, no device, unavailable, commands valid and invalid, mute, height clamp).
-    - Integration: `VolumeAndLayoutTests`:
-      - real Core Audio, read-only (writes the same level back);
-      - the slider sends values and is not overwritten while adjusting, through the same element instance;
-      - no device;
-      - the height grows with the widget count.
-    - Media, metrics and clock presenter tests adapted to `ViewFor`.
-    - The expanded smoke test now checks the width plus a 180–360 height range.
-    - Visual references notch-expanded/pinned **regenerated** at the 180 px minimum.
-    - A 4-widget rendering was checked by eye (measured 284 px).
-    - Real Release app: widget-volume Healthy; exit 0.
-  - **Changed files for the owner:**
-    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (VO1–VO5), `src/DynamicIsland.App/{AppHost.cs, IslandWindow.xaml.cs, MediaView.cs, MetricsView.cs, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, MediaWidgetIntegrationTests.cs, MetricsIntegrationTests.cs, References/notch-expanded.png, References/notch-pinned.png}`, `tests/DynamicIsland.WindowsSmokeTests/IslandInteractionSmokeTests.cs`
-    - new: `docs/ADR/0022-volume-widget-and-content-sized-island.md`, `src/DynamicIsland.App/{ClockView.cs, VolumeView.cs, WidgetView.cs}`, `src/DynamicIsland.Core/Audio/AudioContracts.cs`, `src/DynamicIsland.Platform.Windows/Audio/{CoreAudioInterop.cs, CoreAudioService.cs}`, `src/DynamicIsland.Widgets/VolumeWidget.cs`, `tests/DynamicIsland.IntegrationTests/{AssemblyInfo.cs, VolumeAndLayoutTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/VolumeWidgetTests.cs`
-    - Suggested commit message: `feat(widgets): volume widget, persistent widget views and content-sized island (P04-05, ADR 0022)`
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -187,6 +170,9 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | stats tab fix | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 648/648 ×2, Debug 657/657 ×2, **0 skipped** (P05-01 + stats fix together) |
+| 2026-10-26 | P05-01 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2; after the Settings hint, rebuild and Release ×1 + Debug ×1 | PASS | Release 647/647 ×3, Debug 656/656 ×3, **0 skipped** |
+| 2026-10-26 | G04 + tab fix | GitHub Actions `windows-2025` (`706daf7`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40342549483; 624/624 and 633/633, 0 skipped |
 | 2026-10-26 | G04 + tab fix | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 624/624 ×2, Debug 633/633 ×2, **0 skipped** (Debug includes the 100-restart smoke test) |
 | 2026-10-26 | G04 | same | `RestartSmokeTests` alone, Debug | PASS | 100 restarts in 1 m 45 s |
 | 2026-10-26 | P04-07 + tabs | GitHub Actions `windows-2025` (`b1165d1`) | CI workflow | **FAIL** | https://github.com/imamulkadir/DyanamicEye/actions/runs/40335768082: `ClockWidgetPresenterTests` (tab-selection race); fixed above |

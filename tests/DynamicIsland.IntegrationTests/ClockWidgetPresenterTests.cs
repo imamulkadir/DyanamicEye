@@ -55,6 +55,25 @@ public sealed class ClockWidgetPresenterTests : IDisposable
         Assert.DoesNotContain(registry.Slots, s => s.Id == WidgetIds.Clock);
     }
 
+    [Fact]
+    public async Task System_stats_get_a_tab_before_their_tab_was_ever_shown()
+    {
+        // Regression: stats sample only while their tab is shown, and a tab needed content first, so it never appeared.
+        using var host = new ComponentHost(_lifecycle, new InMemoryNotificationService(TimeProvider.System), new DefaultFailureClassifier(), LaunchArguments.Default, TimeProvider.System);
+        using var registry = new WidgetRegistry(host, BuiltInWidgets.Create(_settings, TimeProvider.System, new NoMedia(), new Platform.Windows.Metrics.Win32SystemMetrics(), new Platform.Windows.Audio.CoreAudioService(), new Infrastructure.PersonalData.SqlitePersonalDataStore(Path.Combine(Path.GetTempPath(), "DynamicIsland.IntegrationTests", Guid.NewGuid().ToString("N")), TimeProvider.System, NullLogger<Infrastructure.PersonalData.SqlitePersonalDataStore>.Instance)));
+        var view = _ui.Invoke(() => new NotchView());
+        using var presenter = new WidgetPresenter(registry, view, _settings, new States(), _lifecycle, NullLogger<WidgetPresenter>.Instance);
+
+        registry.Register(_settings.Current.Widgets);
+        host.StartAll();
+        _ui.Invoke(presenter.Start);
+
+        Assert.True(
+            await WaitAsync(() => _ui.Invoke(() => ((System.Windows.Controls.Panel)view.FindName("TabStrip")).Children.OfType<System.Windows.FrameworkElement>()
+                .Any(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "Tab." + WidgetIds.SystemStats))),
+            "The system stats tab must appear without being shown first.");
+    }
+
     private static async Task<bool> WaitAsync(Func<bool> condition)
     {
         var stopwatch = Stopwatch.StartNew();

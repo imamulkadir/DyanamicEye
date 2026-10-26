@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** next is P04-04 (metrics widget). P04-03 (media widget; ADR 0020, which includes the TFM change to `net10.0-windows10.0.19041.0`) is IMPLEMENTED_AWAITING_VALIDATION. G02/G03 manual rows are still owed by the owner.
-- **Active task status:** P04-03 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-02 is committed as `abd5693`, and CI 40303146979 is green with 0 skipped.
+- **Active task:** next is P04-05 (volume/mute widget). P04-04 (system metrics widget; ADR 0021) is IMPLEMENTED_AWAITING_VALIDATION. G02/G03 manual rows are still owed by the owner.
+- **Active task status:** P04-04 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26), **uncommitted** (the owner commits). P04-03 is committed as `179cef8`, and CI 40309259229 is green with 0 skipped (the WinRT targeting pack restored fine in locked mode).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,17 +23,15 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P04-03 IMPLEMENTED_AWAITING_VALIDATION; next P04-04)
+- **Last updated:** 2026-10-26 (P04-04 IMPLEMENTED_AWAITING_VALIDATION; next P04-05)
 
 ## NEXT ACTION (ONE task only)
-**Owner first:** review and commit the P04-03 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green.
-- CI must restore the new Windows SDK targeting pack (`Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57) in locked mode. If CI fails at restore, read the log first.
-- Manual MD1–MD5 with a real player are the most valuable checks.
-
-**Then agent: P04-04** (guide §5): the metrics widget (CPU, RAM, battery, uptime).
-- Use efficient APIs: `GetSystemTimes`, `GlobalMemoryStatusEx`, `GetSystemPowerStatus` and `Environment.TickCount64` behind a Core `ISystemMetricsService` (guide §3).
-- Handle no battery, sleep/resume (counter reset) and permission errors.
-- Adaptive cadence: about 2 s while the island is expanded, slower or paused while collapsed; nothing while inactive (`SetActive`).
+**Owner first:** review and commit the P04-04 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green.
+**Then agent: P04-05** (guide §5): the volume/mute widget.
+- Use the master volume of the default output device via Core Audio (`IMMDeviceEnumerator` and `IAudioEndpointVolume` with a callback; COM interop in Platform.Windows) behind a Core `IAudioService` (guide §3).
+- Handle default device changes (`IMMNotificationClient`), a missing output device, and changes made outside the app. No per-app volume.
+- The view needs a slider and a mute button, keyboard accessible. It is event-driven: no polling.
+- Expanded height is 252 now; adding a row needs space. Consider placing volume next to the media buttons, or start content-sized expansion (P05-01 territory: ask or record an ADR).
 - Write an ADR first.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
@@ -44,7 +42,7 @@
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
-| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–03 IMPLEMENTED_AWAITING_VALIDATION; 04 next; started with owner approval while G02/G03 are open) | G04 pending |
+| P04 — Core widgets/data | P04-01…P04-07 | IN_PROGRESS (01–04 IMPLEMENTED_AWAITING_VALIDATION; 05 next; started with owner approval while G02/G03 are open) | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
@@ -59,6 +57,29 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **P04-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0021**.
+  - **Core:**
+    - New `Metrics/SystemMetrics.cs`: `ISystemMetricsService`, `CpuTimes`, `MemoryStatus`, `BatteryStatus`, plus the pure helpers `CpuUsage.Between` and `MetricsFormat`.
+    - `IWidget.SetExpanded` (default no-op); `WidgetRegistry.SetExpanded`.
+    - `IslandLayout.Expanded` → 420×**252**.
+  - **Platform.Windows:** new `Metrics/Win32SystemMetrics.cs` (`GetSystemTimes`, `GlobalMemoryStatusEx`, `GetSystemPowerStatus` with no-battery/unknown handling, `Environment.TickCount64`); `NativeMethods` imports.
+  - **Widgets:** new `MetricsWidget` + `MetricsSnapshot`.
+    - Samples every 2 s **only while expanded and on screen**; none while collapsed, hidden or paused.
+    - On expanding it takes a baseline and shows CPU after 0.5 s ("—" before that).
+    - Resume resets the baseline; failed readings leave that value out.
+    - `BuiltInWidgets.Create(..., metrics)`.
+  - **App:**
+    - New `MetricsView` (tiles: CPU, memory used/total GB, battery with ⚡ only when a battery exists, up time; UIA names).
+    - Presenter forwards `SetExpanded` from the island state and registers the view; `AppHost` wiring.
+  - **Tests:**
+    - Unit: `Widgets/MetricsWidgetTests.cs` (math and format: 9 cases; cadence: 5).
+    - Integration: `MetricsIntegrationTests` (real Win32 readings are plausible; tiles with and without a battery).
+    - Visual references notch-expanded/pinned **regenerated** at 252 px; a 3-widget rendering was checked by eye.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (SM1–SM4), `docs/WORK_LOG.md` (older entries archived), `src/DynamicIsland.App/{AppHost.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Platform.Windows/NativeMethods.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, References/notch-expanded.png, References/notch-pinned.png}`
+    - new: `docs/ADR/0021-metrics-widget.md`, `src/DynamicIsland.App/MetricsView.cs`, `src/DynamicIsland.Core/Metrics/SystemMetrics.cs`, `src/DynamicIsland.Platform.Windows/Metrics/Win32SystemMetrics.cs`, `src/DynamicIsland.Widgets/MetricsWidget.cs`, `tests/DynamicIsland.IntegrationTests/MetricsIntegrationTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/MetricsWidgetTests.cs`
+    - Suggested commit message: `feat(widgets): system metrics widget sampling only while expanded (P04-04, ADR 0021)`
+- 2026-10-26 P04-03 committed by the owner as `179cef8`; CI run 40309259229 **success**: Release 545/545, Debug 552/552, 0 skipped.
 - 2026-10-26 **Owner-requested real-player check (P04-03)** with `D:\Music\Music\Avenged Sevenfold - Bat Country ... (320 KBps).mp3` in Media Player (Microsoft.ZuneMusic). Temporary probes using the app's real adapter and view, deleted afterwards.
   - **Bug 1 fixed: album art was missing.** Media Player hands out a **768×768 32-bit BMP of 2,359,446 bytes**; the 2 MB cap skipped it, and the placeholder showed. `MediaWidget.MaxArtBytes` is now 12 MB. Rendered by eye after the fix: the art shows.
   - **Bug 2 fixed: a blank artist line.** The file has no artist tag, which left an empty second line. The view now leaves the line out and wraps the title to 2 lines.
@@ -125,56 +146,6 @@
     - new: `docs/ADR/0019-clock-widget.md`, `src/DynamicIsland.Widgets/ClockWidget.cs`, `tests/DynamicIsland.IntegrationTests/ClockWidgetPresenterTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/ClockWidgetTests.cs`
     - Suggested commit message: `feat(widgets): clock and date widget drives notch and expanded view (P04-02, ADR 0019)`
 - 2026-10-26 P04-01 committed by the owner as `294a8f0`; CI run 40301030072 **success**: Release 533/533, Debug 540/540, 0 skipped.
-- 2026-10-26 **Owner approval:** after P03-05 was pushed, the reply "pushed, continue" (to the question "run G02/G03 or approve continuing to P04") is recorded as **approval to start P04 while G02/G03 stay open**.
-- 2026-10-26 **P04-01 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0018**.
-  - **Core:**
-    - `Components/ComponentHost`: per-component enable/disable.
-      - `Add(..., enabled)`, `SetEnabledAsync` (bounded stop, then status Stopped/"disabled"), `StatusOf`.
-      - Pause/resume and enable/disable are serialized; Resume never starts disabled components.
-      - Every non-skipped component is registered for shutdown once.
-    - `ComponentBoundary.IsRunning/MarkDisabled`.
-    - New `Widgets/WidgetRegistry.cs`:
-      - `IWidget` (an `IIsolatedComponent` with `Id`, `Snapshot`, `SnapshotChanged`, `Release`) and `WidgetSlot`.
-      - `WidgetRegistry` registers widgets with the saved enabled flags; `ApplyAsync` handles enable, disable plus `Release` (3 s stop bound) and reorder; ordered `Slots`; `Changed`; optional retry policy.
-  - **Widgets:** new `BuiltInWidgets.Create`, the compiled-in catalog. It is empty in P04-01; P04-02…06 add their modules.
-  - **App:**
-    - `NotchView.ShowWidgets`: slots in order; a failed widget shows "<name> isn't available right now."; widgets without content take no space; the hint stays when nothing is shown; AutomationId `Widget.<id>`.
-    - New `WidgetPresenter`: applies settings changes off the UI thread and coalesces redraws on the UI thread; per-widget views in `Views`.
-    - `AppLog` 1058 WidgetChangeIncomplete.
-    - `AppHost`/`App.xaml.cs` wiring: register before `StartAll`, presenter after.
-  - **Tests:**
-    - Unit: `Widgets/WidgetRegistryTests.cs` (8). Covers: order and unknown ids; disabled never starts; disable cancels the work, releases content and restarts on enable; reorder without restart; failure isolation with an "unavailable" slot; pause/resume with enable while paused; Safe Mode; id/name validation.
-    - Integration: `WidgetPanelTests.cs` (2).
-  - **No visible change yet:** there are no widget modules until P04-02.
-  - **Changed files for the owner:**
-    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, NotchView.xaml, NotchView.xaml.cs}`, `src/DynamicIsland.Core/Components/{ComponentBoundary.cs, ComponentHost.cs}`
-    - new: `docs/ADR/0018-widget-registry.md`, `src/DynamicIsland.App/WidgetPresenter.cs`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/WidgetPanelTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/WidgetRegistryTests.cs`
-    - Suggested commit message: `feat(widgets): widget registry and lifecycle with enable/disable (P04-01, ADR 0018)`
-- 2026-10-26 P03-05 committed by the owner as `2dc4315`; CI run 40299277622 **success**: Release 523/523, Debug 530/530, 0 skipped.
-- 2026-10-26 **P03-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0017**.
-  - **Core:**
-    - New `Shell/Hotkey.cs`: `Hotkey.TryParse`/`ToString`/`VirtualKey` (keys A–Z, 0–9, F1–F24, Space; **at least 2 modifiers**; canonical text "Ctrl+Alt+Shift+Win+Key"; `HotkeyModifiers` = Win32 MOD_* values).
-    - `ShortcutAction.For/Opens`: Hidden → Show+Click; Paused → Resume+Click; Collapsed/Peek → Click; Expanded/Pinned → Escape; fullscreen → nothing.
-    - `BehaviorSettings.Shortcut` (`ShortcutSettings`: `Enabled` false, `Keys` "Ctrl+Alt+I"). Additive, no schema bump. `BehaviorSettings` equality includes it.
-    - `SettingsValidator` canonicalizes the keys or falls back to the default keys.
-    - `SettingsEditor`: `ShortcutEnabled`/`ShortcutText`/`ShortcutError` (merged per field, reset with Behavior).
-  - **Platform.Windows:**
-    - New `Input/Win32Hotkey.cs`: `RegisterHotKey` with MOD_NOREPEAT; `Registered`/`InUse` (error 1409)/`Failed`.
-    - `NativeMethods` Register/UnregisterHotKey; `IslandWindowInterop.FindMessageWindow` and `Post`.
-  - **App:**
-    - New `ShortcutController`: a message-only window, registers only when enabled, re-registers on change, and activates the island before expanding.
-    - `AppLog` 1056/1057, without the key combination.
-    - `AppHost`/`App.xaml.cs` wiring.
-    - `SettingsWindow` Behavior: a check box, a shortcut field with validation, and the registration status (on / in use / failed / off).
-  - **Tests:**
-    - Unit: `Shell/HotkeyTests.cs` (35 cases: parsing, rules, virtual keys, actions end Expanded, validator) and an editor shortcut test.
-    - Integration: `Win32HotkeyTests` (a real registration, a conflict from a second window reported as InUse, release) and a settings window shortcut test.
-    - Smoke (Debug): `ShortcutSmokeTests`. With the shortcut enabled in isolated settings, a second registration from the test is refused (proof that Windows granted it to the app). A posted WM_HOTKEY opens the island ("Dynamic Island, expanded") and the next one closes it. Released on exit.
-  - **Docs:** ADR 0017 (indexed); TEST_MATRIX SC1–SC4.
-  - **Changed files for the owner:**
-    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `docs/WORK_LOG.md` (P03-01/02 entries archived), `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs}`, `src/DynamicIsland.Core/Settings/{AppSettings.cs, SettingsValidator.cs}`, `src/DynamicIsland.Core/Shell/SettingsEditor.cs`, `src/DynamicIsland.Platform.Windows/{Display/IslandWindowInterop.cs, NativeMethods.cs}`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`, `tests/DynamicIsland.UnitTests/Shell/SettingsEditorTests.cs`
-    - new: `docs/ADR/0017-global-shortcut.md`, `src/DynamicIsland.App/ShortcutController.cs`, `src/DynamicIsland.Core/Shell/Hotkey.cs`, `src/DynamicIsland.Platform.Windows/Input/Win32Hotkey.cs`, `tests/DynamicIsland.IntegrationTests/Win32HotkeyTests.cs`, `tests/DynamicIsland.UnitTests/Shell/HotkeyTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/ShortcutSmokeTests.cs`
-    - Suggested commit message: `feat(shortcut): optional global shortcut via RegisterHotKey (P03-05, ADR 0017)`
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -183,6 +154,8 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | P04-04 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2; unit tests alone ×3 | PASS (1 skipped) | Debug 569/569 ×2. Release 562/562 once, and 561 + **1 skipped** once (the fullscreen smoke test: Windows refused the helper window foreground; a skip, not a pass). Unit 469/469 ×3. |
+| 2026-10-26 | P04-03 | GitHub Actions `windows-2025` (`179cef8`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40309259229; 545/545 and 552/552, 0 skipped |
 | 2026-10-26 | P04-03 fixes | Windows 11 Pro 25H2 x64, `CI=true` | Full suite after the art-cap/retry/view fixes, Release ×1 and Debug ×1 | PASS | Release 545/545, Debug 552/552, 0 skipped |
 | 2026-10-26 | P04-03 | real Media Player, owner's mp3 | Probes via `WindowsMediaSessionService` + `MediaView` rendering | FAIL → fixed | Art missing (2.36 MB BMP over the cap) → fixed; Next/Previous work with a queue; transient refusals → retry added |
 | 2026-10-26 | P04-03 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet restore` (new TFM), `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 543/543 ×2, Debug 550/550 ×2, **0 skipped**; the real GSMTC adapter test included |

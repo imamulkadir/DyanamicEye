@@ -127,7 +127,7 @@ public static class IslandLayout
 {
     public static readonly (double Width, double Height) Collapsed = (236, 32);
     public static readonly (double Width, double Height) Peek = (264, 38);
-    public static readonly (double Width, double Height) Expanded = (420, 212); // Room for the clock and media widgets (ADR 0020).
+    public static readonly (double Width, double Height) Expanded = (420, 252); // Room for the clock, media and metrics widgets (ADR 0020, 0021).
 
     /// <summary>The window is always this large; everything outside the visible pill is transparent and click-through.</summary>
     public static (double Width, double Height) Max => Expanded;

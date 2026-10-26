@@ -35,6 +35,14 @@ public interface IWidget : IIsolatedComponent
     {
     }
 
+    /// <summary>
+    /// True while the island is expanded (or pinned), i.e. while the widget's expanded view is visible. Widgets whose
+    /// values only appear there can sample only then (ADR 0021). Called from any thread.
+    /// </summary>
+    void SetExpanded(bool expanded)
+    {
+    }
+
     /// <summary>Runs a user command from the widget's view (e.g. "next"); <c>false</c> when unsupported or refused.</summary>
     Task<bool> ExecuteAsync(string command, CancellationToken cancellationToken) => Task.FromResult(false);
 }
@@ -192,6 +200,15 @@ public sealed class WidgetRegistry : IDisposable
         foreach (var widget in _widgets.Values)
         {
             widget.SetActive(active);
+        }
+    }
+
+    /// <summary>Forwards whether the expanded panel is visible to every widget.</summary>
+    public void SetExpanded(bool expanded)
+    {
+        foreach (var widget in _widgets.Values)
+        {
+            widget.SetExpanded(expanded);
         }
     }
 

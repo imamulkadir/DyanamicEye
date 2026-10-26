@@ -50,5 +50,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0018 — Widget registry and lifecycle](0018-widget-registry.md) — Accepted (P04-01)
 - [0019 — Clock and date widget](0019-clock-widget.md) — Accepted (P04-02)
 - [0020 — Media widget and WinRT access](0020-media-widget.md) — Accepted (P04-03)
+- [0021 — System metrics widget](0021-metrics-widget.md) — Accepted (P04-04)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

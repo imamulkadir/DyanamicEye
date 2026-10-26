@@ -1,4 +1,5 @@
 using DynamicIsland.Core.Media;
+using DynamicIsland.Core.Metrics;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Widgets;
 
@@ -10,11 +11,12 @@ namespace DynamicIsland.Widgets;
 /// </summary>
 public static class BuiltInWidgets
 {
-    public static IReadOnlyList<IWidget> Create(ISettingsService settings, TimeProvider timeProvider, IMediaSessionService media)
+    public static IReadOnlyList<IWidget> Create(ISettingsService settings, TimeProvider timeProvider, IMediaSessionService media, ISystemMetricsService metrics)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(media);
-        return [new ClockWidget(settings, timeProvider), new MediaWidget(media)];
+        ArgumentNullException.ThrowIfNull(metrics);
+        return [new ClockWidget(settings, timeProvider), new MediaWidget(media), new MetricsWidget(metrics, timeProvider)];
     }
 }

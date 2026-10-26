@@ -54,6 +54,7 @@ public sealed class WidgetPresenter : IDisposable
     {
         [WidgetIds.Clock] = (slot, _) => slot.Snapshot is ClockSnapshot clock ? ClockView(clock) : null,
         [WidgetIds.Media] = (slot, presenter) => slot.Snapshot is MediaSnapshot media ? MediaView.Create(media, presenter) : null,
+        [WidgetIds.SystemStats] = (slot, _) => slot.Snapshot is MetricsSnapshot metrics ? MetricsView.Create(metrics) : null,
     };
 
     /// <summary>Decoded album art; decoding happens off the UI thread and triggers a redraw.</summary>
@@ -83,6 +84,7 @@ public sealed class WidgetPresenter : IDisposable
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         _registry.SetActive(IsOnScreen(_state.State));
+        _registry.SetExpanded(IsExpanded(_state.State));
         Render();
     }
 
@@ -127,6 +129,8 @@ public sealed class WidgetPresenter : IDisposable
 
     private static bool IsOnScreen(IslandState state) => IslandLayout.For(state) is not null;
 
+    private static bool IsExpanded(IslandState state) => state is IslandState.Expanded or IslandState.Pinned;
+
     private static SolidColorBrush Frozen(Color color)
     {
         var brush = new SolidColorBrush(color);
@@ -152,6 +156,11 @@ public sealed class WidgetPresenter : IDisposable
         if (IsOnScreen(e.Current) != IsOnScreen(e.Previous))
         {
             _registry.SetActive(IsOnScreen(e.Current));
+        }
+
+        if (IsExpanded(e.Current) != IsExpanded(e.Previous))
+        {
+            _registry.SetExpanded(IsExpanded(e.Current));
         }
     }
 

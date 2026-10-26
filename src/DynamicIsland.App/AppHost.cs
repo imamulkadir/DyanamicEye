@@ -69,7 +69,8 @@ public static class AppHost
             BuiltInWidgets.Create(
                 sp.GetRequiredService<ISettingsService>(),
                 sp.GetRequiredService<TimeProvider>(),
-                new Platform.Windows.Media.WindowsMediaSessionService())));
+                new Platform.Windows.Media.WindowsMediaSessionService(),
+                new Platform.Windows.Metrics.Win32SystemMetrics())));
         builder.Services.AddSingleton(sp => new DiagnosticBundleBuilder(
             System.IO.Path.Combine(root, AppDataPaths.LogsFolderName),
             dataDirectory,

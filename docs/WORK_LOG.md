@@ -2,6 +2,60 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-26 (P03-05, P04-01, P04-02)
+
+### Verified changes
+- 2026-10-26 **Owner approval:** after P03-05 was pushed, the reply "pushed, continue" (to the question "run G02/G03 or approve continuing to P04") is recorded as **approval to start P04 while G02/G03 stay open**.
+- 2026-10-26 **P04-01 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0018**.
+  - **Core:**
+    - `Components/ComponentHost`: per-component enable/disable.
+      - `Add(..., enabled)`, `SetEnabledAsync` (bounded stop, then status Stopped/"disabled"), `StatusOf`.
+      - Pause/resume and enable/disable are serialized; Resume never starts disabled components.
+      - Every non-skipped component is registered for shutdown once.
+    - `ComponentBoundary.IsRunning/MarkDisabled`.
+    - New `Widgets/WidgetRegistry.cs`:
+      - `IWidget` (an `IIsolatedComponent` with `Id`, `Snapshot`, `SnapshotChanged`, `Release`) and `WidgetSlot`.
+      - `WidgetRegistry` registers widgets with the saved enabled flags; `ApplyAsync` handles enable, disable plus `Release` (3 s stop bound) and reorder; ordered `Slots`; `Changed`; optional retry policy.
+  - **Widgets:** new `BuiltInWidgets.Create`, the compiled-in catalog. It is empty in P04-01; P04-02…06 add their modules.
+  - **App:**
+    - `NotchView.ShowWidgets`: slots in order; a failed widget shows "<name> isn't available right now."; widgets without content take no space; the hint stays when nothing is shown; AutomationId `Widget.<id>`.
+    - New `WidgetPresenter`: applies settings changes off the UI thread and coalesces redraws on the UI thread; per-widget views in `Views`.
+    - `AppLog` 1058 WidgetChangeIncomplete.
+    - `AppHost`/`App.xaml.cs` wiring: register before `StartAll`, presenter after.
+  - **Tests:**
+    - Unit: `Widgets/WidgetRegistryTests.cs` (8). Covers: order and unknown ids; disabled never starts; disable cancels the work, releases content and restarts on enable; reorder without restart; failure isolation with an "unavailable" slot; pause/resume with enable while paused; Safe Mode; id/name validation.
+    - Integration: `WidgetPanelTests.cs` (2).
+  - **No visible change yet:** there are no widget modules until P04-02.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, NotchView.xaml, NotchView.xaml.cs}`, `src/DynamicIsland.Core/Components/{ComponentBoundary.cs, ComponentHost.cs}`
+    - new: `docs/ADR/0018-widget-registry.md`, `src/DynamicIsland.App/WidgetPresenter.cs`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/WidgetPanelTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/WidgetRegistryTests.cs`
+    - Suggested commit message: `feat(widgets): widget registry and lifecycle with enable/disable (P04-01, ADR 0018)`
+- 2026-10-26 P03-05 committed by the owner as `2dc4315`; CI run 40299277622 **success**: Release 523/523, Debug 530/530, 0 skipped.
+- 2026-10-26 **P03-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0017**.
+  - **Core:**
+    - New `Shell/Hotkey.cs`: `Hotkey.TryParse`/`ToString`/`VirtualKey` (keys A–Z, 0–9, F1–F24, Space; **at least 2 modifiers**; canonical text "Ctrl+Alt+Shift+Win+Key"; `HotkeyModifiers` = Win32 MOD_* values).
+    - `ShortcutAction.For/Opens`: Hidden → Show+Click; Paused → Resume+Click; Collapsed/Peek → Click; Expanded/Pinned → Escape; fullscreen → nothing.
+    - `BehaviorSettings.Shortcut` (`ShortcutSettings`: `Enabled` false, `Keys` "Ctrl+Alt+I"). Additive, no schema bump. `BehaviorSettings` equality includes it.
+    - `SettingsValidator` canonicalizes the keys or falls back to the default keys.
+    - `SettingsEditor`: `ShortcutEnabled`/`ShortcutText`/`ShortcutError` (merged per field, reset with Behavior).
+  - **Platform.Windows:**
+    - New `Input/Win32Hotkey.cs`: `RegisterHotKey` with MOD_NOREPEAT; `Registered`/`InUse` (error 1409)/`Failed`.
+    - `NativeMethods` Register/UnregisterHotKey; `IslandWindowInterop.FindMessageWindow` and `Post`.
+  - **App:**
+    - New `ShortcutController`: a message-only window, registers only when enabled, re-registers on change, and activates the island before expanding.
+    - `AppLog` 1056/1057, without the key combination.
+    - `AppHost`/`App.xaml.cs` wiring.
+    - `SettingsWindow` Behavior: a check box, a shortcut field with validation, and the registration status (on / in use / failed / off).
+  - **Tests:**
+    - Unit: `Shell/HotkeyTests.cs` (35 cases: parsing, rules, virtual keys, actions end Expanded, validator) and an editor shortcut test.
+    - Integration: `Win32HotkeyTests` (a real registration, a conflict from a second window reported as InUse, release) and a settings window shortcut test.
+    - Smoke (Debug): `ShortcutSmokeTests`. With the shortcut enabled in isolated settings, a second registration from the test is refused (proof that Windows granted it to the app). A posted WM_HOTKEY opens the island ("Dynamic Island, expanded") and the next one closes it. Released on exit.
+  - **Docs:** ADR 0017 (indexed); TEST_MATRIX SC1–SC4.
+  - **Changed files for the owner:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `docs/WORK_LOG.md` (P03-01/02 entries archived), `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs}`, `src/DynamicIsland.Core/Settings/{AppSettings.cs, SettingsValidator.cs}`, `src/DynamicIsland.Core/Shell/SettingsEditor.cs`, `src/DynamicIsland.Platform.Windows/{Display/IslandWindowInterop.cs, NativeMethods.cs}`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`, `tests/DynamicIsland.UnitTests/Shell/SettingsEditorTests.cs`
+    - new: `docs/ADR/0017-global-shortcut.md`, `src/DynamicIsland.App/ShortcutController.cs`, `src/DynamicIsland.Core/Shell/Hotkey.cs`, `src/DynamicIsland.Platform.Windows/Input/Win32Hotkey.cs`, `tests/DynamicIsland.IntegrationTests/Win32HotkeyTests.cs`, `tests/DynamicIsland.UnitTests/Shell/HotkeyTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/ShortcutSmokeTests.cs`
+    - Suggested commit message: `feat(shortcut): optional global shortcut via RegisterHotKey (P03-05, ADR 0017)`
+
 ## Archived 2026-10-26 (P03-03, P03-04, notch clock)
 
 ### Verified changes

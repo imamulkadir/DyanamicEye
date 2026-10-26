@@ -33,7 +33,7 @@ public sealed class ClockWidgetPresenterTests : IDisposable
     public async Task Notch_and_expanded_panel_show_the_clock_and_disabling_clears_them()
     {
         using var host = new ComponentHost(_lifecycle, new InMemoryNotificationService(TimeProvider.System), new DefaultFailureClassifier(), LaunchArguments.Default, TimeProvider.System);
-        using var registry = new WidgetRegistry(host, BuiltInWidgets.Create(_settings, TimeProvider.System, new NoMedia()));
+        using var registry = new WidgetRegistry(host, BuiltInWidgets.Create(_settings, TimeProvider.System, new NoMedia(), new Platform.Windows.Metrics.Win32SystemMetrics()));
         var view = _ui.Invoke(() => new NotchView());
         using var presenter = new WidgetPresenter(registry, view, _settings, new States(), _lifecycle, NullLogger<WidgetPresenter>.Instance);
 

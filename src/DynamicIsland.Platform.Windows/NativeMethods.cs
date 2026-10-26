@@ -283,6 +283,31 @@ internal static unsafe partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GetSystemPowerStatus(out SystemPowerStatus status);
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MemoryStatusEx
+    {
+        public uint Length;
+        public uint MemoryLoad;
+        public ulong TotalPhys;
+        public ulong AvailPhys;
+        public ulong TotalPageFile;
+        public ulong AvailPageFile;
+        public ulong TotalVirtual;
+        public ulong AvailVirtual;
+        public ulong AvailExtendedVirtual;
+    }
+
+    [LibraryImport("kernel32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
+
+    /// <summary>FILETIME values read as 100 ns ticks (same unit as <see cref="TimeSpan.Ticks"/>).</summary>
+    [LibraryImport("kernel32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetSystemTimes(out long idleTime, out long kernelTime, out long userTime);
+
     [LibraryImport("user32.dll")]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [return: MarshalAs(UnmanagedType.Bool)]

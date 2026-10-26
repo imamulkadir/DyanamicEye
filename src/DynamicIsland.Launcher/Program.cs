@@ -7,7 +7,8 @@ using DynamicIsland.Infrastructure.Logging;
 namespace DynamicIsland.Launcher;
 
 /// <summary>
-/// Entry point for sign-in startup and shortcuts. Accepts no arguments (anything passed is ignored).
+/// Entry point for sign-in startup, shortcuts and restarts. Accepts only <c>--safe-mode</c> and <c>--after-pid N</c>
+/// (wait for a previous app instance to exit first); anything else is ignored.
 /// Exit code: 0 after a clean app exit; otherwise the app's last exit code, or 1 when the app cannot be started.
 /// </summary>
 internal static class Program
@@ -15,8 +16,11 @@ internal static class Program
     private const string AppExecutableName = "DynamicIsland.exe";
     private const string LogFilePrefix = "launcher-";
 
-    private static int Main()
+    private static readonly TimeSpan PreviousInstanceTimeout = TimeSpan.FromSeconds(15);
+
+    private static int Main(string[] args)
     {
+        var arguments = LauncherArguments.Parse(args);
         var notifier = new MessageBoxRecoveryNotifier(AppDataPaths.Logs);
         using var logs = new FileLoggerProvider(
             new FileLoggerOptions(AppDataPaths.Logs) { FilePrefix = LogFilePrefix },
@@ -39,10 +43,15 @@ internal static class Program
             TimeProvider.System);
 
         LauncherLog.Started(logger);
+        if (arguments.AfterProcessId is { } previous)
+        {
+            WaitForPreviousInstance(previous);
+        }
+
         try
         {
             var exitCode = supervisor
-                .RunAsync(step => LauncherLog.Step(logger, step.Run, step.SafeMode, step.ExitCode, step.Action), CancellationToken.None)
+                .RunAsync(step => LauncherLog.Step(logger, step.Run, step.SafeMode, step.ExitCode, step.Action), CancellationToken.None, arguments.SafeMode)
                 .GetAwaiter()
                 .GetResult();
             LauncherLog.Finished(logger, exitCode);
@@ -54,6 +63,20 @@ internal static class Program
             LauncherLog.StartFailed(logger, ex.NativeErrorCode);
             MessageBoxRecoveryNotifier.NotifyAppMissing();
             return ExitCodes.Fatal;
+        }
+    }
+
+    /// <summary>Restart of an unsupervised app: let the old instance release its single-instance lock first (bounded).</summary>
+    private static void WaitForPreviousInstance(int processId)
+    {
+        try
+        {
+            using var previous = System.Diagnostics.Process.GetProcessById(processId);
+            previous.WaitForExit(PreviousInstanceTimeout);
+        }
+        catch (ArgumentException)
+        {
+            // Already gone.
         }
     }
 }

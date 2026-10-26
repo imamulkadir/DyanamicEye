@@ -76,6 +76,16 @@ Automated coverage (CI + dev host): placement, click-through, UIA expand/pin/col
 | Y5 | Exit from tray | Menu → Exit | The app exits and the icon disappears immediately (no ghost icon on hover) | NOT_RUN |
 | Y6 | Explorer restart | Task Manager → Windows Explorer → Restart | The icon comes back within a few seconds and still works | NOT_RUN (automated simulation PASS) |
 | Y7 | High DPI | Set 150 % or 200 % scaling, restart the app | The tray icon is crisp, not blurry | NOT_RUN |
+| T1 | Pin (P03-02) | Menu → Pin; move the mouse away; menu → Pin again | While pinned the island stays expanded and the item is checked; unpinning lets it collapse. Pin is disabled while the island is hidden | NOT_RUN |
+| T2 | Pause/Resume | Menu → Pause; wait 10 s; menu → Resume | Pause hides the island and the item reads "Resume"; Resume brings it back. Left-clicking the icon while paused also resumes | NOT_RUN (automated PASS) |
+| T3 | Display select (2 monitors) | Connect a second monitor; menu → Display → pick the other display | Items read "Display N (primary)" ordered left to right with the current one checked; the island moves to the chosen display and stays there after a restart | NOT_RUN |
+| T4 | Reset to primary | Drag the island far off (or select the secondary display), then menu → Display → Reset to primary display | The island returns to the default spot on the primary display; offsets are reset | NOT_RUN (automated PASS, settings saved) |
+| T5 | Settings / updates disabled | Open the menu; hover "Settings…" and "Check for updates" | Both are greyed out with a tooltip saying they arrive later; nothing happens on Enter | NOT_RUN |
+| T6 | Open logs folder | Menu → Open logs folder | File Explorer opens the logs folder (`%LOCALAPPDATA%\DynamicIsland\logs`, or the portable data folder) | NOT_RUN |
+| T7 | Restart (started directly) | Start `DynamicIsland.App.exe` directly; menu → Restart | The island disappears and returns within a few seconds; only one instance runs afterwards | NOT_RUN (automated PASS) |
+| T8 | Restart (via launcher) | Start `DynamicIsland.Launcher.exe`; menu → Restart | Same as T7 | NOT_RUN (automated PASS) |
+| T9 | Safe Mode enter/leave | Menu → Restart in Safe Mode; check the tooltip; then menu → Leave Safe Mode | The app comes back with the tooltip "Dynamic Island (Safe Mode)" and the item reads "Leave Safe Mode (restart)"; leaving restarts normally | NOT_RUN (automated PASS for enter) |
+| T10 | Exit and keyboard | Shift+F10 on the icon, arrow keys through every item including the Display submenu, Esc, then menu → Exit | Every item is reachable with the keyboard and has an access key; Exit removes the icon and ends the app | NOT_RUN |
 
 ## G01 — Reliability (all automated; recorded for completeness)
 | # | Scenario | Status |

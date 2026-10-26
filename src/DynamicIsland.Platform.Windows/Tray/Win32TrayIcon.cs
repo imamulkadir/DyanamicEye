@@ -131,6 +131,10 @@ public sealed unsafe class Win32TrayIcon : IDisposable
     /// <summary>The message id the shell broadcasts when the taskbar is (re)created.</summary>
     public static uint TaskbarCreated => TaskbarCreatedMessage;
 
+    /// <summary>Posts the shell's "open context menu" callback for an icon, as a right click would (automation and tests).</summary>
+    public static void RequestContextMenu(IntPtr window, uint id) =>
+        NativeMethods.PostMessage(window, CallbackMessage, IntPtr.Zero, new IntPtr(((int)id << 16) | WmContextMenu));
+
     /// <summary>Delivers the Explorer-restart notification to one window (tests simulate an Explorer restart with it).</summary>
     public static void SendTaskbarCreated(IntPtr window) => NativeMethods.SendMessage(window, TaskbarCreatedMessage, IntPtr.Zero, IntPtr.Zero);
 

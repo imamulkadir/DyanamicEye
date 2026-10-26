@@ -1,5 +1,6 @@
 using System.Windows.Threading;
 using DynamicIsland.Core.Display;
+using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Shell;
 using DynamicIsland.Platform.Windows.Display;
 using Microsoft.Extensions.Logging;
@@ -18,7 +19,7 @@ public sealed class FullscreenCoordinator : IDisposable
 
     private readonly Win32FullscreenDetector _detector;
     private readonly IIslandStateMachine _state;
-    private readonly AppSettingsSnapshot _settings;
+    private readonly ISettingsService _settings;
     private readonly Func<string?> _islandMonitorId;
     private readonly ILogger<FullscreenCoordinator> _logger;
     private readonly Debouncer _debouncer;
@@ -27,7 +28,7 @@ public sealed class FullscreenCoordinator : IDisposable
     public FullscreenCoordinator(
         Win32FullscreenDetector detector,
         IIslandStateMachine state,
-        AppSettingsSnapshot settings,
+        ISettingsService settings,
         Func<string?> islandMonitorId,
         TimeProvider timeProvider,
         Dispatcher dispatcher,

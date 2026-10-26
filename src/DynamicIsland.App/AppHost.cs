@@ -68,20 +68,31 @@ public static class AppHost
         builder.Services.AddSingleton(_ => new SettingsStoreOptions(dataDirectory));
         builder.Services.AddSingleton<ISettingsStore, JsonSettingsStore>();
 
-        builder.Services.AddSingleton<AppSettingsSnapshot>();
+        builder.Services.AddSingleton<SettingsService>();
+        builder.Services.AddSingleton<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());
         builder.Services.AddSingleton<IMonitorService, Win32MonitorService>();
         builder.Services.AddSingleton<IIslandStateMachine>(sp => new IslandStateMachine(
             sp.GetRequiredService<TimeProvider>(),
             action => System.Windows.Application.Current.Dispatcher.BeginInvoke(action)));
         builder.Services.AddSingleton<IMotionGate, MotionGate>();
         builder.Services.AddSingleton<IslandWindow>();
-        builder.Services.AddSingleton<TrayController>();
+        builder.Services.AddSingleton<RestartService>();
+        builder.Services.AddSingleton(sp => new TrayController(
+            sp.GetRequiredService<IIslandStateMachine>(),
+            sp.GetRequiredService<LifecycleCoordinator>(),
+            sp.GetRequiredService<LaunchArguments>(),
+            sp.GetRequiredService<ISettingsService>(),
+            sp.GetRequiredService<IMonitorService>(),
+            () => sp.GetRequiredService<IslandWindow>().LastPlacement?.Monitor.Id,
+            sp.GetRequiredService<RestartService>(),
+            sp.GetRequiredService<FileLoggerOptions>().Directory,
+            sp.GetRequiredService<ILogger<TrayController>>()));
         builder.Services.AddSingleton<Win32FullscreenDetector>();
         builder.Services.AddSingleton<IFullscreenDetector>(sp => sp.GetRequiredService<Win32FullscreenDetector>());
         builder.Services.AddSingleton(sp => new FullscreenCoordinator(
             sp.GetRequiredService<Win32FullscreenDetector>(),
             sp.GetRequiredService<IIslandStateMachine>(),
-            sp.GetRequiredService<AppSettingsSnapshot>(),
+            sp.GetRequiredService<ISettingsService>(),
             () => sp.GetRequiredService<IslandWindow>().LastPlacement?.Monitor.Id,
             sp.GetRequiredService<TimeProvider>(),
             System.Windows.Application.Current.Dispatcher,

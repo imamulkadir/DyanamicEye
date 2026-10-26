@@ -4,6 +4,7 @@ using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using DynamicIsland.Core.Display;
+using DynamicIsland.Core.Lifecycle;
 using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Shell;
 using DynamicIsland.Platform.Windows.Display;
@@ -28,10 +29,11 @@ public sealed partial class IslandWindow : Window, IDisposable
     private const int WmSettingChange = 0x001A;
     private const int SpiSetWorkArea = 0x002F;
 
-    private readonly AppSettingsSnapshot _settings;
+    private readonly ISettingsService _settings;
     private readonly ILogger<IslandWindow> _logger;
     private readonly IIslandStateMachine _state;
     private readonly IMotionGate _motion;
+    private readonly LifecycleCoordinator _lifecycle;
     private readonly IslandPlacementController _placement;
     private readonly Debouncer _displayChanges;
     private IntPtr _handle;
@@ -39,9 +41,10 @@ public sealed partial class IslandWindow : Window, IDisposable
 
     public IslandWindow(
         IMonitorService monitors,
-        AppSettingsSnapshot settings,
+        ISettingsService settings,
         IIslandStateMachine state,
         IMotionGate motion,
+        LifecycleCoordinator lifecycle,
         TimeProvider timeProvider,
         ILogger<IslandWindow> logger)
     {
@@ -49,6 +52,7 @@ public sealed partial class IslandWindow : Window, IDisposable
         _logger = logger;
         _state = state;
         _motion = motion;
+        _lifecycle = lifecycle;
         _placement = new IslandPlacementController(monitors, () => BuildRequest(_settings.Current));
         _displayChanges = new Debouncer(DisplayChangeQuietPeriod, timeProvider, () => Dispatcher.BeginInvoke(Reposition));
         InitializeComponent();
@@ -61,6 +65,23 @@ public sealed partial class IslandWindow : Window, IDisposable
         Notch.PinToggle.Click += (_, _) => _state.Fire(IslandInput.TogglePin);
         PreviewKeyDown += OnPreviewKeyDown;
         _state.StateChanged += (_, e) => ApplyState(e.Previous, e.Current, animate: true);
+
+        _settings.Changed += (_, _) => Dispatcher.BeginInvoke(() =>
+        {
+            Reposition();
+            ApplyState(_state.State, _state.State, animate: false);
+        });
+
+        // Closing the island (Alt+F4, a close request from a tool) means Exit; the app shuts down only through the
+        // lifecycle (ShutdownMode=OnExplicitShutdown), so other windows such as Settings can close freely.
+        Closing += (_, e) =>
+        {
+            if (_lifecycle.Reason is null)
+            {
+                e.Cancel = true;
+                _lifecycle.RequestShutdown(ExitReason.UserExit);
+            }
+        };
 
         SourceInitialized += OnSourceInitialized;
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, Reposition);

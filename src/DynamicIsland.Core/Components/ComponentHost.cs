@@ -81,6 +81,42 @@ public sealed class ComponentHost(
         }
     }
 
+    /// <summary>
+    /// Pauses (stops) or resumes all optional components that run in this mode (tray Pause, ADR 0013). Components
+    /// skipped for Safe Mode stay skipped. Stops are bounded by <paramref name="cancellationToken"/>.
+    /// </summary>
+    public async Task SetPausedAsync(bool paused, CancellationToken cancellationToken)
+    {
+        (ComponentBoundary Boundary, bool Optional)[] components;
+        lock (_gate)
+        {
+            if (!_started)
+            {
+                return;
+            }
+
+            components = [.. _components];
+        }
+
+        foreach (var (boundary, optional) in components)
+        {
+            if (!optional || launchArguments.SafeMode)
+            {
+                continue;
+            }
+
+            if (paused)
+            {
+                await boundary.StopAsync(cancellationToken).ConfigureAwait(false);
+                boundary.MarkPaused();
+            }
+            else
+            {
+                boundary.Start();
+            }
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate)

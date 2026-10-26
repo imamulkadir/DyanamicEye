@@ -74,6 +74,26 @@ internal static partial class AppLog
         Message = "The notification-area icon could not be added (no shell tray); the island remains usable without it")]
     public static partial void TrayUnavailable(ILogger logger);
 
+    [LoggerMessage(EventId = 1041, EventName = "RestartRequested", Level = LogLevel.Information,
+        Message = "Restart requested (safe mode {SafeMode})")]
+    public static partial void RestartRequested(ILogger logger, bool safeMode);
+
+    [LoggerMessage(EventId = 1042, EventName = "RestartUnavailable", Level = LogLevel.Warning,
+        Message = "Restart is unavailable: the launcher is not installed next to the app; restart Dynamic Island manually")]
+    public static partial void RestartUnavailable(ILogger logger);
+
+    [LoggerMessage(EventId = 1043, EventName = "SettingsNotSaved", Level = LogLevel.Warning,
+        Message = "Settings change applied for this session only ({Reason})")]
+    public static partial void SettingsNotSaved(ILogger logger, string reason);
+
+    [LoggerMessage(EventId = 1044, EventName = "OpenLogsFailed", Level = LogLevel.Warning,
+        Message = "The logs folder could not be opened ({ErrorType})")]
+    public static partial void OpenLogsFailed(ILogger logger, string errorType);
+
+    [LoggerMessage(EventId = 1045, EventName = "ComponentPauseIncomplete", Level = LogLevel.Warning,
+        Message = "Pausing or resuming components did not finish in time")]
+    public static partial void ComponentPauseIncomplete(ILogger logger);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

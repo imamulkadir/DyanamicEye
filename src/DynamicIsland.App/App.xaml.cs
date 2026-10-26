@@ -7,6 +7,7 @@ using DynamicIsland.Core.Diagnostics;
 using DynamicIsland.Core.Lifecycle;
 using DynamicIsland.Core.Notifications;
 using DynamicIsland.Core.Settings;
+using DynamicIsland.Core.Shell;
 using DynamicIsland.Platform.Windows.Instance;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -78,7 +79,7 @@ public partial class App : Application
         var settings = Task.Run(() => store.LoadAsync(token), token).GetAwaiter().GetResult();
         AppLog.SettingsLoaded(_logger, settings.Outcome, settings.Corrections.Count, store.IsReadOnly);
 
-        _host.Services.GetRequiredService<AppSettingsSnapshot>().Current = settings.Settings;
+        _host.Services.GetRequiredService<SettingsService>().Initialize(settings.Settings);
         var window = _host.Services.GetRequiredService<IslandWindow>();
         if (launch.SafeMode)
         {
@@ -100,6 +101,25 @@ public partial class App : Application
         components.StatusChanged +=
             (_, s) => AppLog.ComponentStatusChanged(logger, s.Name, s.State, s.ReasonCode, s.ConsecutiveFailures, s.LastErrorType);
         components.StartAll();
+
+        // Tray "Pause" also pauses optional background work (ADR 0013).
+        _host.Services.GetRequiredService<IIslandStateMachine>().StateChanged += async (_, e) =>
+        {
+            if ((e.Current == IslandState.Paused) == (e.Previous == IslandState.Paused))
+            {
+                return;
+            }
+
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                await components.SetPausedAsync(e.Current == IslandState.Paused, timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                AppLog.ComponentPauseIncomplete(logger);
+            }
+        };
 
         ApplyTestCrashHook();
     }

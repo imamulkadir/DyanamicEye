@@ -1,4 +1,5 @@
 using System.Windows;
+using DynamicIsland.Core.Settings;
 using DynamicIsland.Core.Shell;
 using DynamicIsland.Platform.Windows.Power;
 using Microsoft.Win32;
@@ -11,10 +12,10 @@ namespace DynamicIsland.App;
 /// </summary>
 public sealed class MotionGate : IMotionGate, IDisposable
 {
-    private readonly AppSettingsSnapshot _settings;
+    private readonly ISettingsService _settings;
     private volatile bool _energySaverOn;
 
-    public MotionGate(AppSettingsSnapshot settings)
+    public MotionGate(ISettingsService settings)
     {
         _settings = settings;
         _energySaverOn = PowerStatus.IsEnergySaverOn();

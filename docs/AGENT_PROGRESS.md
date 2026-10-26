@@ -3,9 +3,9 @@
 > **Keep this file accurate on every session.** This is the durable checkpoint that lets a new agent resume after a context reset. Update it alongside source changes, and never mark anything DONE without evidence. Move older detail to `docs/WORK_LOG.md` so this file stays short.
 
 ## CURRENT STATUS (read first)
-- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01 is implemented.
-- **Active task:** P03-02: tray actions, settings service, shutdown mode. G02 and the P03-01 manual rows are owed by the owner.
-- **Active task status:** NOT_STARTED. P03-01 is IMPLEMENTED_AWAITING_VALIDATION and uncommitted. P02-05 was pushed and CI 40207131071 is green.
+- **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01 and P03-02 are implemented (awaiting manual validation).
+- **Active task:** next is P03-03 (settings window). P03-02 (tray actions, settings service, restart contract, shutdown mode; ADR 0013) is IMPLEMENTED_AWAITING_VALIDATION. G02 and the P03-01/02 manual rows (Y1–Y7, T1–T10) are owed by the owner.
+- **Active task status:** P03-02 IMPLEMENTED_AWAITING_VALIDATION (2026-10-26). Full suites green 7× locally; the 2 intermittent smoke failures from 2026-10-25 did not reproduce. Everything since P03-01 is **uncommitted**; the owner commits. P03-01 was pushed and CI 40208475923 is green.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,30 +23,11 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-25 (P03-01 implemented; G02 still pending owner)
+- **Last updated:** 2026-10-26 (P03-02 IMPLEMENTED_AWAITING_VALIDATION; next P03-03)
 
 ## NEXT ACTION (ONE task only)
-**P03-02 — Tray actions:** show/hide, pin, pause/resume, move to display and reset display, settings, update check, logs, Safe Mode, restart, Exit. Closing the settings window must never shut the app down. (guide §5 P03-02, §0.1 tray list, D05; ADRs 0005/0006/0009/0012)
-1. **Menu items in `TrayController`**, keyboard accessible with access keys, wired to existing services:
-   - **Show/Hide:** done.
-   - **Pin/Unpin:** `TogglePin`.
-   - **Pause/Resume:** state machine `Pause`/`Resume`. While paused, optional components also pause, i.e. `ComponentHost` stops optional components and restarts them on resume (ADR 0007).
-   - **Display:** a submenu listing monitors (from `IMonitorService`, with friendly labels such as "Display 1 (primary)", never device paths). Choosing one sets `General.PreferredMonitorId`, saves through `ISettingsStore` and re-places the island. "Reset to primary display" clears the preference; it is also the fix for an off-screen or lost island.
-   - **Settings…:** placeholder until P03-03; it opens a minimal settings window or is disabled with a tooltip. Do not fake functionality.
-   - **Check for updates:** disabled until P06, with the tooltip "Coming in a later version".
-   - **Open logs folder:** opens Explorer on the logs folder.
-   - **Restart in Safe Mode / Leave Safe Mode:** exit code 3 (`ExitReason.Restart`) plus the launcher relaunch with or without `--safe-mode`. This needs a restart-with-arguments contract: extend the launcher protocol, e.g. a `data/restart-request.json` the launcher reads, or a distinct exit code for Safe Mode. Decide in an ADR.
-   - **Restart:** `ExitReason.Restart`.
-   - **Exit:** done.
-2. **Settings persistence:** add a settings service (Core interface, App implementation) with `Current`, `UpdateAsync(Func<AppSettings, AppSettings>)` (validate → save → `Changed` event) and a read-only guard, replacing `AppSettingsSnapshot` usage. The island re-places on change.
-3. **Shutdown mode:** `ShutdownMode = OnExplicitShutdown`. Only the lifecycle (Exit, session end, fatal) ends the app, so closing the island or settings windows never exits it. Update smoke tests that rely on `CloseMainWindow`, which currently exits, to use the tray Exit path or a close request to the tray window (already handled).
-4. **Tests:**
-   - unit tests for the menu-model builder (items, enabled states, labels per state; pure, Core or App-testable)
-   - the settings service (update → validate → save → event)
-   - smoke: choose "Reset to primary display" through the tray-menu UIA, or via the callback message to open the menu followed by UIA `Invoke`; verify the island re-places
-   - smoke: Pause hides and Resume shows
-   - smoke: the restart path relaunches through the launcher (Debug, isolated data root)
-5. **Verify:** Release + Debug builds with 0 warnings and all tests green (`--max-parallel-test-modules 1`); CI green after the owner pushes. Add `TEST_MATRIX.md` rows for every menu action. Do not commit.
+**Owner first:** review and commit the P03-02 changes (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. Watch the CI run for the two earlier intermittent smoke tests (`FullscreenSmokeTests`, `IdleBudgetSmokeTests`); if either fails, read the "App log tail" / idle-CPU diagnostic in the log before changing anything.
+**Then agent: start P03-03** (guide §5 line 178): a dedicated WPF settings window with General/Appearance/Behavior/Widgets/Updates/Privacy/Diagnostics/About navigation, explicit Save/auto-save semantics, validation and reset. Bind it to `ISettingsService` (ADR 0013), open it from the tray's Settings… item (enable that item and remove its tooltip), and keep it keyboard accessible and DPI aware. Closing it must not exit the app (`ShutdownMode=OnExplicitShutdown`). Write an ADR if the save semantics need a decision.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -55,7 +36,7 @@
 | P00 — Environment and baseline | P00-01…P00-04 | DONE | **G00 PASS** 2026-10-25, run 40196393380 (`963b01c`) |
 | P01 — Reliability kernel | P01-01…P01-05 | DONE | **G01 PASS** 2026-10-25, CI run 40201274900 (Release + Debug). See the G01 evidence below. |
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
-| P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending |
+| P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–02 IMPLEMENTED_AWAITING_VALIDATION; 03 next; started with owner approval while G02 is open) | G03 pending |
 | P04 — Core widgets/data | P04-01…P04-07 | NOT_STARTED | G04 pending |
 | P05 — Customization/performance | P05-01…P05-04 | NOT_STARTED | G05 pending |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
@@ -71,6 +52,39 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 **P03-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits).
+  - Wrote ADR 0013 (`docs/ADR/0013-tray-actions-settings-restart.md`, indexed in the ADR README) and TEST_MATRIX rows T1–T10.
+  - Intermittent smoke failures: neither reproduced in 7 full-suite runs (see TEST EVIDENCE). Analysis:
+    - (a) The fullscreen failure took about 10 s. That means the helper window did become foreground (otherwise the test skips at 5 s), but the island did not hide within the next 5 s. The cause is unknown; the test captures the app log tail if it fails again.
+    - (b) The fullscreen detector's out-of-context `EVENT_OBJECT_LOCATIONCHANGE` hook wakes the app for every window or cursor move anywhere on the desktop. It returns early, but idle CPU still depends on other activity on the screen. This dates from P02-04 and is not specific to P03-02. Limit left at 300 ms. Possible later refinement: install the location hook only for the current foreground window's process/thread.
+  - **Changed files for the owner (since P03-01):**
+    - modified: `docs/AGENT_PROGRESS.md`, `docs/ADR/README.md`, `docs/TEST_MATRIX.md`, `src/DynamicIsland.App/{App.xaml, App.xaml.cs, AppHost.cs, AppLog.cs, FullscreenCoordinator.cs, IslandWindow.xaml.cs, MotionGate.cs, TrayController.cs}`, `src/DynamicIsland.Core/Components/{ComponentBoundary.cs, ComponentHost.cs}`, `src/DynamicIsland.Core/Lifecycle/{AppSupervisor.cs, ExitReason.cs}`, `src/DynamicIsland.Launcher/{ProcessAppRunner.cs, Program.cs}`, `src/DynamicIsland.Platform.Windows/Tray/Win32TrayIcon.cs`
+    - deleted: `src/DynamicIsland.App/AppSettingsSnapshot.cs`
+    - new: `docs/ADR/0013-tray-actions-settings-restart.md`, `src/DynamicIsland.App/RestartService.cs`, `src/DynamicIsland.Core/Lifecycle/LauncherArguments.cs`, `src/DynamicIsland.Core/Settings/SettingsService.cs`, `src/DynamicIsland.Core/Shell/TrayMenu.cs`, `tests/DynamicIsland.UnitTests/{Lifecycle/RestartContractTests.cs, Settings/SettingsServiceTests.cs, Shell/TrayMenuModelTests.cs}`, `tests/DynamicIsland.WindowsSmokeTests/{TrayActionSmokeTests.cs, TrayMenuDriver.cs}`
+    - Suggested commit message: `feat(tray): tray actions, settings service, restart contract (P03-02, ADR 0013)`
+  - **Decisions (ADR 0013):**
+    - **Exit codes:** `ExitReason.RestartInSafeMode` with **exit code 4**. The launcher relaunches in Safe Mode on 4 and normally on 3; neither counts as a crash, and both share the existing cap of 5 restart requests per launcher lifetime.
+    - **Launcher contract** (`Core/Lifecycle/ExitReason.cs` → `LauncherContract`):
+      - The launcher sets the env var `DYNAMICISLAND_SUPERVISED=1` for its child.
+      - The launcher accepts the allow-listed `--safe-mode` and `--after-pid N` (`Core/Lifecycle/LauncherArguments.cs`). With `--after-pid` it waits up to 15 s for that process, so the single-instance lock is free.
+    - **Restart** (`App/RestartService.cs`): when supervised, the app exits with 3/4. When started directly, it starts the launcher with `--after-pid <own pid> [--safe-mode]`, then exits. Without a launcher next to the app the restart is refused and logged.
+    - **Settings:** `Core/Settings/SettingsService.cs` (`ISettingsService`: `Current`, `IsReadOnly`, `Changed`, serialized `UpdateAsync` = change → validate → save → publish; a read-only store applies the change for the session only; a failed save keeps the old settings). It replaces `AppSettingsSnapshot`, which was **deleted**. `IslandWindow` re-places itself and re-applies its state on `Changed`.
+    - **Shutdown:** `App.xaml` sets `ShutdownMode="OnExplicitShutdown"`. Closing the island window (Alt+F4 or a close request) is turned into `RequestShutdown(UserExit)` in its `Closing` handler, so future windows such as Settings can close freely.
+    - **Pause:** tray Pause → state machine `Paused` → `ComponentHost.SetPausedAsync(true)` stops optional components (status Stopped, reason `paused`); Resume restarts them. `ComponentBoundary` is now restartable after a stop.
+    - **Tray menu:** a pure model `Core/Shell/TrayMenu.cs` (`TrayMenuModel.Build`) with Show/Hide, Pin (enabled only while visible), Pause/Resume, a Display submenu ("Display N (primary)" ordered left→right, current monitor checked, monitor ids only as arguments), Reset to primary display (also resets offsets: the lost-island recovery), Settings… and Check for updates (both **disabled with tooltips** until P03-03/P06), Open logs folder, Restart in/Leave Safe Mode, Restart and Exit. Every item has an AutomationId `Tray.*`.
+    - `TrayController` was rewritten to render the model and execute commands (settings updates are async with failures logged, never crashing).
+  - **Other changes:**
+    - `AppLog` adds RestartRequested, RestartUnavailable, SettingsNotSaved, OpenLogsFailed and ComponentPauseIncomplete.
+    - `AppHost` registrations: `SettingsService`, `RestartService`, and the `TrayController` factory with the logs folder.
+    - `App.xaml.cs` wires pause to the component host and initializes the settings service after load.
+    - `Win32TrayIcon.RequestContextMenu`.
+  - **Tests added:**
+    - `UnitTests/Shell/TrayMenuModelTests.cs`
+    - `UnitTests/Settings/SettingsServiceTests.cs`
+    - `UnitTests/Lifecycle/RestartContractTests.cs`: launcher args, exit codes, Safe Mode restart, start in Safe Mode, component pause/resume
+    - smoke `TrayMenuDriver.cs`: opens the real tray menu via the callback message and invokes items by AutomationId with UIA, no mouse
+    - smoke `TrayActionSmokeTests.cs`: pause/resume (all configs); reset display saves settings, restart through the launcher (3 → new instance, 4 → Safe Mode), and unsupervised restart handover (Debug-only, isolated data root)
+- 2026-10-25 P03-01 pushed; CI run 40208475923 **success**: Release 350, Debug 351, 0 skipped.
 - 2026-10-25 **Owner approval:** "pushed, proceed" after G02 was set up for owner validation. Recorded as approval to **continue P03 while G02 stays open**; the hardware matrix rows are still owed.
 - 2026-10-25 **P03-01 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; owner commits). Decisions are in ADR 0012.
   - **Platform.Windows:**
@@ -105,6 +119,12 @@
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
 |---|---|---|---|---|---|
+| 2026-10-25 | P03-01 | GitHub Actions `windows-2025` | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40208475923 |
+| 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
+| 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
+| 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug, then `dotnet test --solution DynamicIsland.sln -c <cfg> --no-build --max-parallel-test-modules 1`: Release ×4, Debug ×3 | PASS | 0 failed in all 7 runs. Release: 380/380 three times and 379 + 1 skipped once. Debug: 384/384 twice and 383 + 1 skipped once. Both skips were the fullscreen smoke test, skipped because Windows refused the helper window foreground; this is a skip, not a pass. The intermittent failures from 2026-10-25 did not reproduce. |
+| 2026-10-25 | P03-02 | same, `CI=true` | Full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | **2 intermittent FAILs** | Release run 1: fullscreen smoke failed. Debug run 1: idle CPU over 300 ms. Runs 2: Release 380 (1 skipped), Debug 384 green. Not yet diagnosed; see NEXT ACTION. |
 | 2026-10-25 | P02-05 | GitHub Actions `windows-2025` | CI workflow (Release + Debug, sequential modules) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40207131071; 342/343, 0 skipped |
 | 2026-10-25 | P03-01 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | Integration 44/44 and smoke 12/12 (Release), first run | PASS | Tray registered, recovered after a simulated `TaskbarCreated`, removed on exit; 0 skipped |
 | 2026-10-25 | P03-01 | same, real desktop | Opened the tray menu via the callback message (no synthetic mouse) and took a screenshot; then `taskkill` | FAIL → fixed | The menu shows "Hide island" and "Exit" with focus on the first item. `taskkill` left the app running with the tray window destroyed. Fixed: WM_CLOSE on the tray window means Exit; `taskkill` now exits with code 0. |
@@ -129,6 +149,6 @@
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P03-02** (G02 still owed by the owner).
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **finish P03-02 per NEXT ACTION** (G02 still owed by the owner).
 - Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

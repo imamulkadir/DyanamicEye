@@ -33,17 +33,19 @@ public sealed record SupervisorStep(int Run, bool SafeMode, int ExitCode, Superv
 
 /// <summary>
 /// Launcher loop (guide §4.5, D03). Exit code 0 ends supervision; <see cref="ExitCodes.RestartRequested"/> relaunches
-/// without counting a crash (bounded); anything else is a crash decided by <see cref="CrashPolicy"/>.
+/// normally and <see cref="ExitCodes.RestartInSafeModeRequested"/> in Safe Mode, without counting a crash (bounded);
+/// anything else is a crash decided by <see cref="CrashPolicy"/>.
 /// </summary>
 public sealed class AppSupervisor(IAppProcessRunner runner, ICrashStateStore crashStore, IRecoveryNotifier notifier, TimeProvider timeProvider)
 {
     /// <summary>Restart requests beyond this per launcher lifetime count as crashes (protects against restart loops).</summary>
     public const int MaxRestartRequests = 5;
 
+    /// <param name="startInSafeMode">First run in Safe Mode (launcher started with <c>--safe-mode</c>).</param>
     /// <returns>0 after a clean exit; otherwise the exit code of the last run.</returns>
-    public async Task<int> RunAsync(Action<SupervisorStep>? onStep, CancellationToken cancellationToken)
+    public async Task<int> RunAsync(Action<SupervisorStep>? onStep, CancellationToken cancellationToken, bool startInSafeMode = false)
     {
-        var safeMode = false;
+        var safeMode = startInSafeMode;
         var restartRequests = 0;
 
         for (var run = 1; ; run++)
@@ -73,9 +75,9 @@ public sealed class AppSupervisor(IAppProcessRunner runner, ICrashStateStore cra
             return SupervisorAction.Finished;
         }
 
-        if (exitCode == ExitCodes.RestartRequested && ++restartRequests <= MaxRestartRequests)
+        if (exitCode is ExitCodes.RestartRequested or ExitCodes.RestartInSafeModeRequested && ++restartRequests <= MaxRestartRequests)
         {
-            return SupervisorAction.Relaunch;
+            return exitCode == ExitCodes.RestartInSafeModeRequested ? SupervisorAction.RelaunchInSafeMode : SupervisorAction.Relaunch;
         }
 
         var now = timeProvider.GetUtcNow();

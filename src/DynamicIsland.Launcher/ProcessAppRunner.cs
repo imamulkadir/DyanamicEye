@@ -13,6 +13,7 @@ internal sealed class ProcessAppRunner(string appPath) : IAppProcessRunner
             UseShellExecute = false,
             WorkingDirectory = Path.GetDirectoryName(appPath)!,
         };
+        startInfo.Environment[LauncherContract.SupervisedVariable] = "1";
 
         if (safeMode)
         {

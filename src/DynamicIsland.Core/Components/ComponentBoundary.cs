@@ -65,16 +65,21 @@ public sealed class ComponentBoundary : IComponentContext, IDisposable
     {
         lock (_gate)
         {
-            if (_loop is not null)
+            if (_loop is { IsCompleted: false })
             {
-                throw new InvalidOperationException($"Component '{Name}' was already started.");
+                throw new InvalidOperationException($"Component '{Name}' is already running.");
             }
 
+            // Restartable after a stop (pause/resume): each run gets a fresh cancellation source.
+            _stopping?.Dispose();
             _stopping = CancellationTokenSource.CreateLinkedTokenSource(_lifecycle.ApplicationStopping);
             var token = _stopping.Token;
             _loop = Task.Run(() => RunLoopAsync(token), CancellationToken.None);
         }
     }
+
+    /// <summary>Marks the component as stopped because the user paused the island.</summary>
+    public void MarkPaused() => SetStatus(Status with { State = ComponentState.Stopped, ReasonCode = "paused", NextRetryUtc = null, ConsecutiveFailures = 0 });
 
     /// <summary>Marks the component as not started because of Safe Mode.</summary>
     public void MarkSkippedForSafeMode() => SetStatus(_status with { State = ComponentState.SkippedSafeMode, ReasonCode = "safe-mode" });

@@ -243,6 +243,21 @@ public partial class NotchView : UserControl
         return ClockRow.Height.Value + ExpandedPanel.DesiredSize.Height;
     }
 
+    /// <summary>
+    /// The expanded height for the selected tab at <paramref name="width"/> (scaled DIPs), clamped to the expanded range
+    /// (ADR 0022). Only content taller than the maximum can scroll; otherwise scrolling is off, so no scroll bar flashes
+    /// while the island grows to fit a taller tab.
+    /// </summary>
+    public double FitExpandedHeight(double width, double scale)
+    {
+        var content = MeasureExpandedHeight(width) / scale;
+        WidgetScroll.VerticalScrollBarVisibility = content > IslandLayout.ExpandedMaxHeight ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
+        return IslandLayout.ExpandedHeightFor(content) * scale;
+    }
+
+    /// <summary>Whether the widget area can scroll (tests).</summary>
+    public bool IsScrollingAllowed => WidgetScroll.VerticalScrollBarVisibility != ScrollBarVisibility.Disabled;
+
     /// <summary>The selected widget's element, as shown (tests).</summary>
     public IReadOnlyList<UIElement> WidgetElements => [.. WidgetPanel.Children.OfType<UIElement>()];
 

@@ -206,8 +206,7 @@ public sealed partial class IslandWindow : Window, IDisposable
         }
     }
 
-    private double ExpandedHeight(double width, double scale) =>
-        IslandLayout.ExpandedHeightFor(Notch.MeasureExpandedHeight(width) / scale) * scale;
+    private double ExpandedHeight(double width, double scale) => Notch.FitExpandedHeight(width, scale);
 
     /// <summary>Widget content changed while expanded: follow its height only (no focus or state changes).</summary>
     private void OnNotchContentChanged(object? sender, EventArgs e)

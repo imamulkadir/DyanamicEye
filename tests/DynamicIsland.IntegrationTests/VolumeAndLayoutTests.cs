@@ -118,6 +118,29 @@ public sealed class VolumeAndLayoutTests : IDisposable
         Assert.InRange(IslandLayout.ExpandedHeightFor(clockHeight), IslandLayout.Expanded.Height, IslandLayout.ExpandedMaxHeight);
     }
 
+    [Fact]
+    public void Only_content_taller_than_the_maximum_can_scroll()
+    {
+        var (clock, tall) = _ui.Invoke(() =>
+        {
+            var view = new NotchView { Width = 420, Height = 360 };
+            view.ApplyVisualState(IslandState.Expanded, 360, 1.0);
+            view.ShowWidgets(
+                [new(WidgetIds.Clock, "Clock", Healthy, 40.0), new(WidgetIds.Notes, "Notes", Healthy, 900.0)],
+                slot => new Border { Height = (double)slot.Snapshot! });
+
+            var clockHeight = view.FitExpandedHeight(420, 1.0);
+            var clockScrolls = view.IsScrollingAllowed;
+            view.SelectWidget(WidgetIds.Notes);
+            return ((clockHeight, clockScrolls), (view.FitExpandedHeight(420, 1.0), view.IsScrollingAllowed));
+        });
+
+        // No scroll bar for a tab that fits, so none flashes while the island grows to it.
+        Assert.False(clock.Item2);
+        Assert.InRange(clock.Item1, IslandLayout.Expanded.Height, IslandLayout.ExpandedMaxHeight - 1);
+        Assert.Equal((IslandLayout.ExpandedMaxHeight, true), tall);
+    }
+
     private ComponentHost NewHost() =>
         new(_lifecycle, new InMemoryNotificationService(TimeProvider.System), new DefaultFailureClassifier(), LaunchArguments.Default, TimeProvider.System);
 

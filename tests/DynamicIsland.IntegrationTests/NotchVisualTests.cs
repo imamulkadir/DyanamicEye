@@ -2,8 +2,15 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using DynamicIsland.App;
+using DynamicIsland.Core.Components;
+using DynamicIsland.Core.Lifecycle;
+using DynamicIsland.Core.Settings;
+using DynamicIsland.Core.Notifications;
 using DynamicIsland.Core.Shell;
+using DynamicIsland.Core.Widgets;
 using DynamicIsland.TestSupport;
+using DynamicIsland.Widgets;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DynamicIsland.IntegrationTests;
 
@@ -31,6 +38,7 @@ public sealed class NotchVisualTests : IDisposable
         { IslandState.Pinned, "Dark" },
         { IslandState.Collapsed, "Light" }, // ADR 0026
         { IslandState.Pinned, "Light" },
+        { IslandState.Pinned, "Tabs" }, // Clock, stats and volume tabs, clock selected (ADR 0025).
     };
 
     [Theory]
@@ -38,7 +46,7 @@ public sealed class NotchVisualTests : IDisposable
     public void Notch_matches_its_reference_rendering(IslandState state, string theme)
     {
         var name = $"notch-{state.ToString().ToLowerInvariant()}{(theme == "Dark" ? string.Empty : "-" + theme.ToLowerInvariant())}.png";
-        var actual = _ui.Invoke(() => Render(state, theme == "Light" ? IslandTheme.Light : IslandTheme.Dark));
+        var actual = _ui.Invoke(() => Render(state, theme == "Light" ? IslandTheme.Light : IslandTheme.Dark, withTabs: theme == "Tabs"));
 
         if (Environment.GetEnvironmentVariable(UpdateVariable) == "1")
         {
@@ -60,13 +68,20 @@ public sealed class NotchVisualTests : IDisposable
         }
     }
 
-    private static RenderTargetBitmap Render(IslandState state, IslandPalette palette)
+    private static RenderTargetBitmap Render(IslandState state, IslandPalette palette, bool withTabs = false)
     {
         var size = IslandLayout.For(state)!.Value;
         var view = new NotchView { Width = size.Width, Height = size.Height };
         view.ApplyTheme(palette);
         view.ApplyVisualState(state, size.Height, scale: 1.0);
         view.SetClock("2:42 PM"); // Fixed text: the reference must not depend on the time of the run.
+        if (withTabs)
+        {
+            ShowFixedWidgets(view);
+            size = (size.Width, view.FitExpandedHeight(size.Width, 1.0));
+            view.Height = size.Height;
+            view.ApplyVisualState(state, size.Height, scale: 1.0);
+        }
 
         // The notch on a mid-grey backdrop, so the outline (shoulders, corners) is part of the comparison.
         var backdrop = new System.Windows.Controls.Border
@@ -84,6 +99,23 @@ public sealed class NotchVisualTests : IDisposable
         bitmap.Render(backdrop);
         bitmap.Freeze();
         return bitmap;
+    }
+
+    /// <summary>Real widget views with fixed content (no clock, sensors or devices are read).</summary>
+    private static void ShowFixedWidgets(NotchView view)
+    {
+        using var lifecycle = new LifecycleCoordinator(TimeProvider.System);
+        using var host = new ComponentHost(lifecycle, new InMemoryNotificationService(TimeProvider.System), new DefaultFailureClassifier(), LaunchArguments.Default, TimeProvider.System);
+        using var registry = new WidgetRegistry(host, []);
+        var presenter = new WidgetPresenter(registry, view, null!, null!, lifecycle, NullLogger<WidgetPresenter>.Instance);
+        var healthy = new ComponentStatus("x", ComponentState.Healthy);
+        view.ShowWidgets(
+            [
+                new(WidgetIds.Clock, "Clock and date", healthy, new ClockSnapshot(new DateTime(2026, 10, 26, 14, 42, 0), "2:42 PM", "2:42 PM", "Monday, October 26, 2026")),
+                new(WidgetIds.SystemStats, "System stats", healthy, new MetricsSnapshot(12, null, null, TimeSpan.FromHours(3))),
+                new(WidgetIds.Volume, "Volume", healthy, new VolumeSnapshot(true, 50, false)),
+            ],
+            presenter.ViewFor);
     }
 
     private static (int Differing, int Total) Compare(BitmapSource expected, BitmapSource actual)

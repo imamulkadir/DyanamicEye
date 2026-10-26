@@ -2,6 +2,40 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-26 (Microsoft.Data.Sqlite approval)
+- 2026-10-26 **Owner approval:** `Microsoft.Data.Sqlite` was proposed with "Do you approve adding it?"; the reply "pushed, continue" is recorded as **approval of that dependency** (ADR 0023 §1).
+
+## Archived 2026-10-26 (P04-06 implementation entry)
+- 2026-10-26 **P04-06 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0023**.
+  - **Dependency:** `Microsoft.Data.Sqlite` **10.0.13** (MIT), which brings SQLitePCLRaw **2.1.13** (Apache-2.0) and native SQLite (public domain). Verified on nuget.org 2026-10-26.
+    - Pinned in `Directory.Packages.props` and referenced by Infrastructure only.
+    - `THIRD_PARTY_NOTICES.md` has 3 new entries.
+    - Lock files updated by `dotnet restore`.
+  - **Core:** new `PersonalData/PersonalData.cs` (`IPersonalDataStore`, `Note`, `TaskItem`, `PersonalDataResult`, `PersonalDataRules`: note 1–2000 / task 1–300 characters, no control characters except line breaks in notes, at most 1000 notes and 2000 tasks).
+  - **Infrastructure:** new `PersonalData/SqlitePersonalDataStore.cs`.
+    - Serialized and off-thread; every write is one transaction; limits are checked inside the transaction.
+    - `user_version` migrations; WAL; `quick_check`. A corrupt file becomes `islands.corrupt-<UTC>.db` (newest 5 kept) and a fresh database is created.
+    - A newer schema opens read-only without being modified.
+    - Logs 3100–3102 carry no text.
+  - **Widgets:** new `NotesAndTasksWidgets.cs`.
+    - `PersonalDataWidget` base with commands `add:`, `edit:<id>:`, `toggle:<id>` and `delete:<id>`, validated.
+    - `TasksWidget` shows 6, open first. `NotesWidget` shows the latest 3.
+    - Snapshots carry `LastResult` for refusal messages.
+  - **App:**
+    - New `PersonalDataViews.cs` (add field with a placeholder behind it, delete button, inline editor, messages), `TasksView` and `NotesView`. Rows are reused by id, focus is kept when a task moves, and an item being edited is never overwritten.
+    - `NotchView` widget panel inside a `ScrollViewer` (scrolls beyond 360 DIP).
+    - `IslandWindow`: Escape moved to bubbling `KeyDown`, so a text box clears or cancels first.
+    - The `MediaView.IconButtonStyle` template now honours content alignment and `Padding` (defaults centred), so note rows align left.
+    - `AppHost` registers the store at `data\islands.db`.
+  - **Tests:**
+    - Unit: `PersonalData/SqlitePersonalDataStoreTests.cs` (12: CRUD, ordering, validation, limit inside the transaction, restart persistence, corrupt quarantine, newer schema read-only, SQLite ≥ 3.45). `Widgets/NotesAndTasksWidgetTests.cs` (11).
+    - Integration: `NotesAndTasksViewTests` (3, real store, registry and views in an offscreen window: Enter adds, check box completes with the row reused, F2 edits, Esc clears without bubbling, too-long text shows a message and saves nothing).
+    - Renderings checked by eye.
+  - **Changed files for the owner:**
+    - modified: `Directory.Packages.props`, `THIRD_PARTY_NOTICES.md`, `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (NT1–NT6), `docs/WORK_LOG.md` (older entries archived), `src/DynamicIsland.App/{AppHost.cs, IslandWindow.xaml.cs, MediaView.cs, NotchView.xaml, WidgetPresenter.cs, packages.lock.json}`, `src/DynamicIsland.Infrastructure/{DynamicIsland.Infrastructure.csproj, packages.lock.json}`, `src/DynamicIsland.Launcher/packages.lock.json`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, packages.lock.json}`, `tests/DynamicIsland.UnitTests/packages.lock.json`, `tests/DynamicIsland.WindowsSmokeTests/packages.lock.json`
+    - new: `docs/ADR/0023-notes-and-tasks-storage.md`, `src/DynamicIsland.App/{NotesView.cs, PersonalDataViews.cs, TasksView.cs}`, `src/DynamicIsland.Core/PersonalData/PersonalData.cs`, `src/DynamicIsland.Infrastructure/PersonalData/SqlitePersonalDataStore.cs`, `src/DynamicIsland.Widgets/NotesAndTasksWidgets.cs`, `tests/DynamicIsland.IntegrationTests/NotesAndTasksViewTests.cs`, `tests/DynamicIsland.UnitTests/PersonalData/SqlitePersonalDataStoreTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/NotesAndTasksWidgetTests.cs`
+    - Suggested commit message: `feat(widgets): SQLite notes and tasks with transactional store (P04-06, ADR 0023)`
+
 ## Archived 2026-10-26 (P04-05)
 - 2026-10-26 P04-05 committed by the owner as `6ab223e`; CI run 40313608497 **success**: Release 582/582, Debug 589/589, 0 skipped.
 - 2026-10-26 **P04-05 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0022**.

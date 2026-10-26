@@ -5,7 +5,7 @@
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
 - **Active task:** P05-01 (theme tokens, light/dark island, safe size) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. G04 automated evidence PASS on CI. G02/G03/P04 manual rows are still owed by the owner.
-- **Active task status:** P05-01 **uncommitted** (the owner commits). G04 evidence + tab fix committed as `706daf7`; CI run 40342549483 **success** (624/624, 633/633, 0 skipped).
+- **Active task status:** P05-01 + stats fix committed as `6edc4a6`; CI run 40354693505 **success**. Uncommitted: title removal + scroll-flash fix (owner requests).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -26,7 +26,7 @@
 - **Last updated:** 2026-10-26 (P05-01 IMPLEMENTED_AWAITING_VALIDATION; next: owner commit, CI, then P05-02)
 
 ## NEXT ACTION (ONE task only)
-**Owner:** review and commit P05-01 and the system-stats tab fix (file lists in RECENT VERIFIED CHANGES), push, and check that CI is green. TH1–TH3 in `docs/TEST_MATRIX.md` are quick manual checks (Light/Dark, follow Windows, 200 % on a laptop).
+**Owner:** review and commit the title removal + scroll-flash fix (file list in the newest RECENT VERIFIED CHANGES entry), push, and check that CI is green. TH1–TH3 in `docs/TEST_MATRIX.md` are quick manual checks (Light/Dark, follow Windows, 200 % on a laptop).
 **Then agent:** **P05-02** (guide §5 P05: persist reorder/pin/preferences; widget configuration errors recover; update UI without full shell recreation). Start by checking what already persists (widget order/enabled in settings, ADR 0003/0018; pin is session-only) and list only the gaps.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
@@ -52,6 +52,12 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-26 P05-01 + system-stats tab fix committed by the owner as `6edc4a6`; CI run 40354693505 **success**: Release 648/648, Debug 657/657, 0 skipped.
+- 2026-10-26 **Owner requests: no "Dynamic Island" title; scroll bar flashed when switching to the Clock tab — fixed** (uncommitted, with P05-01).
+  - Title removed: `NotchView.xaml` expanded panel is one row (tabs left, pin right; pin 30×30 to match the tabs), then the selected widget. With one widget the tabs hide and the pin stays.
+  - Scroll flash cause: the ScrollViewer was `Auto`, so while the island animated up to a taller tab the content overflowed for ~200 ms and a bar showed. Fix: `NotchView.FitExpandedHeight(width, scale)` measures, allows scrolling only when the tab is taller than 360 DIP, and returns the clamped height; `IslandWindow.ExpandedHeight` uses it. ADR 0025 §1 and Consequences amended; TB4 added.
+  - Tests: new `VolumeAndLayoutTests.Only_content_taller_than_the_maximum_can_scroll`; `NotchVisualTests` regenerated `notch-expanded.png`, `notch-pinned.png`, `notch-pinned-light.png` (title gone) and new `notch-pinned-tabs.png` (real clock/stats/volume views, clock selected), checked by eye.
+  - Changed files: `src/DynamicIsland.App/{NotchView.xaml, NotchView.xaml.cs, IslandWindow.xaml.cs}`, `tests/DynamicIsland.IntegrationTests/{VolumeAndLayoutTests.cs, NotchVisualTests.cs, References/notch-expanded.png, References/notch-pinned.png, References/notch-pinned-light.png, References/notch-pinned-tabs.png}`, `docs/ADR/0025-tabbed-expanded-island.md`, `docs/TEST_MATRIX.md`. Suggested commit message: `fix: remove island title, no scroll bar flash on tab switch (ADR 0025)`
 - 2026-10-26 **Owner report: "system stats widget is checked but not shown" — fixed** (uncommitted, with P05-01).
   - Cause (from the tabs change, ADR 0025 §4): stats sample only while their tab is shown, but a tab exists only for a widget with content, so the stats widget never got a tab. Only `MetricsWidget` is gated this way.
   - Fix: `MetricsWidget.RunAsync` publishes a placeholder snapshot on start (no readings; up time from the tick count, not a sample); sampling still starts only when its tab is shown. ADR 0025 §4 amended.
@@ -132,36 +138,6 @@
     - new: `docs/ADR/0024-backup-export-import.md`, `src/DynamicIsland.Core/PersonalData/DataBackup.cs`, `src/DynamicIsland.Infrastructure/PersonalData/DataBackupService.cs`, `tests/DynamicIsland.UnitTests/PersonalData/DataBackupServiceTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/RestoreSmokeTests.cs`
     - Suggested commit message: `feat(data): backup export and verified restore with rollback (P04-07, ADR 0024)`
 - 2026-10-26 P04-06 committed by the owner as `c2bb883`; CI run 40325111433 **success**: Release 607/607, Debug 614/614, 0 skipped (covers the Debug and smoke runs owed for P04-06).
-- 2026-10-26 **Owner approval:** `Microsoft.Data.Sqlite` was proposed with "Do you approve adding it?"; the reply "pushed, continue" is recorded as **approval of that dependency** (ADR 0023 §1).
-- 2026-10-26 **P04-06 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0023**.
-  - **Dependency:** `Microsoft.Data.Sqlite` **10.0.13** (MIT), which brings SQLitePCLRaw **2.1.13** (Apache-2.0) and native SQLite (public domain). Verified on nuget.org 2026-10-26.
-    - Pinned in `Directory.Packages.props` and referenced by Infrastructure only.
-    - `THIRD_PARTY_NOTICES.md` has 3 new entries.
-    - Lock files updated by `dotnet restore`.
-  - **Core:** new `PersonalData/PersonalData.cs` (`IPersonalDataStore`, `Note`, `TaskItem`, `PersonalDataResult`, `PersonalDataRules`: note 1–2000 / task 1–300 characters, no control characters except line breaks in notes, at most 1000 notes and 2000 tasks).
-  - **Infrastructure:** new `PersonalData/SqlitePersonalDataStore.cs`.
-    - Serialized and off-thread; every write is one transaction; limits are checked inside the transaction.
-    - `user_version` migrations; WAL; `quick_check`. A corrupt file becomes `islands.corrupt-<UTC>.db` (newest 5 kept) and a fresh database is created.
-    - A newer schema opens read-only without being modified.
-    - Logs 3100–3102 carry no text.
-  - **Widgets:** new `NotesAndTasksWidgets.cs`.
-    - `PersonalDataWidget` base with commands `add:`, `edit:<id>:`, `toggle:<id>` and `delete:<id>`, validated.
-    - `TasksWidget` shows 6, open first. `NotesWidget` shows the latest 3.
-    - Snapshots carry `LastResult` for refusal messages.
-  - **App:**
-    - New `PersonalDataViews.cs` (add field with a placeholder behind it, delete button, inline editor, messages), `TasksView` and `NotesView`. Rows are reused by id, focus is kept when a task moves, and an item being edited is never overwritten.
-    - `NotchView` widget panel inside a `ScrollViewer` (scrolls beyond 360 DIP).
-    - `IslandWindow`: Escape moved to bubbling `KeyDown`, so a text box clears or cancels first.
-    - The `MediaView.IconButtonStyle` template now honours content alignment and `Padding` (defaults centred), so note rows align left.
-    - `AppHost` registers the store at `data\islands.db`.
-  - **Tests:**
-    - Unit: `PersonalData/SqlitePersonalDataStoreTests.cs` (12: CRUD, ordering, validation, limit inside the transaction, restart persistence, corrupt quarantine, newer schema read-only, SQLite ≥ 3.45). `Widgets/NotesAndTasksWidgetTests.cs` (11).
-    - Integration: `NotesAndTasksViewTests` (3, real store, registry and views in an offscreen window: Enter adds, check box completes with the row reused, F2 edits, Esc clears without bubbling, too-long text shows a message and saves nothing).
-    - Renderings checked by eye.
-  - **Changed files for the owner:**
-    - modified: `Directory.Packages.props`, `THIRD_PARTY_NOTICES.md`, `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (NT1–NT6), `docs/WORK_LOG.md` (older entries archived), `src/DynamicIsland.App/{AppHost.cs, IslandWindow.xaml.cs, MediaView.cs, NotchView.xaml, WidgetPresenter.cs, packages.lock.json}`, `src/DynamicIsland.Infrastructure/{DynamicIsland.Infrastructure.csproj, packages.lock.json}`, `src/DynamicIsland.Launcher/packages.lock.json`, `src/DynamicIsland.Widgets/BuiltInWidgets.cs`, `tests/DynamicIsland.IntegrationTests/{ClockWidgetPresenterTests.cs, packages.lock.json}`, `tests/DynamicIsland.UnitTests/packages.lock.json`, `tests/DynamicIsland.WindowsSmokeTests/packages.lock.json`
-    - new: `docs/ADR/0023-notes-and-tasks-storage.md`, `src/DynamicIsland.App/{NotesView.cs, PersonalDataViews.cs, TasksView.cs}`, `src/DynamicIsland.Core/PersonalData/PersonalData.cs`, `src/DynamicIsland.Infrastructure/PersonalData/SqlitePersonalDataStore.cs`, `src/DynamicIsland.Widgets/NotesAndTasksWidgets.cs`, `tests/DynamicIsland.IntegrationTests/NotesAndTasksViewTests.cs`, `tests/DynamicIsland.UnitTests/PersonalData/SqlitePersonalDataStoreTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/NotesAndTasksWidgetTests.cs`
-    - Suggested commit message: `feat(widgets): SQLite notes and tasks with transactional store (P04-06, ADR 0023)`
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -170,6 +146,8 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-26 | title + scroll fix | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 650/650 ×2, Debug 659/659 ×2, **0 skipped** |
+| 2026-10-26 | P05-01 + stats fix | GitHub Actions `windows-2025` (`6edc4a6`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40354693505 |
 | 2026-10-26 | stats tab fix | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 648/648 ×2, Debug 657/657 ×2, **0 skipped** (P05-01 + stats fix together) |
 | 2026-10-26 | P05-01 | Windows 11 Pro 25H2 x64, 1 monitor at 100 %, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2; after the Settings hint, rebuild and Release ×1 + Debug ×1 | PASS | Release 647/647 ×3, Debug 656/656 ×3, **0 skipped** |
 | 2026-10-26 | G04 + tab fix | GitHub Actions `windows-2025` (`706daf7`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40342549483; 624/624 and 633/633, 0 skipped |

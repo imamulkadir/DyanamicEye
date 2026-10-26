@@ -69,39 +69,38 @@
                        Typography.NumeralAlignment="Tabular"
                        AutomationProperties.Name="Time" />
 
-            <!-- Expanded panel: title and pin, one icon tab per enabled widget, the selected widget (ADR 0025). -->
-            <Grid x:Name="ExpandedPanel" Grid.Row="1" Margin="18,4,18,16" Visibility="Collapsed">
+            <!-- Expanded panel: one icon tab per enabled widget and the pin in one row, then the selected widget (ADR 0025). -->
+            <Grid x:Name="ExpandedPanel" Grid.Row="1" Margin="18,2,18,16" Visibility="Collapsed">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <DockPanel>
-                    <ToggleButton x:Name="PinButton"
-                                  DockPanel.Dock="Right"
-                                  Width="28" Height="28"
-                                  Style="{StaticResource IslandIconToggle}"
-                                  Content="&#xE718;"
-                                  FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                  FontSize="14"
-                                  ToolTip="Keep the island open"
-                                  AutomationProperties.Name="Pin island" />
-                    <TextBlock Text="Dynamic Island"
-                               Foreground="{DynamicResource Island.TextPrimary}" FontSize="14" FontWeight="SemiBold"
-                               VerticalAlignment="Center" />
-                </DockPanel>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <!-- Tabs in the user's widget order; arrow keys move between them, Ctrl+Tab cycles from anywhere. -->
-                <StackPanel x:Name="TabStrip" Grid.Row="1" Orientation="Horizontal" Margin="-4,6,0,2" Visibility="Collapsed"
+                <StackPanel x:Name="TabStrip" Orientation="Horizontal" Margin="-4,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"
                             KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle"
                             AutomationProperties.Name="Widget tabs" AutomationProperties.AutomationId="Tabs" />
+                <ToggleButton x:Name="PinButton"
+                              Grid.Column="1"
+                              Width="30" Height="30"
+                              VerticalAlignment="Center"
+                              Style="{StaticResource IslandIconToggle}"
+                              Content="&#xE718;"
+                              FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                              FontSize="14"
+                              ToolTip="Keep the island open"
+                              AutomationProperties.Name="Pin island" />
                 <!-- The selected widget; the hint shows while no widget has content. -->
-                <Grid Grid.Row="2">
+                <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,6,0,0">
                     <TextBlock x:Name="WidgetPlaceholder"
                                Text="Widgets will appear here."
                                Foreground="{DynamicResource Island.TextSecondary}" FontSize="12"
                                VerticalAlignment="Center" HorizontalAlignment="Center" />
-                    <!-- Scrolls only when the content is taller than the expanded maximum (ADR 0022/0023). -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                    <!-- Scrolls only when the content is taller than the expanded maximum (ADR 0022/0023); see AllowScrolling. -->
+                    <ScrollViewer x:Name="WidgetScroll" VerticalScrollBarVisibility="Disabled" HorizontalScrollBarVisibility="Disabled"
                                   Focusable="False" PanningMode="VerticalOnly">
                         <StackPanel x:Name="WidgetPanel" VerticalAlignment="Center"
                                     AutomationProperties.Name="Widgets" />

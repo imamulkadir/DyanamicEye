@@ -72,6 +72,26 @@ Versions are pinned in `Directory.Packages.props`. Resolved transitive packages 
 - Notice: Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0). The full
   license text must accompany binary distributions; the installer and portable ZIP include it (P06).
 
+### .NET 10 runtime: Microsoft.NETCore.App and Microsoft.WindowsDesktop.App (WPF) 10.0.12
+- Source: https://github.com/dotnet/runtime, https://github.com/dotnet/wpf
+- License: MIT (https://licenses.nuget.org/MIT). Taken from the runtime pack nuspecs, 2026-10-27.
+- Used by: the release app payload, which is self-contained so users need no .NET install and no admin rights (ADR 0030)
+- Redistributed: yes (release packages only)
+- Notice: "Copyright (c) .NET Foundation and Contributors", MIT License (text as for Microsoft.Extensions.Hosting
+  above). The runtime's own third-party notices: https://github.com/dotnet/runtime/blob/main/THIRD-PARTY-NOTICES.TXT
+  and https://github.com/dotnet/wpf/blob/main/THIRD-PARTY-NOTICES.TXT.
+
+### Windows SDK .NET projection: Microsoft.Windows.SDK.NET.dll (10.0.19041.57) and WinRT.Runtime.dll
+- Source: Microsoft.Windows.SDK.NET.Ref (https://aka.ms/WinSDKProjectURL); WinRT.Runtime from C#/WinRT
+  (https://github.com/microsoft/CsWinRT)
+- License: Microsoft.Windows.SDK.NET.dll: Windows SDK license terms (https://aka.ms/WinSDKLicenseURL), which allow
+  distributing the files on the SDK's REDIST list. WinRT.Runtime.dll: MIT (C#/WinRT).
+- Used by: DynamicIsland.App and Platform.Windows: media sessions (ADR 0020). The .NET SDK copies both into every app
+  that targets a `net*-windows10.0.*` framework.
+- Redistributed: yes
+- Notice: **open item (P07-01):** confirm that Microsoft.Windows.SDK.NET.dll is covered by the Windows SDK REDIST list
+  before the first public release; checked on 2026-10-27 only that the license has a REDIST-list distribution clause.
+
 ### SQLite (native library `e_sqlite3`, bundled by SQLitePCLRaw.lib.e_sqlite3 2.1.13)
 - Source: https://sqlite.org
 - License: public domain (https://sqlite.org/copyright.html)

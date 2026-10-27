@@ -17,6 +17,8 @@
     <!-- Reproducible restore: lock files committed; CI restores in locked mode. -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RestoreLockedMode Condition="'$(CI)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">true</RestoreLockedMode>
+    <!-- Release packages are win-x64 (ADR 0030); listing it lets locked restores also cover `dotnet publish -r win-x64`. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
 
     <!-- Test-only fault injection and data-root override (TestHooks). Compiled into Debug builds only; inert in Release. -->
     <DefineConstants Condition="'$(Configuration)' == 'Debug'">$(DefineConstants);DYNAMICISLAND_TEST_HOOKS</DefineConstants>

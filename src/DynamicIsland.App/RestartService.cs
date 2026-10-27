@@ -21,14 +21,14 @@ public sealed class RestartService(LifecycleCoordinator lifecycle, ILogger<Resta
     {
         if (Environment.GetEnvironmentVariable(LauncherContract.SupervisedVariable) != "1")
         {
-            var launcher = Path.Combine(AppContext.BaseDirectory, LauncherContract.LauncherExecutable);
+            var launcher = Core.Distribution.AppLayout.LauncherFor(AppContext.BaseDirectory, File.Exists);
             if (!File.Exists(launcher))
             {
                 AppLog.RestartUnavailable(logger);
                 return false;
             }
 
-            var startInfo = new ProcessStartInfo(launcher) { UseShellExecute = false, WorkingDirectory = AppContext.BaseDirectory };
+            var startInfo = new ProcessStartInfo(launcher) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(launcher)! };
             startInfo.ArgumentList.Add(LauncherContract.AfterPidSwitch);
             startInfo.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
             if (safeMode)

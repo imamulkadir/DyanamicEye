@@ -59,5 +59,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0027 — Remembered pin and "Try again" for failed widgets](0027-pin-memory-and-widget-retry.md) — Accepted (P05-02)
 - [0028 — Accessibility pass: focus, names, high contrast, target sizes](0028-accessibility-pass.md) — Accepted (P05-03)
 - [0029 — Resource budget, adaptive stats cadence and the benchmark](0029-resource-budget-and-benchmark.md) — Accepted (P05-04)
+- [0030 — Release layout: stable launcher and immutable versioned payloads](0030-release-layout.md) — Accepted (P06-01)
 
-Pending: per-user installer technology (P06), updater trust/provenance model (P06).
+Pending: per-user installer technology (P06-02), updater trust/provenance model (P06-05).

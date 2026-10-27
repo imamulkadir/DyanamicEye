@@ -11,6 +11,11 @@
     <ApplicationIcon>..\..\assets\DynamicIsland.ico</ApplicationIcon>
     <!-- Required by LibraryImport-generated P/Invoke stubs. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!--
+      Release layout (ADR 0030): published as one NativeAOT file, the stable root DynamicIsland.exe (~4 MB, no runtime
+      to extract). Publishing needs the C++ build tools; normal builds and tests do not.
+    -->
+    <PublishAot>true</PublishAot>
   </PropertyGroup>
 
   <ItemGroup>

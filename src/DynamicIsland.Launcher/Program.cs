@@ -1,4 +1,5 @@
 using DynamicIsland.Core.Diagnostics;
+using DynamicIsland.Core.Distribution;
 using DynamicIsland.Core.Lifecycle;
 using DynamicIsland.Infrastructure;
 using DynamicIsland.Infrastructure.Lifecycle;
@@ -7,14 +8,14 @@ using DynamicIsland.Infrastructure.Logging;
 namespace DynamicIsland.Launcher;
 
 /// <summary>
-/// Entry point for sign-in startup, shortcuts and restarts. Accepts only <c>--safe-mode</c>, <c>--startup</c> (sign-in
+/// Entry point for sign-in startup, shortcuts and restarts. In a release layout it runs the payload named by
+/// <c>current.json</c> (falling back to the previous one), otherwise the app next to it (ADR 0030). Accepts only <c>--safe-mode</c>, <c>--startup</c> (sign-in
 /// start: wait <see cref="LauncherContract.StartupDelay"/> first, ADR 0015) and <c>--after-pid N</c> (wait for a previous
 /// app instance to exit first); anything else is ignored.
 /// Exit code: 0 after a clean app exit; otherwise the app's last exit code, or 1 when the app cannot be started.
 /// </summary>
 internal static class Program
 {
-    private const string AppExecutableName = "DynamicIsland.exe";
     private const string LogFilePrefix = "launcher-";
 
     private static readonly TimeSpan PreviousInstanceTimeout = TimeSpan.FromSeconds(15);
@@ -29,13 +30,20 @@ internal static class Program
             TimeProvider.System);
         var logger = logs.CreateLogger("DynamicIsland.Launcher");
 
-        var appPath = Path.Combine(AppContext.BaseDirectory, AppExecutableName);
-        if (!File.Exists(appPath))
+        var app = AppLayout.ResolveApp(AppContext.BaseDirectory, ReadPointer(), File.Exists, Environment.ProcessPath);
+        if (app is null)
         {
             LauncherLog.AppMissing(logger);
             MessageBoxRecoveryNotifier.NotifyAppMissing();
             return ExitCodes.Fatal;
         }
+
+        if (app.UsedPrevious)
+        {
+            LauncherLog.UsingPreviousVersion(logger, app.Version ?? string.Empty);
+        }
+
+        var appPath = app.AppPath;
 
         var supervisor = new AppSupervisor(
             new ProcessAppRunner(appPath, arguments.Startup),
@@ -70,6 +78,20 @@ internal static class Program
             LauncherLog.StartFailed(logger, ex.NativeErrorCode);
             MessageBoxRecoveryNotifier.NotifyAppMissing();
             return ExitCodes.Fatal;
+        }
+    }
+
+    /// <returns>The layout pointer, or <c>null</c> without one (development layout) or when it cannot be read.</returns>
+    private static string? ReadPointer()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, AppLayout.PointerFileName);
+        try
+        {
+            return File.Exists(path) && new FileInfo(path).Length <= AppLayout.MaxPointerBytes ? File.ReadAllText(path) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 

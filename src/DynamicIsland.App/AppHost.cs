@@ -120,7 +120,7 @@ public static class AppHost
         builder.Services.AddSingleton(sp => new StartupCoordinator(
             sp.GetRequiredService<IStartupRegistration>(),
             sp.GetRequiredService<ISettingsService>(),
-            System.IO.Path.Combine(AppContext.BaseDirectory, LauncherContract.LauncherExecutable),
+            Core.Distribution.AppLayout.LauncherFor(AppContext.BaseDirectory, System.IO.File.Exists), // Stable path (ADR 0030).
             sp.GetRequiredService<ILogger<StartupCoordinator>>()));
         builder.Services.AddSingleton(sp => new SettingsWindowService(() =>
         {

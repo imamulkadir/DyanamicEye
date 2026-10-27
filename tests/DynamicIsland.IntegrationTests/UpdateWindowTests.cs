@@ -191,7 +191,7 @@ public sealed class UpdateWindowTests : IDisposable
 
         public int Downloads => Volatile.Read(ref _downloads);
 
-        public async Task<UpdateDownloadResult> DownloadAsync(ReleaseAsset asset, IProgress<long> received, CancellationToken cancellationToken)
+        public async Task<UpdateDownloadResult> DownloadAsync(ReleaseInfo release, ReleaseAsset asset, IProgress<long> received, CancellationToken cancellationToken)
         {
             TaskCompletionSource<UpdateDownloadResult> next;
             lock (_lock)

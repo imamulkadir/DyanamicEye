@@ -136,6 +136,18 @@ public static class AppHost
             TimeSpan.FromMinutes(Random.Shared.Next(0, (int)Core.Updates.UpdateChecker.MaxJitter.TotalMinutes))));
         builder.Services.AddSingleton<Core.Updates.IUpdateChecker>(sp => sp.GetRequiredService<Core.Updates.UpdateChecker>());
         builder.Services.AddSingleton<UpdateCheckScheduler>();
+        // Verified downloads (ADR 0034) need the pinned release-signing key; without it the window offers the release page.
+        if (Core.Updates.ReleaseSigningKeys.Pinned.Count > 0)
+        {
+            builder.Services.AddSingleton<Core.Updates.IUpdateDownloader>(_ => new Infrastructure.Updates.GitHubUpdateDownloader(
+                new System.Net.Http.HttpClient(new System.Net.Http.SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(15) })
+                {
+                    Timeout = System.Threading.Timeout.InfiniteTimeSpan, // Large files; the downloader's stall timeout applies instead.
+                },
+                System.IO.Path.Combine(root, "updates"),
+                Core.Updates.ReleaseSigningKeys.Pinned));
+        }
+
         // Release details and the separate Download/Install approvals (ADR 0033). The in-app download and install arrive
         // with P06-05/06 (IUpdateDownloader/IUpdateInstaller); until then the window offers the release page.
         builder.Services.AddSingleton(sp => new UpdateWindowService(

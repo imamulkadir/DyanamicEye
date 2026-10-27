@@ -179,7 +179,7 @@ public sealed class UpdateFlowTests
 
         public int Downloads { get; private set; }
 
-        public async Task<UpdateDownloadResult> DownloadAsync(ReleaseAsset asset, IProgress<long> received, CancellationToken cancellationToken)
+        public async Task<UpdateDownloadResult> DownloadAsync(ReleaseInfo release, ReleaseAsset asset, IProgress<long> received, CancellationToken cancellationToken)
         {
             Downloads++;
             _progress = received;

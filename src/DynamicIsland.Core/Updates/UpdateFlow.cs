@@ -9,11 +9,12 @@ public sealed record StagedPackage(ReleaseAsset Asset, string Path);
 /// <param name="Problem">A short plain sentence for the user, on failure.</param>
 public sealed record UpdateDownloadResult(StagedPackage? Package, string? Problem);
 
-/// <summary>Downloads and verifies one release file (guide P06-05). Reports received bytes; never runs anything.</summary>
+/// <summary>Downloads and verifies one release file (guide P06-05, ADR 0034). Reports received bytes; never runs anything.</summary>
 public interface IUpdateDownloader
 {
+    /// <param name="asset">The file of <paramref name="release"/> to download (the other assets carry its signed manifest).</param>
     /// <exception cref="OperationCanceledException">The user cancelled.</exception>
-    Task<UpdateDownloadResult> DownloadAsync(ReleaseAsset asset, IProgress<long> received, CancellationToken cancellationToken);
+    Task<UpdateDownloadResult> DownloadAsync(ReleaseInfo release, ReleaseAsset asset, IProgress<long> received, CancellationToken cancellationToken);
 }
 
 /// <summary>Hands a verified package to the updater (guide P06-06), which closes and restarts the app.</summary>
@@ -118,7 +119,7 @@ public sealed class UpdateFlow : IDisposable
         UpdateDownloadResult result;
         try
         {
-            result = await _downloader!.DownloadAsync(Package!, progress, cancel.Token).ConfigureAwait(false);
+            result = await _downloader!.DownloadAsync(Release, Package!, progress, cancel.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancel.IsCancellationRequested)
         {

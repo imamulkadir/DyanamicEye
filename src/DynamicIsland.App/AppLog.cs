@@ -158,6 +158,10 @@ internal static partial class AppLog
         Message = "The island's pin could not be saved ({ErrorType})")]
     public static partial void PinNotSaved(ILogger logger, string errorType);
 
+    [LoggerMessage(EventId = 1062, EventName = "UpdateCheckFinished", Level = LogLevel.Information,
+        Message = "Update check: {Outcome} (latest published {LatestVersion})")]
+    public static partial void UpdateCheckFinished(ILogger logger, Core.Updates.UpdateCheckOutcome outcome, string? latestVersion);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

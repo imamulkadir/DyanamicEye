@@ -122,7 +122,10 @@ public sealed class MetricsWidgetTests : IDisposable
         await WaitForAsync(() => time.PendingTimers == 0, "the loop to go idle");
         widget.SetExpanded(true); // Shown again: quick cadence again.
         await StepAsync(time, widget, TimeSpan.Zero, expectedSamples: 19);
-        await StepAsync(time, widget, MetricsWidget.BaselineDelay, expectedSamples: 20);
+
+        // The next sample comes after the 0.5 s baseline delay, or after 2 s when the loop kept its baseline because hide
+        // and show arrived together; either way the quick cadence, not 5 s.
+        await StepAsync(time, widget, MetricsWidget.Interval, expectedSamples: 20);
         await StepAsync(time, widget, MetricsWidget.Interval, expectedSamples: 21);
 
         await stop.CancelAsync();

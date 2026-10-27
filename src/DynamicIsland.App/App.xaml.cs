@@ -134,6 +134,10 @@ public partial class App : Application
         components.StartAll();
         _host.Services.GetRequiredService<WidgetPresenter>().Start();
         _host.Services.GetRequiredService<PinMemory>().Start(); // Restores the pin from the last session (ADR 0027).
+        if (!launch.SafeMode)
+        {
+            _host.Services.GetRequiredService<UpdateCheckScheduler>().Start(); // Daily, consent and IT policy apply (ADR 0032).
+        }
 
         // Tray "Pause" also pauses optional background work (ADR 0013).
         _host.Services.GetRequiredService<IIslandStateMachine>().StateChanged += async (_, e) =>

@@ -75,14 +75,16 @@ public sealed class TrayMenuModelTests
     }
 
     [Fact]
-    public void Update_check_is_disabled_with_an_explanation_until_it_exists_and_settings_is_available()
+    public void Update_check_is_available_unless_updates_are_managed()
     {
         var menu = TrayMenuModel.Build(IslandState.Collapsed, safeMode: false, [Primary], null);
-
-        var updates = menu.Single(i => i.Command == TrayCommand.CheckForUpdates);
-        Assert.False(updates.Enabled);
-        Assert.False(string.IsNullOrWhiteSpace(updates.ToolTip));
+        Assert.True(menu.Single(i => i.Command == TrayCommand.CheckForUpdates).Enabled);
         Assert.True(menu.Single(i => i.Command == TrayCommand.Settings).Enabled);
+
+        var managed = TrayMenuModel.Build(IslandState.Collapsed, safeMode: false, [Primary], null, updatesManaged: true)
+            .Single(i => i.Command == TrayCommand.CheckForUpdates);
+        Assert.False(managed.Enabled);
+        Assert.False(string.IsNullOrWhiteSpace(managed.ToolTip)); // Says why.
     }
 
     [Fact]

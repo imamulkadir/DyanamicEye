@@ -26,6 +26,7 @@ public sealed class SettingsWindowTests : IDisposable
     private StartupState _startupState = StartupState.Off;
     private ShortcutState _shortcutState = ShortcutState.Off;
     private Core.Distribution.UpdatePolicy _updatePolicy = Core.Distribution.UpdatePolicy.Allowed;
+    private Core.Updates.IUpdateChecker? _updates;
 
     public void Dispose()
     {
@@ -270,6 +271,31 @@ public sealed class SettingsWindowTests : IDisposable
     }
 
     [Fact]
+    public async Task Check_for_updates_shows_the_answer_and_the_tray_opens_the_updates_page()
+    {
+        var release = new Core.Updates.ReleaseInfo(new Core.Updates.SemanticVersion(1, 3, 0, null), "v1.3.0", "Dynamic Island 1.3.0",
+            new DateTimeOffset(2026, 11, 2, 10, 0, 0, TimeSpan.Zero), new Uri("https://github.com/x/y/releases/tag/v1.3.0"), string.Empty, []);
+        var checker = new ScriptedChecker(new Core.Updates.UpdateCheckResult(Core.Updates.UpdateCheckOutcome.UpdateAvailable, release, DateTimeOffset.UtcNow));
+        _updates = checker;
+        var window = _ui.Invoke(Open);
+
+        _ui.Invoke(window.CheckForUpdatesNow);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        string status;
+        while (!(status = _ui.Invoke(() => ((TextBlock)window.FindName("UpdateStatusText")).Text)).StartsWith("Version 1.3.0", StringComparison.Ordinal) && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+
+        Assert.StartsWith("Version 1.3.0 is available", status, StringComparison.Ordinal);
+        Assert.Contains("you have 1.2.3", status, StringComparison.Ordinal);
+        Assert.Equal(1, checker.ManualChecks);
+        Assert.Equal("Updates", _ui.Invoke(() => (string)((TabItem)((TabControl)window.FindName("Pages")).SelectedItem).Header));
+        Assert.True(_ui.Invoke(() => ((Button)window.FindName("CheckUpdatesButton")).IsEnabled));
+        _ui.Invoke(window.Close);
+    }
+
+    [Fact]
     public void An_unmanaged_copy_shows_no_note()
     {
         var window = _ui.Invoke(Open);
@@ -294,7 +320,8 @@ public sealed class SettingsWindowTests : IDisposable
             () => _shortcutState,
             new NoBackup(),
             () => false,
-            _updatePolicy);
+            _updatePolicy,
+            _updates);
         var builder = new DiagnosticBundleBuilder(Path.Combine(_root, "logs"), Path.Combine(_root, "data"), new LogRedactor([]), TimeProvider.System);
         var window = new SettingsWindow(_settings, new FixedMonitors([Primary, Second]), builder, context, NullLogger<SettingsWindow>.Instance)
         {
@@ -359,6 +386,20 @@ public sealed class SettingsWindowTests : IDisposable
 
             Changed?.Invoke(this, Current);
             return IsReadOnly ? SettingsSaveResult.SkippedReadOnly : SettingsSaveResult.Saved;
+        }
+    }
+
+    private sealed class ScriptedChecker(Core.Updates.UpdateCheckResult answer) : Core.Updates.IUpdateChecker
+    {
+        public int ManualChecks { get; private set; }
+
+        public Core.Updates.UpdateCheckResult? Last { get; private set; }
+
+        public async Task<Core.Updates.UpdateCheckResult> CheckAsync(bool manual, CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            ManualChecks += manual ? 1 : 0;
+            return Last = answer;
         }
     }
 }

@@ -90,7 +90,9 @@ public sealed class NotesAndTasksWidgetTests : IDisposable
             Assert.True(await _notes.ExecuteAsync(PersonalDataWidget.AddCommand + $"note {i}", Ct));
         }
 
-        var snapshot = await WaitForNotesAsync(s => s.Total == 5 && s.Items.Count == 3);
+        // Items and total are two reads: a refresh racing the 5th insert can briefly pair the old items with the new
+        // total; the next change notification settles it, so wait for the settled state.
+        var snapshot = await WaitForNotesAsync(s => s.Total == 5 && s.Items.Count == 3 && s.Items[0].Text == "note 5");
 
         Assert.Equal(["note 5", "note 4", "note 3"], snapshot.Items.Select(n => n.Text));
         Assert.False(await _notes.ExecuteAsync(PersonalDataWidget.Toggle(snapshot.Items[0].Id), Ct)); // Notes have no "done".

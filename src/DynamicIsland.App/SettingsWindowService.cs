@@ -29,4 +29,11 @@ public sealed class SettingsWindowService(Func<SettingsWindow> create)
         window.Show();
         window.Activate();
     }
+
+    /// <summary>Tray "Check for updates": the Updates page, checking right away (ADR 0032).</summary>
+    public void ShowAndCheckForUpdates()
+    {
+        Show();
+        _window?.CheckForUpdatesNow();
+    }
 }

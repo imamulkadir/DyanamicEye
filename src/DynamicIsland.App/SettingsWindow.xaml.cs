@@ -34,7 +34,8 @@ public sealed record SettingsWindowContext(
     Func<ShortcutState> ShortcutState,
     IDataBackupService Backup,
     Func<bool> Restart,
-    Core.Distribution.UpdatePolicy? UpdatePolicy = null);
+    Core.Distribution.UpdatePolicy? UpdatePolicy = null,
+    Core.Updates.IUpdateChecker? Updates = null);
 
 /// <summary>
 /// Settings window (guide P03-03, ADR 0014): edits a <see cref="SettingsEditor"/> draft and saves it explicitly through
@@ -97,6 +98,12 @@ public partial class SettingsWindow : Window
         ReadOnlyBanner.Visibility = settings.IsReadOnly ? Visibility.Visible : Visibility.Collapsed;
         UpdatesVersionText.Text = context.Version;
         ShowUpdatePolicy(context.UpdatePolicy ?? Core.Distribution.UpdatePolicy.Allowed);
+        CheckUpdatesButton.IsEnabled = context.Updates is not null && context.UpdatePolicy?.SelfUpdateDisabled != true;
+        CheckUpdatesButton.ToolTip = context.Updates is null ? "Update checks are not available in this build" : null;
+        if (context.Updates?.Last is { } last)
+        {
+            ShowUpdateResult(last);
+        }
         AboutVersionText.Text = $"Version {context.Version}";
         AboutCopyrightText.Text = context.Copyright;
         DataFolderText.Text = context.DataFolder;
@@ -184,6 +191,42 @@ public partial class SettingsWindow : Window
     };
 
     /// <summary>What Windows actually does with the saved startup choice (ADR 0015); the box itself is the draft.</summary>
+    /// <summary>Tray "Check for updates": shows the Updates page and checks now (ADR 0032).</summary>
+    public void CheckForUpdatesNow()
+    {
+        Pages.SelectedItem = UpdatesPage;
+        if (CheckUpdatesButton.IsEnabled)
+        {
+            OnCheckForUpdates(this, new RoutedEventArgs());
+        }
+    }
+
+    private async void OnCheckForUpdates(object sender, RoutedEventArgs e)
+    {
+        if (_context.Updates is not { } updates)
+        {
+            return;
+        }
+
+        CheckUpdatesButton.IsEnabled = false;
+        UpdateStatusText.Text = "Checking GitHub…";
+        try
+        {
+            ShowUpdateResult(await updates.CheckAsync(manual: true, CancellationToken.None));
+        }
+        finally
+        {
+            CheckUpdatesButton.IsEnabled = true;
+        }
+    }
+
+    private void ShowUpdateResult(Core.Updates.UpdateCheckResult result) =>
+        UpdateStatusText.Text = Core.Updates.UpdateMessages.Describe(
+            result,
+            Core.Updates.SemanticVersion.TryParse(_context.Version) ?? new Core.Updates.SemanticVersion(0, 0, 0, null),
+            TimeZoneInfo.Local,
+            CultureInfo.CurrentCulture);
+
     /// <summary>IT-managed copies never update themselves (ADR 0031): say so and lock the daily check option.</summary>
     private void ShowUpdatePolicy(Core.Distribution.UpdatePolicy policy)
     {

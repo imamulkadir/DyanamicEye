@@ -2,6 +2,21 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-27 (oldest RECENT entries at P06-03)
+- 2026-10-26 **P05-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0027**.
+  - Audit: widget order/on-off, appearance and behavior already persist and apply without recreating the island; widget settings errors already recover on load (`NormalizeWidgets`). Gaps fixed: the pin was session-only; a Failed widget needed Settings off/on or a restart.
+  - **Core:** `BehaviorSettings.Pinned` (+ equality); `SettingsEditor` merge keeps the latest pin; `IslandSnapshot.IsPinned` (pinned, or hidden and returning pinned); `IIslandStateMachine.IsPinned` (default member; the real machine uses the snapshot); `ComponentHost.RetryAsync` (only enabled + Failed + not running + started + not paused + not Safe Mode); `WidgetRegistry.RetryAsync`.
+  - **App:** new `PinMemory` (restores at start, saves pin/unpin in order, logs `PinNotSaved` 1061 by type); registered in `AppHost`, started in `App.xaml.cs` after the presenter. `NotchView`: failed tab note has a **Try again** button (`Retry.<id>`) raising `RetryRequested`; `WidgetPresenter.Retry`.
+  - **Tests:** unit `IslandStateMachineTests.Pin_survives_hiding_but_not_unpinning_or_escape` (8 cases), `WidgetRegistryTests.Try_again_restarts_only_a_failed_enabled_widget` and `..._does_nothing_while_disabled_paused_or_in_safe_mode`, `SettingsEditorTests` merge keeps the pin; integration `PinMemoryTests` (restore, save/no save on hide and fullscreen, Escape, failed save then retry; found and fixed out-of-order saves), `WidgetPanelTests.A_failed_widgets_tab_offers_try_again`; smoke `PinSmokeTests` (real app starts pinned from settings, UIA Toggle unpins, `settings.json` saved `pinned: false`, exit 0).
+  - **First full run found 2 failures (Debug, one per run):**
+    - `Try_again_restarts_only_a_failed_enabled_widget`: `RetryAsync` returned false because Failed is reported just before the run loop ends (`IsRunning` still true). Product race too (a very quick click). Fix: `ComponentHost.RetryAsync` waits for the failed loop to end (`StopAsync`) and then starts it. Then 8/8 repeats green.
+    - `TrayActionSmokeTests.Pause_hides_the_island_and_resume_brings_it_back`: "Timed out waiting for menu item Tray.TogglePause" (cleanup then hit a locked `islands.db-shm` because the app was still running). Not reproduced in 3 repeats. Likely cause: a popup menu closes itself when the foreground changes (the first-run window closing just before). Test-driver fix: `TrayMenuDriver` asks for the menu again if its first item has not appeared within 2 s (up to 10 s). Tray smoke 7/7 ×2 after.
+  - **Changed files:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (PN1–PN2), `docs/WORK_LOG.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Components/ComponentHost.cs`, `src/DynamicIsland.Core/Settings/AppSettings.cs`, `src/DynamicIsland.Core/Shell/{IslandStateMachine.cs, IslandStates.cs, SettingsEditor.cs}`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `tests/DynamicIsland.IntegrationTests/WidgetPanelTests.cs`, `tests/DynamicIsland.UnitTests/Shell/{IslandStateMachineTests.cs, SettingsEditorTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/WidgetRegistryTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/TrayMenuDriver.cs`
+    - new: `docs/ADR/0027-pin-memory-and-widget-retry.md`, `src/DynamicIsland.App/PinMemory.cs`, `tests/DynamicIsland.IntegrationTests/PinMemoryTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/PinSmokeTests.cs`
+    - Suggested commit message: `feat: remember the pin and retry failed widgets (P05-02, ADR 0027)`
+- 2026-10-26 Title removal + scroll fix committed by the owner as `d5ba82b`; CI run 40356940917 **success**: Release 650/650, Debug 659/659, 0 skipped.
+
 ## Archived 2026-10-27 (oldest RECENT entry at P06-02)
 - 2026-10-26 P05-01 + system-stats tab fix committed by the owner as `6edc4a6`; CI run 40354693505 **success**: Release 648/648, Debug 657/657, 0 skipped.
 

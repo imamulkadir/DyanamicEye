@@ -33,6 +33,8 @@ public sealed class TrayController : IDisposable
     private readonly Func<string?> _islandMonitorId;
     private readonly RestartService _restart;
     private readonly Action _openSettings;
+    private readonly Action _checkForUpdates;
+    private readonly bool _updatesManaged;
     private readonly string _logsFolder;
     private readonly ILogger<TrayController> _logger;
     private readonly HwndSource _messageWindow;
@@ -49,8 +51,12 @@ public sealed class TrayController : IDisposable
         RestartService restart,
         Action openSettings,
         string logsFolder,
-        ILogger<TrayController> logger)
+        ILogger<TrayController> logger,
+        Action? checkForUpdates = null,
+        bool updatesManaged = false)
     {
+        _checkForUpdates = checkForUpdates ?? openSettings;
+        _updatesManaged = updatesManaged;
         _state = state;
         _lifecycle = lifecycle;
         _launch = launch;
@@ -124,7 +130,7 @@ public sealed class TrayController : IDisposable
 
     private void ShowMenu()
     {
-        var model = TrayMenuModel.Build(_state.State, _launch.SafeMode, _monitors.GetMonitors(), _islandMonitorId());
+        var model = TrayMenuModel.Build(_state.State, _launch.SafeMode, _monitors.GetMonitors(), _islandMonitorId(), _updatesManaged);
         _menu.Items.Clear();
         foreach (var item in model)
         {
@@ -208,6 +214,9 @@ public sealed class TrayController : IDisposable
                 break;
             case TrayCommand.Settings:
                 _openSettings();
+                break;
+            case TrayCommand.CheckForUpdates:
+                _checkForUpdates();
                 break;
             case TrayCommand.OpenLogs:
                 OpenLogsFolder();

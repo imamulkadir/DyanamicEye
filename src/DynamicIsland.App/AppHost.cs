@@ -114,6 +114,29 @@ public static class AppHost
             sp.GetRequiredService<LifecycleCoordinator>(),
             sp.GetRequiredService<ILogger<WidgetPresenter>>()));
         builder.Services.AddSingleton<AppInfo>();
+        // Update checks (ADR 0032): GitHub releases/latest; tests (Debug data-root hook) never touch the network.
+        builder.Services.AddSingleton(_ => new System.Net.Http.HttpClient(new System.Net.Http.SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            AutomaticDecompression = System.Net.DecompressionMethods.All,
+        }));
+        builder.Services.AddSingleton<Core.Updates.IReleaseSource>(sp => TestHooks.Get(TestHooks.DataRootVariable) is { Length: > 0 }
+            ? new Infrastructure.Updates.OfflineReleaseSource()
+            : new Infrastructure.Updates.GitHubReleaseSource(
+                sp.GetRequiredService<System.Net.Http.HttpClient>(),
+                Infrastructure.Updates.GitHubReleaseSource.ProjectRepository,
+                sp.GetRequiredService<AppInfo>().DisplayVersion));
+        builder.Services.AddSingleton(sp => new Core.Updates.UpdateChecker(
+            sp.GetRequiredService<Core.Updates.IReleaseSource>(),
+            new Infrastructure.Updates.JsonUpdateStateStore(dataDirectory),
+            () => sp.GetRequiredService<ISettingsService>().Current,
+            sp.GetRequiredService<Core.Distribution.UpdatePolicy>(),
+            Core.Updates.SemanticVersion.TryParse(sp.GetRequiredService<AppInfo>().DisplayVersion) ?? new Core.Updates.SemanticVersion(0, 0, 0, null),
+            sp.GetRequiredService<TimeProvider>(),
+            TimeSpan.FromMinutes(Random.Shared.Next(0, (int)Core.Updates.UpdateChecker.MaxJitter.TotalMinutes))));
+        builder.Services.AddSingleton<Core.Updates.IUpdateChecker>(sp => sp.GetRequiredService<Core.Updates.UpdateChecker>());
+        builder.Services.AddSingleton<UpdateCheckScheduler>();
+
         // IT-managed copies never update themselves (ADR 0031); read once at start.
         builder.Services.AddSingleton(_ => Platform.Windows.Startup.UpdatePolicyReader.Read(
             System.IO.Path.GetDirectoryName(Core.Distribution.AppLayout.LauncherFor(AppContext.BaseDirectory, System.IO.File.Exists))!));
@@ -146,7 +169,8 @@ public static class AppHost
                     () => sp.GetRequiredService<ShortcutController>().State,
                     sp.GetRequiredService<Core.PersonalData.IDataBackupService>(),
                     () => sp.GetRequiredService<RestartService>().Restart(launch.SafeMode),
-                    sp.GetRequiredService<Core.Distribution.UpdatePolicy>()),
+                    sp.GetRequiredService<Core.Distribution.UpdatePolicy>(),
+                    sp.GetRequiredService<Core.Updates.IUpdateChecker>()),
                 sp.GetRequiredService<ILogger<SettingsWindow>>());
         }));
         builder.Services.AddSingleton(sp => new TrayController(
@@ -159,7 +183,9 @@ public static class AppHost
             sp.GetRequiredService<RestartService>(),
             () => sp.GetRequiredService<SettingsWindowService>().Show(),
             sp.GetRequiredService<FileLoggerOptions>().Directory,
-            sp.GetRequiredService<ILogger<TrayController>>()));
+            sp.GetRequiredService<ILogger<TrayController>>(),
+            () => sp.GetRequiredService<SettingsWindowService>().ShowAndCheckForUpdates(),
+            sp.GetRequiredService<Core.Distribution.UpdatePolicy>().SelfUpdateDisabled));
         builder.Services.AddSingleton<Win32FullscreenDetector>();
         builder.Services.AddSingleton<IFullscreenDetector>(sp => sp.GetRequiredService<Win32FullscreenDetector>());
         builder.Services.AddSingleton(sp => new FullscreenCoordinator(

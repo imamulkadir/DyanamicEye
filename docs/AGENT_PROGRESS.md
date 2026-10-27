@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P06-02 (per-user Inno Setup installer + IT-managed update policy) IMPLEMENTED_AWAITING_VALIDATION, uncommitted together with the SDK-pin fix. P06-01 committed (`da6a6b8`). G02/G03/P04/P05/P06 manual rows are still owed by the owner.
-- **Active task status:** uncommitted: SDK-pin fix + P06-02. Last CI: run 40454654011 on `da6a6b8` **failed** at locked restore (fixed by the SDK pin).
+- **Active task:** P06-03 (update checks against GitHub releases/latest) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. P06-01/02 committed. G02/G03/P04/P05/P06 manual rows are still owed by the owner.
+- **Active task status:** P06-03 **uncommitted**. P06-02 + SDK pin committed as `150a187`; CI run 40463039773 **success** (712/712, 725/725, 0 skipped; ZIP and installer built on CI).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -26,8 +26,8 @@
 - **Last updated:** 2026-10-26 (P05-01 IMPLEMENTED_AWAITING_VALIDATION; next: owner commit, CI, then P05-02)
 
 ## NEXT ACTION (ONE task only)
-**Owner:** commit the SDK-pin fix and P06-02 together (file list in RECENT VERIFIED CHANGES), push, and check that CI is green (CI now builds the portable ZIP **and** the installer as a verification step). Manual: IN1 (interactive wizard), IN3 (uninstall Yes/No prompt), IN4 (Standard User account), IN5 (managed).
-**Then agent:** **P06-03** release metadata: SemVer compare (prerelease policy) against the installed version, stable channel, daily checks with local cache/jitter/backoff, GitHub `releases/latest` or a static manifest, user agent and rate-limit awareness — and honor `UpdatePolicy` (no checks when managed) and the user's daily-check consent. Network code: ask the owner before the first real request to GitHub if unsure.
+**Owner:** review and commit P06-03 (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. Manual: UP1–UP4 in `docs/TEST_MATRIX.md` (Check for updates, offline, daily check log line, managed).
+**Then agent:** **P06-04** update UI: version, release date, formatted download size, notes sections (features/fixes) as plain text, release link, progress/cancel/retry, **separate download approval and install approval**, never silent. The download/verify itself is P06-05 and the swap P06-06 — P06-04 can stop at a confirmed "Download" approval with a stubbed downloader if needed; keep each step reviewable.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -39,7 +39,7 @@
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
 | P05 — Customization/performance | P05-01…P05-04 | IMPLEMENTED_AWAITING_VALIDATION (01–04) | **G05 automated PASS** 2026-10-27, CI run 40437920943 (`802906f`): goals met on the reference machine (idle CPU ~0 %, private 62–77 MB at rest; 94–104 MB after heavy automated use, documented deviation) — docs/PERFORMANCE.md; manual rows owed |
-| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–02 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
+| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–03 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
 ### G01 evidence (guide §5: "corrupt settings recover; simulated widget failure isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app")
@@ -52,6 +52,18 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-27 **P06-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0032**.
+  - **Core/Updates:** `SemanticVersion` (SemVer 2.0 precedence, `v` prefix, build metadata ignored), `UpdateContracts` (`ReleaseInfo`, `ReleaseAsset`, `ReleaseFetch`, `IReleaseSource`, `IUpdateChecker`, `UpdateCheckState`, `IUpdateStateStore`), `GitHubReleaseParser` (stable only; SemVer tag; HTTPS github.com URLs inside the repo only; sizes ≤ 1 GB; ≤ 50 assets; notes plain text ≤ 20,000 chars; response ≤ 1 MB), `UpdateChecker` (policy > consent; 24 h + 0–2 h jitter; backoff 1 h doubling to 24 h; honors GitHub reset; manual cooldown 1 min; ETag/304; cache), `UpdateMessages`.
+  - **Infrastructure/Updates:** `GitHubReleaseSource` (unauthenticated; User-Agent, Accept, API version, If-None-Match; 15 s timeout; 404/304/403/429 handling), `JsonUpdateStateStore` (`data/update-check.json`, atomic, re-validated on load), `OfflineReleaseSource` (Debug tests under the data-root hook never reach the network).
+  - **App:** `UpdateCheckScheduler` (2 min after start, then when due; at least hourly re-evaluation; not in Safe Mode; log `UpdateCheckFinished` 1062); Settings › Updates "Check for updates" live with a status sentence; tray "Check for updates…" enabled (greyed out when managed) and opens that page checking; DI in `AppHost`.
+  - Live request (real `GitHubReleaseSource`, .NET 10 file-based scratch program outside the repo): `NoRelease` (404 — no releases yet), as expected.
+  - **Flaky tests found in the first full run and fixed (test-only):** the new metrics cadence test (hide+show in one wake keeps the baseline: 2 s instead of 0.5 s — both quick; the test now accepts either), and `NotesAndTasksWidgetTests.Notes_show_the_latest_three_and_count_the_rest` (items and total are two store reads; a refresh racing the 5th insert briefly pairs old items with the new total; the next notification settles it — the test waits for the settled state). 20/20 repeats green after.
+  - **Tests:** unit `SemanticVersionAndParserTests`, `UpdateCheckerTests`, `GitHubReleaseSourceTests` (fake handler: headers, status codes, rate limits, offline, garbage, oversized, timeout; cache round trip and tampered link) — 49 total; `TrayMenuModelTests` updated; integration `SettingsWindowTests.Check_for_updates_shows_the_answer_and_the_tray_opens_the_updates_page`.
+  - **Changed files:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (UP1–UP4), `docs/WORK_LOG.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs, SettingsWindowService.cs, TrayController.cs}`, `src/DynamicIsland.Core/Shell/TrayMenu.cs`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`, `tests/DynamicIsland.UnitTests/Shell/TrayMenuModelTests.cs`, `tests/DynamicIsland.UnitTests/Widgets/{MetricsWidgetTests.cs, NotesAndTasksWidgetTests.cs}`
+    - new: `docs/ADR/0032-update-checks.md`, `src/DynamicIsland.App/UpdateCheckScheduler.cs`, `src/DynamicIsland.Core/Updates/{GitHubReleaseParser.cs, SemanticVersion.cs, UpdateChecker.cs, UpdateContracts.cs, UpdateMessages.cs}`, `src/DynamicIsland.Infrastructure/Updates/{GitHubReleaseSource.cs, JsonUpdateStateStore.cs, OfflineReleaseSource.cs}`, `tests/DynamicIsland.UnitTests/Updates/{GitHubReleaseSourceTests.cs, SemanticVersionAndParserTests.cs, UpdateCheckerTests.cs}`
+    - Suggested commit message: `feat: daily update checks against GitHub releases (P06-03, ADR 0032)`
+- 2026-10-27 P06-02 + SDK pin committed by the owner as `150a187`; CI run 40463039773 **success**: 712/712 and 725/725, 0 skipped; ZIP and installer built on CI.
 - 2026-10-27 **P06-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0031**.
   - Owner decision (AskUserQuestion): **Inno Setup** (recommended; WiX MSI and "no installer" offered).
   - `packaging/installer/DynamicIsland.iss`: per-user (`PrivilegesRequired=lowest`, `%LOCALAPPDATA%\Programs\DynamicIsland`), Start menu, optional desktop icon, upgrades replace `app-*`, closes a running island first (WM_CLOSE to `DynamicIsland.Tray`), uninstall removes our Run value and keeps user data unless the user answers Yes (silent: always kept), `/MANAGED=1` writes `managed.json`. `tools/Publish-Layout.ps1 -Installer` builds `DynamicIsland-Setup-win-x64.exe` (49.2 MB) + SHA-256; CI builds it too (Inno Setup 6.7.1 on the runner image).
@@ -99,19 +111,6 @@
     - new: `docs/ADR/0028-accessibility-pass.md`, `tests/DynamicIsland.IntegrationTests/AccessibilityAuditTests.cs`, `tests/DynamicIsland.IntegrationTests/References/notch-pinned-highcontrast.png`
     - Suggested commit message: `feat: accessibility pass - focus marks, high contrast, target sizes (P05-03, ADR 0028); bound media session calls`
 - 2026-10-26 P05-02 committed by the owner as `3c2c70f`; CI run 40362826141 **success**.
-- 2026-10-26 **P05-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0027**.
-  - Audit: widget order/on-off, appearance and behavior already persist and apply without recreating the island; widget settings errors already recover on load (`NormalizeWidgets`). Gaps fixed: the pin was session-only; a Failed widget needed Settings off/on or a restart.
-  - **Core:** `BehaviorSettings.Pinned` (+ equality); `SettingsEditor` merge keeps the latest pin; `IslandSnapshot.IsPinned` (pinned, or hidden and returning pinned); `IIslandStateMachine.IsPinned` (default member; the real machine uses the snapshot); `ComponentHost.RetryAsync` (only enabled + Failed + not running + started + not paused + not Safe Mode); `WidgetRegistry.RetryAsync`.
-  - **App:** new `PinMemory` (restores at start, saves pin/unpin in order, logs `PinNotSaved` 1061 by type); registered in `AppHost`, started in `App.xaml.cs` after the presenter. `NotchView`: failed tab note has a **Try again** button (`Retry.<id>`) raising `RetryRequested`; `WidgetPresenter.Retry`.
-  - **Tests:** unit `IslandStateMachineTests.Pin_survives_hiding_but_not_unpinning_or_escape` (8 cases), `WidgetRegistryTests.Try_again_restarts_only_a_failed_enabled_widget` and `..._does_nothing_while_disabled_paused_or_in_safe_mode`, `SettingsEditorTests` merge keeps the pin; integration `PinMemoryTests` (restore, save/no save on hide and fullscreen, Escape, failed save then retry; found and fixed out-of-order saves), `WidgetPanelTests.A_failed_widgets_tab_offers_try_again`; smoke `PinSmokeTests` (real app starts pinned from settings, UIA Toggle unpins, `settings.json` saved `pinned: false`, exit 0).
-  - **First full run found 2 failures (Debug, one per run):**
-    - `Try_again_restarts_only_a_failed_enabled_widget`: `RetryAsync` returned false because Failed is reported just before the run loop ends (`IsRunning` still true). Product race too (a very quick click). Fix: `ComponentHost.RetryAsync` waits for the failed loop to end (`StopAsync`) and then starts it. Then 8/8 repeats green.
-    - `TrayActionSmokeTests.Pause_hides_the_island_and_resume_brings_it_back`: "Timed out waiting for menu item Tray.TogglePause" (cleanup then hit a locked `islands.db-shm` because the app was still running). Not reproduced in 3 repeats. Likely cause: a popup menu closes itself when the foreground changes (the first-run window closing just before). Test-driver fix: `TrayMenuDriver` asks for the menu again if its first item has not appeared within 2 s (up to 10 s). Tray smoke 7/7 ×2 after.
-  - **Changed files:**
-    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (PN1–PN2), `docs/WORK_LOG.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, NotchView.xaml.cs, WidgetPresenter.cs}`, `src/DynamicIsland.Core/Components/ComponentHost.cs`, `src/DynamicIsland.Core/Settings/AppSettings.cs`, `src/DynamicIsland.Core/Shell/{IslandStateMachine.cs, IslandStates.cs, SettingsEditor.cs}`, `src/DynamicIsland.Core/Widgets/WidgetRegistry.cs`, `tests/DynamicIsland.IntegrationTests/WidgetPanelTests.cs`, `tests/DynamicIsland.UnitTests/Shell/{IslandStateMachineTests.cs, SettingsEditorTests.cs}`, `tests/DynamicIsland.UnitTests/Widgets/WidgetRegistryTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/TrayMenuDriver.cs`
-    - new: `docs/ADR/0027-pin-memory-and-widget-retry.md`, `src/DynamicIsland.App/PinMemory.cs`, `tests/DynamicIsland.IntegrationTests/PinMemoryTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/PinSmokeTests.cs`
-    - Suggested commit message: `feat: remember the pin and retry failed widgets (P05-02, ADR 0027)`
-- 2026-10-26 Title removal + scroll fix committed by the owner as `d5ba82b`; CI run 40356940917 **success**: Release 650/650, Debug 659/659, 0 skipped.
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -120,6 +119,10 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-27 | P06-03 | Windows 11 Pro 25H2 x64, `CI=true`, SDK 10.0.401 | full suite `--max-parallel-test-modules 1` Release ×2, Debug ×2 | **2 FAILs + 1 skip → fixed** | Release 761/762 (1 skipped, unnamed) and 760/762 (`Notes_show_the_latest_three…`); Debug 774/775 (new metrics cadence test) and 775/775; both flaky tests fixed (test-only), 20/20 repeats |
+| 2026-10-27 | P06-03 fixes | same | full suite Release ×1, Debug ×1 with `--output Detailed` | PASS | Release 762/762, Debug 775/775, **0 skipped** |
+| 2026-10-27 | P06-03 live | same | real `GitHubReleaseSource` against api.github.com | PASS | NoRelease (404), as expected with no releases |
+| 2026-10-27 | P06-02 | GitHub Actions `windows-2025` (`150a187`) | CI workflow incl. packaging | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40463039773; 712/712 and 725/725, 0 skipped |
 | 2026-10-27 | P06-02 | Windows 11 Pro 25H2 x64, `CI=true`, SDK 10.0.401 exact | `dotnet build` Release + Debug (0 warnings); full suite `--max-parallel-test-modules 1` Release ×2, Debug ×2; `Publish-Layout.ps1 -Installer` | PASS | Release 712/712 ×2, Debug 725/725 ×2, **0 skipped**; installer 49.2 MB |
 | 2026-10-27 | P06-02 install test | same, Medium integrity, scratch folder | silent install / start / reinstall over running / uninstall while running | FAIL → fixed → PASS | first run left the app running on a half-deleted folder; close-first fix; rerun all 6 checks pass |
 | 2026-10-27 | P06-01 | GitHub Actions `windows-2025` (`da6a6b8`) | CI workflow | **FAIL** | https://github.com/imamulkadir/DyanamicEye/actions/runs/40454654011: NU1004 at locked restore (SDK 10.0.403 rolled forward); fixed by the exact SDK pin |

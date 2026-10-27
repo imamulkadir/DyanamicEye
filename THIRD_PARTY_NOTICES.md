@@ -92,6 +92,15 @@ Versions are pinned in `Directory.Packages.props`. Resolved transitive packages 
 - Notice: **open item (P07-01):** confirm that Microsoft.Windows.SDK.NET.dll is covered by the Windows SDK REDIST list
   before the first public release; checked on 2026-10-27 only that the license has a REDIST-list distribution clause.
 
+### Inno Setup 6 (setup and uninstall runtime embedded in DynamicIsland-Setup-win-x64.exe)
+- Source: https://jrsoftware.org/isinfo.php
+- License: Inno Setup License (https://jrsoftware.org/files/is/license.txt): use for any purpose including commercial,
+  redistribution allowed; binary redistributions must keep the copyright notice and web addresses in place (the
+  Setup "About" box keeps them). Read 2026-10-27.
+- Used by: `packaging/installer/DynamicIsland.iss` (built with the Inno Setup 6 compiler, ADR 0031)
+- Redistributed: yes (inside the installer)
+- Notice: "Copyright (C) 1997-2026 Jordan Russell. Portions Copyright (C) 2000-2026 Martijn Laan." https://jrsoftware.org/
+
 ### SQLite (native library `e_sqlite3`, bundled by SQLitePCLRaw.lib.e_sqlite3 2.1.13)
 - Source: https://sqlite.org
 - License: public domain (https://sqlite.org/copyright.html)

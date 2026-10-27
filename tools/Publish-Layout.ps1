@@ -14,11 +14,16 @@
     %LOCALAPPDATA%\DynamicIsland, for the portable and the installed version alike.
 .PARAMETER Version
     Payload version (SemVer). Defaults to <Version> in Directory.Build.props.
+.PARAMETER Installer
+    Also build the per-user installer artifacts/DynamicIsland-Setup-win-x64.exe (+ .sha256) with Inno Setup 6
+    (ADR 0031). Needs ISCC.exe (Inno Setup 6 installed, or -IsccPath).
 #>
 [CmdletBinding()]
 param(
     [string] $Version,
-    [string] $Output = (Join-Path $PSScriptRoot '..' 'artifacts')
+    [string] $Output = (Join-Path $PSScriptRoot '..' 'artifacts'),
+    [switch] $Installer,
+    [string] $IsccPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,8 +37,8 @@ if ($Version -notmatch '^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})(-[
 }
 
 # The NativeAOT linker is found through vswhere, which is not always on PATH.
-$installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio' 'Installer'
-if ((Test-Path $installer) -and ($env:PATH -notlike "*$installer*")) { $env:PATH = "$env:PATH;$installer" }
+$vsInstaller = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio' 'Installer'
+if ((Test-Path $vsInstaller) -and ($env:PATH -notlike "*$vsInstaller*")) { $env:PATH = "$env:PATH;$vsInstaller" }
 
 $layout = Join-Path $Output 'layout'
 $payload = Join-Path $layout "app-$Version"
@@ -74,3 +79,24 @@ $launcherMb = [math]::Round((Get-Item (Join-Path $layout 'DynamicIsland.exe')).L
 $zipMb = [math]::Round((Get-Item $zip).Length / 1MB, 1)
 Write-Host "Layout: $layout (launcher $launcherMb MB, payload $payloadMb MB)"
 Write-Host "Portable ZIP: $zip ($zipMb MB, SHA-256 $hash)"
+
+if ($Installer) {
+    if (-not $IsccPath) {
+        $IsccPath = @(
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6' 'ISCC.exe'),
+            (Join-Path $env:ProgramFiles 'Inno Setup 6' 'ISCC.exe'),
+            (Join-Path $env:LOCALAPPDATA 'Programs' 'Inno Setup 6' 'ISCC.exe')
+        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    }
+    if (-not $IsccPath) { throw 'Inno Setup 6 (ISCC.exe) not found; install it or pass -IsccPath.' }
+
+    Write-Host "Building installer with $IsccPath..."
+    $script = Join-Path $root 'packaging' 'installer' 'DynamicIsland.iss'
+    & $IsccPath /Q "/DAppVersion=$Version" "/DLayoutDir=$((Resolve-Path $layout).Path)" "/DOutputDir=$((Resolve-Path $Output).Path)" $script
+    if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
+
+    $setup = Join-Path $Output 'DynamicIsland-Setup-win-x64.exe'
+    $setupHash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+    "$setupHash  $(Split-Path $setup -Leaf)" | Set-Content "$setup.sha256" -Encoding ascii
+    Write-Host "Installer: $setup ($([math]::Round((Get-Item $setup).Length / 1MB, 1)) MB, SHA-256 $setupHash)"
+}

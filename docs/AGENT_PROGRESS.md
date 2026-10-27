@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P06-01 (release layout: stable NativeAOT launcher + immutable versioned payloads) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. P05 complete in code; G05 automated evidence on CI. G02/G03/P04/P05 manual rows are still owed by the owner.
-- **Active task status:** P06-01 **uncommitted**. P05-04 committed as `802906f`; CI run 40437920943 **success** (668/668, 679/679, 0 skipped; benchmark ran on CI).
+- **Active task:** P06-02 (per-user Inno Setup installer + IT-managed update policy) IMPLEMENTED_AWAITING_VALIDATION, uncommitted together with the SDK-pin fix. P06-01 committed (`da6a6b8`). G02/G03/P04/P05/P06 manual rows are still owed by the owner.
+- **Active task status:** uncommitted: SDK-pin fix + P06-02. Last CI: run 40454654011 on `da6a6b8` **failed** at locked restore (fixed by the SDK pin).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -26,8 +26,8 @@
 - **Last updated:** 2026-10-26 (P05-01 IMPLEMENTED_AWAITING_VALIDATION; next: owner commit, CI, then P05-02)
 
 ## NEXT ACTION (ONE task only)
-**Owner:** review and commit P06-01 (file list in RECENT VERIFIED CHANGES), push, and check that CI is green — CI now also runs `tools/Publish-Layout.ps1` (NativeAOT launcher + self-contained payload) as a verification step, adding a few minutes. Optional: try LY1/LY4 with `artifacts\DynamicIsland-Portable-win-x64.zip`. Note the open license item in THIRD_PARTY_NOTICES.md (Windows SDK projection DLL, to settle before the first public release).
-**Then agent:** **P06-02** per-user installer (guide §5: no elevation, Start menu, uninstall keeps user data unless asked, IT-managed flag disables self-update; test with a Standard User account). First decide WiX vs Inno Setup per guide §2 (license, security, enterprise) in an ADR — ask the owner before adding a build-tool dependency.
+**Owner:** commit the SDK-pin fix and P06-02 together (file list in RECENT VERIFIED CHANGES), push, and check that CI is green (CI now builds the portable ZIP **and** the installer as a verification step). Manual: IN1 (interactive wizard), IN3 (uninstall Yes/No prompt), IN4 (Standard User account), IN5 (managed).
+**Then agent:** **P06-03** release metadata: SemVer compare (prerelease policy) against the installed version, stable channel, daily checks with local cache/jitter/backoff, GitHub `releases/latest` or a static manifest, user agent and rate-limit awareness — and honor `UpdatePolicy` (no checks when managed) and the user's daily-check consent. Network code: ask the owner before the first real request to GitHub if unsure.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -39,7 +39,7 @@
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
 | P05 — Customization/performance | P05-01…P05-04 | IMPLEMENTED_AWAITING_VALIDATION (01–04) | **G05 automated PASS** 2026-10-27, CI run 40437920943 (`802906f`): goals met on the reference machine (idle CPU ~0 %, private 62–77 MB at rest; 94–104 MB after heavy automated use, documented deviation) — docs/PERFORMANCE.md; manual rows owed |
-| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
+| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–02 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
 ### G01 evidence (guide §5: "corrupt settings recover; simulated widget failure isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app")
@@ -52,6 +52,18 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-27 **P06-02 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0031**.
+  - Owner decision (AskUserQuestion): **Inno Setup** (recommended; WiX MSI and "no installer" offered).
+  - `packaging/installer/DynamicIsland.iss`: per-user (`PrivilegesRequired=lowest`, `%LOCALAPPDATA%\Programs\DynamicIsland`), Start menu, optional desktop icon, upgrades replace `app-*`, closes a running island first (WM_CLOSE to `DynamicIsland.Tray`), uninstall removes our Run value and keeps user data unless the user answers Yes (silent: always kept), `/MANAGED=1` writes `managed.json`. `tools/Publish-Layout.ps1 -Installer` builds `DynamicIsland-Setup-win-x64.exe` (49.2 MB) + SHA-256; CI builds it too (Inno Setup 6.7.1 on the runner image).
+  - IT policy: `Core/Distribution/UpdatePolicy` (HKLM policy > HKCU policy > managed.json; 0 explicitly allows; unreadable managed.json fails closed), `Platform.Windows/Startup/UpdatePolicyReader`, registered in `AppHost`; Settings › Updates shows who manages updates and locks the daily-check box (`SettingsWindowContext.UpdatePolicy`, optional).
+  - Install test (dev PC, Medium integrity = not elevated, scratch folder, silent): first run found that **uninstalling a running copy left it running on a half-deleted folder** (it crashed on exit — exit -532462766 — and the crash supervisor relaunched it). Fixed with the close-first step; rerun: install, start, reinstall over the running copy (closed cleanly), start, uninstall while running → everything removed (folder, shortcut, uninstall entry, Run value), no HKLM entry, no new crash records, user data folder kept. The first run's two crash records in the owner's real `crash-history.json` are outside the 5-minute restart window (no Safe Mode effect); test processes were stopped and the scratch folder removed.
+  - **Notices:** Inno Setup runtime (embedded in the installer).
+  - **Tests:** unit `UpdatePolicyTests` (12); integration `SettingsWindowTests` managed note (machine policy / installer flag) and unmanaged default.
+  - **Changed files** (together with the SDK-pin fix: `global.json`, `docs/ADR/0001-supported-windows-versions.md`):
+    - modified: `.github/workflows/ci.yml`, `THIRD_PARTY_NOTICES.md`, `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (IN1–IN5), `docs/WORK_LOG.md`, `src/DynamicIsland.App/{AppHost.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs}`, `tests/DynamicIsland.IntegrationTests/SettingsWindowTests.cs`, `tools/Publish-Layout.ps1`
+    - new: `docs/ADR/0031-per-user-installer.md`, `packaging/installer/DynamicIsland.iss`, `src/DynamicIsland.Core/Distribution/UpdatePolicy.cs`, `src/DynamicIsland.Platform.Windows/Startup/UpdatePolicyReader.cs`, `tests/DynamicIsland.UnitTests/Distribution/UpdatePolicyTests.cs`
+    - Suggested commit message: `feat: per-user installer and IT-managed update policy (P06-02, ADR 0031); pin the .NET SDK exactly`
+- 2026-10-27 P06-01 committed by the owner as `da6a6b8`; CI run 40454654011 **failure** at "Restore (locked)": `NU1004 … Microsoft.DotNet.ILCompiler version has changed from [10.0.12, ) to [10.0.14, )`. Cause: `global.json` rollForward `latestFeature` let setup-dotnet install and use SDK 10.0.403 (runtime 10.0.14) while the lock files came from 10.0.401; the implicit NativeAOT/runtime packs follow the SDK patch. Fix (uncommitted): `"rollForward": "disable"` (exact SDK 10.0.401); ADR 0001 amended. Local: SDK 10.0.401, locked restore and Release build OK. Suggested commit message: `build: pin the .NET SDK exactly (NativeAOT packs follow the SDK patch)`
 - 2026-10-27 **P06-01 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions and failure modes are in **ADR 0030**.
   - Owner decision (AskUserQuestion): portable data stays in `%LOCALAPPDATA%` (recommended option).
   - Layout: root `DynamicIsland.exe` (NativeAOT launcher, 3.6 MB) + `current.json` + `app-<version>\` (self-contained payload, 159 MB; portable ZIP 69 MB with SHA-256) + LICENSE.txt + THIRD_PARTY_NOTICES.md.
@@ -100,12 +112,6 @@
     - new: `docs/ADR/0027-pin-memory-and-widget-retry.md`, `src/DynamicIsland.App/PinMemory.cs`, `tests/DynamicIsland.IntegrationTests/PinMemoryTests.cs`, `tests/DynamicIsland.WindowsSmokeTests/PinSmokeTests.cs`
     - Suggested commit message: `feat: remember the pin and retry failed widgets (P05-02, ADR 0027)`
 - 2026-10-26 Title removal + scroll fix committed by the owner as `d5ba82b`; CI run 40356940917 **success**: Release 650/650, Debug 659/659, 0 skipped.
-- 2026-10-26 P05-01 + system-stats tab fix committed by the owner as `6edc4a6`; CI run 40354693505 **success**: Release 648/648, Debug 657/657, 0 skipped.
-- 2026-10-26 **Owner requests: no "Dynamic Island" title; scroll bar flashed when switching to the Clock tab — fixed** (uncommitted, with P05-01).
-  - Title removed: `NotchView.xaml` expanded panel is one row (tabs left, pin right; pin 30×30 to match the tabs), then the selected widget. With one widget the tabs hide and the pin stays.
-  - Scroll flash cause: the ScrollViewer was `Auto`, so while the island animated up to a taller tab the content overflowed for ~200 ms and a bar showed. Fix: `NotchView.FitExpandedHeight(width, scale)` measures, allows scrolling only when the tab is taller than 360 DIP, and returns the clamped height; `IslandWindow.ExpandedHeight` uses it. ADR 0025 §1 and Consequences amended; TB4 added.
-  - Tests: new `VolumeAndLayoutTests.Only_content_taller_than_the_maximum_can_scroll`; `NotchVisualTests` regenerated `notch-expanded.png`, `notch-pinned.png`, `notch-pinned-light.png` (title gone) and new `notch-pinned-tabs.png` (real clock/stats/volume views, clock selected), checked by eye.
-  - Changed files: `src/DynamicIsland.App/{NotchView.xaml, NotchView.xaml.cs, IslandWindow.xaml.cs}`, `tests/DynamicIsland.IntegrationTests/{VolumeAndLayoutTests.cs, NotchVisualTests.cs, References/notch-expanded.png, References/notch-pinned.png, References/notch-pinned-light.png, References/notch-pinned-tabs.png}`, `docs/ADR/0025-tabbed-expanded-island.md`, `docs/TEST_MATRIX.md`. Suggested commit message: `fix: remove island title, no scroll bar flash on tab switch (ADR 0025)`
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -114,6 +120,9 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-27 | P06-02 | Windows 11 Pro 25H2 x64, `CI=true`, SDK 10.0.401 exact | `dotnet build` Release + Debug (0 warnings); full suite `--max-parallel-test-modules 1` Release ×2, Debug ×2; `Publish-Layout.ps1 -Installer` | PASS | Release 712/712 ×2, Debug 725/725 ×2, **0 skipped**; installer 49.2 MB |
+| 2026-10-27 | P06-02 install test | same, Medium integrity, scratch folder | silent install / start / reinstall over running / uninstall while running | FAIL → fixed → PASS | first run left the app running on a half-deleted folder; close-first fix; rerun all 6 checks pass |
+| 2026-10-27 | P06-01 | GitHub Actions `windows-2025` (`da6a6b8`) | CI workflow | **FAIL** | https://github.com/imamulkadir/DyanamicEye/actions/runs/40454654011: NU1004 at locked restore (SDK 10.0.403 rolled forward); fixed by the exact SDK pin |
 | 2026-10-27 | P06-01 | Windows 11 Pro 25H2 x64, `CI=true` | locked restore; `dotnet build` Release + Debug (0 warnings); full suite `--max-parallel-test-modules 1` Release ×2, Debug ×2; `tools/Publish-Layout.ps1` | PASS | Release 697/697 ×2, Debug 710/710 ×2, **0 skipped**; layout published (launcher 3.6 MB, payload 159.4 MB, ZIP 68.8 MB) |
 | 2026-10-27 | P06-01 PoC | same, real Release layout | published / moved + missing current / create-and-write denied | PASS | runs `app-0.1.0` each time; fallback logged; launcher exit 0 |
 | 2026-10-27 | P05-04 | GitHub Actions `windows-2025` (`802906f`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40437920943; 668/668 and 679/679, 0 skipped |
@@ -172,6 +181,7 @@
 | — | P02-01 | multi-monitor, mixed DPI, 125–200 % | Placement on a secondary or high-DPI monitor, fallback when unplugged | PENDING_WINDOWS | Single 100 % monitor on the dev host; covered by unit tests; G02 matrix in P02-02 || 2026-10-25 | P01-04 | GitHub Actions `windows-2025`, owner push | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40200547110 |
 
 ## BLOCKERS / RISKS
+- 2026-10-27: **before any release**, bump the pinned SDK to the latest .NET 10 patch (CI saw SDK 10.0.403 / runtime 10.0.14; the dev host has 10.0.401 / 10.0.12): self-contained packages bundle the SDK's runtime, so an old pin ships old security patches. Needs the newer SDK installed on the dev PC, then `global.json` + `dotnet restore --force-evaluate` (lock files).
 - 2026-10-26 (resolved 2026-10-27): on the dev PC, Windows media sessions stopped answering for a while; the real-media test failed locally after 5 s and passed again the next day. Media calls are bounded (ADR 0020).
 - Enterprise policy may block an unsigned per-user executable; never bypass it.
 - Self-update and rollback must handle a read-only portable folder and DB schema compatibility (P06).

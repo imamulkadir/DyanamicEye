@@ -114,6 +114,9 @@ public static class AppHost
             sp.GetRequiredService<LifecycleCoordinator>(),
             sp.GetRequiredService<ILogger<WidgetPresenter>>()));
         builder.Services.AddSingleton<AppInfo>();
+        // IT-managed copies never update themselves (ADR 0031); read once at start.
+        builder.Services.AddSingleton(_ => Platform.Windows.Startup.UpdatePolicyReader.Read(
+            System.IO.Path.GetDirectoryName(Core.Distribution.AppLayout.LauncherFor(AppContext.BaseDirectory, System.IO.File.Exists))!));
         builder.Services.AddSingleton<IStartupRegistration>(_ => TestHooks.Get(TestHooks.RegistryRootVariable) is { Length: > 0 } testRoot
             ? new RegistryStartupRegistration(testRoot, checkMachinePolicy: false)
             : new RegistryStartupRegistration());
@@ -142,7 +145,8 @@ public static class AppHost
                     () => sp.GetRequiredService<StartupCoordinator>().State,
                     () => sp.GetRequiredService<ShortcutController>().State,
                     sp.GetRequiredService<Core.PersonalData.IDataBackupService>(),
-                    () => sp.GetRequiredService<RestartService>().Restart(launch.SafeMode)),
+                    () => sp.GetRequiredService<RestartService>().Restart(launch.SafeMode),
+                    sp.GetRequiredService<Core.Distribution.UpdatePolicy>()),
                 sp.GetRequiredService<ILogger<SettingsWindow>>());
         }));
         builder.Services.AddSingleton(sp => new TrayController(

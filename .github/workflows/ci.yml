@@ -68,13 +68,14 @@ jobs:
           --results-directory "${{ github.workspace }}/TestResults"
           --report-xunit-trx
 
-      # Proves the release layout still publishes (NativeAOT launcher, self-contained payload, locked restore for
-      # win-x64). Verification only: the output is not uploaded, signed or released (ADR 0030; releases are P06-09).
+      # Proves the release layout and the per-user installer still build (NativeAOT launcher, self-contained payload,
+      # locked restore for win-x64, Inno Setup from the runner image). Verification only: the output is not uploaded,
+      # signed or released (ADR 0030/0031; releases are P06-09).
       - name: Package layout (verification only)
         shell: pwsh
         run: |
-          ./tools/Publish-Layout.ps1
-          foreach ($path in 'artifacts/layout/DynamicIsland.exe', 'artifacts/layout/current.json', 'artifacts/DynamicIsland-Portable-win-x64.zip') {
+          ./tools/Publish-Layout.ps1 -Installer
+          foreach ($path in 'artifacts/layout/DynamicIsland.exe', 'artifacts/layout/current.json', 'artifacts/DynamicIsland-Portable-win-x64.zip', 'artifacts/DynamicIsland-Setup-win-x64.exe') {
             if (-not (Test-Path $path)) { throw "Missing $path" }
           }
 

@@ -290,7 +290,9 @@
                         <TextBlock Text="Updates" Style="{StaticResource PageTitle}" />
                         <Label Content="Installed version" />
                         <TextBlock x:Name="UpdatesVersionText" AutomationProperties.AutomationId="Settings.Version" />
-                        <CheckBox Content="Check GitHub for updates once a _day" IsChecked="{Binding DailyUpdateChecks}" Margin="0,12,0,2"
+                        <TextBlock x:Name="ManagedUpdatesText" TextWrapping="Wrap" Margin="0,12,0,0" Visibility="Collapsed"
+                                   AutomationProperties.AutomationId="Settings.UpdatesManaged" />
+                        <CheckBox x:Name="UpdateChecksBox" Content="Check GitHub for updates once a _day" IsChecked="{Binding DailyUpdateChecks}" Margin="0,12,0,2"
                                   AutomationProperties.AutomationId="Settings.UpdateChecks" />
                         <TextBlock Style="{StaticResource Hint}"
                                    Text="Saved now; the daily check itself arrives in a later version. It only looks for a new version." />

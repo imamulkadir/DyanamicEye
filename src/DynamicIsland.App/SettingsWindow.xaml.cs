@@ -33,7 +33,8 @@ public sealed record SettingsWindowContext(
     Func<StartupState> StartupState,
     Func<ShortcutState> ShortcutState,
     IDataBackupService Backup,
-    Func<bool> Restart);
+    Func<bool> Restart,
+    Core.Distribution.UpdatePolicy? UpdatePolicy = null);
 
 /// <summary>
 /// Settings window (guide P03-03, ADR 0014): edits a <see cref="SettingsEditor"/> draft and saves it explicitly through
@@ -95,6 +96,7 @@ public partial class SettingsWindow : Window
 
         ReadOnlyBanner.Visibility = settings.IsReadOnly ? Visibility.Visible : Visibility.Collapsed;
         UpdatesVersionText.Text = context.Version;
+        ShowUpdatePolicy(context.UpdatePolicy ?? Core.Distribution.UpdatePolicy.Allowed);
         AboutVersionText.Text = $"Version {context.Version}";
         AboutCopyrightText.Text = context.Copyright;
         DataFolderText.Text = context.DataFolder;
@@ -182,6 +184,21 @@ public partial class SettingsWindow : Window
     };
 
     /// <summary>What Windows actually does with the saved startup choice (ADR 0015); the box itself is the draft.</summary>
+    /// <summary>IT-managed copies never update themselves (ADR 0031): say so and lock the daily check option.</summary>
+    private void ShowUpdatePolicy(Core.Distribution.UpdatePolicy policy)
+    {
+        if (!policy.SelfUpdateDisabled)
+        {
+            return;
+        }
+
+        ManagedUpdatesText.Text = policy.Source == Core.Distribution.UpdatePolicySource.InstallerFlag
+            ? "Updates are managed by whoever installed this copy: it does not check for or install updates. Ask them for new versions."
+            : "Updates are managed by your organization's policy: this copy does not check for or install updates. Contact your IT support for new versions.";
+        ManagedUpdatesText.Visibility = Visibility.Visible;
+        UpdateChecksBox.IsEnabled = false;
+    }
+
     private void ShowStartupStatus() => StartupStatusText.Text = _context.StartupState() switch
     {
         StartupState.On => "Starts a few seconds after you sign in, for your account only.",

@@ -25,6 +25,7 @@ public sealed class SettingsWindowTests : IDisposable
     private readonly FakeSettingsService _settings = new();
     private StartupState _startupState = StartupState.Off;
     private ShortcutState _shortcutState = ShortcutState.Off;
+    private Core.Distribution.UpdatePolicy _updatePolicy = Core.Distribution.UpdatePolicy.Allowed;
 
     public void Dispose()
     {
@@ -248,6 +249,38 @@ public sealed class SettingsWindowTests : IDisposable
         _ui.Invoke(window.Close);
     }
 
+    [Theory]
+    [InlineData(Core.Distribution.UpdatePolicySource.MachinePolicy, "your organization")]
+    [InlineData(Core.Distribution.UpdatePolicySource.InstallerFlag, "whoever installed this copy")]
+    public void An_it_managed_copy_says_so_and_locks_the_daily_check(Core.Distribution.UpdatePolicySource source, string expected)
+    {
+        _updatePolicy = new Core.Distribution.UpdatePolicy(true, source);
+        var window = _ui.Invoke(Open);
+
+        var (text, visible, checkEnabled) = _ui.Invoke(() =>
+        {
+            var note = (TextBlock)window.FindName("ManagedUpdatesText");
+            return (note.Text, note.Visibility, ((CheckBox)window.FindName("UpdateChecksBox")).IsEnabled);
+        });
+
+        Assert.Contains(expected, text, StringComparison.Ordinal);
+        Assert.Equal(Visibility.Visible, visible);
+        Assert.False(checkEnabled);
+        _ui.Invoke(window.Close);
+    }
+
+    [Fact]
+    public void An_unmanaged_copy_shows_no_note()
+    {
+        var window = _ui.Invoke(Open);
+
+        var (visible, checkEnabled) = _ui.Invoke(() =>
+            (((TextBlock)window.FindName("ManagedUpdatesText")).Visibility, ((CheckBox)window.FindName("UpdateChecksBox")).IsEnabled));
+
+        Assert.Equal((Visibility.Collapsed, true), (visible, checkEnabled));
+        _ui.Invoke(window.Close);
+    }
+
     private SettingsWindow Open()
     {
         var context = new SettingsWindowContext(
@@ -260,7 +293,8 @@ public sealed class SettingsWindowTests : IDisposable
             () => _startupState,
             () => _shortcutState,
             new NoBackup(),
-            () => false);
+            () => false,
+            _updatePolicy);
         var builder = new DiagnosticBundleBuilder(Path.Combine(_root, "logs"), Path.Combine(_root, "data"), new LogRedactor([]), TimeProvider.System);
         var window = new SettingsWindow(_settings, new FixedMonitors([Primary, Second]), builder, context, NullLogger<SettingsWindow>.Instance)
         {

@@ -19,7 +19,7 @@ Official sources, read 2026-10-25:
 The page does not define "(E)" or "(IoT)". We read "(E)" as Enterprise/Education. Reading the 1809 and 1607 rows as LTSC builds is also our inference.
 
 ## Decision
-1. Runtime stays on .NET 10 LTS (`net10.0-windows`). `global.json` pins SDK `10.0.401` with `rollForward: latestFeature` and no prereleases.
+1. Runtime stays on .NET 10 LTS (`net10.0-windows`). `global.json` pins SDK `10.0.401` with `rollForward: latestFeature` and no prereleases. **Amended 2026-10-27 (ADR 0030):** `rollForward: disable` — the NativeAOT compiler and self-contained runtime packs follow the SDK's patch, so a newer preinstalled SDK on CI broke locked restore. Bumping the SDK is now an explicit change (global.json + regenerated lock files), and must happen before every release so packages bundle the latest runtime security patch.
 2. **v1 tested target:** Windows 11 24H2 / 25H2 (and 26H1 when available), x64.
 3. **Runtime-supported, not yet validated:** Windows 11 23H2 Enterprise/Education. Windows 10 21H2 Enterprise/IoT. Windows 10 1809 and 1607 Enterprise. These are listed as "may work" until a P07 compatibility pass validates them.
 4. **Not supported:** Windows 10 22H2 Home/Pro and any OS that .NET 10 does not support. Docs, installer and About must not claim them.

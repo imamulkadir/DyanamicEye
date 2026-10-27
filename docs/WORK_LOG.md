@@ -2,6 +2,16 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-27 (oldest RECENT entry at P06-02)
+- 2026-10-26 P05-01 + system-stats tab fix committed by the owner as `6edc4a6`; CI run 40354693505 **success**: Release 648/648, Debug 657/657, 0 skipped.
+
+## Archived 2026-10-27 (oldest RECENT entry at the SDK pin fix)
+- 2026-10-26 **Owner requests: no "Dynamic Island" title; scroll bar flashed when switching to the Clock tab — fixed** (uncommitted, with P05-01).
+  - Title removed: `NotchView.xaml` expanded panel is one row (tabs left, pin right; pin 30×30 to match the tabs), then the selected widget. With one widget the tabs hide and the pin stays.
+  - Scroll flash cause: the ScrollViewer was `Auto`, so while the island animated up to a taller tab the content overflowed for ~200 ms and a bar showed. Fix: `NotchView.FitExpandedHeight(width, scale)` measures, allows scrolling only when the tab is taller than 360 DIP, and returns the clamped height; `IslandWindow.ExpandedHeight` uses it. ADR 0025 §1 and Consequences amended; TB4 added.
+  - Tests: new `VolumeAndLayoutTests.Only_content_taller_than_the_maximum_can_scroll`; `NotchVisualTests` regenerated `notch-expanded.png`, `notch-pinned.png`, `notch-pinned-light.png` (title gone) and new `notch-pinned-tabs.png` (real clock/stats/volume views, clock selected), checked by eye.
+  - Changed files: `src/DynamicIsland.App/{NotchView.xaml, NotchView.xaml.cs, IslandWindow.xaml.cs}`, `tests/DynamicIsland.IntegrationTests/{VolumeAndLayoutTests.cs, NotchVisualTests.cs, References/notch-expanded.png, References/notch-pinned.png, References/notch-pinned-light.png, References/notch-pinned-tabs.png}`, `docs/ADR/0025-tabbed-expanded-island.md`, `docs/TEST_MATRIX.md`. Suggested commit message: `fix: remove island title, no scroll bar flash on tab switch (ADR 0025)`
+
 ## Archived 2026-10-27 (oldest two RECENT entries at P06-01)
 - 2026-10-26 **Owner report: "system stats widget is checked but not shown" — fixed** (uncommitted, with P05-01).
   - Cause (from the tabs change, ADR 0025 §4): stats sample only while their tab is shown, but a tab exists only for a widget with content, so the stats widget never got a tab. Only `MetricsWidget` is gated this way.

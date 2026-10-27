@@ -2,6 +2,18 @@
 
 Verbatim detail moved out of `docs/AGENT_PROGRESS.md` to keep startup context small (AGENTS.md). Newest entries first within each section. Append new archives at the top of the relevant section.
 
+## Archived 2026-10-27 (oldest two RECENT entries at P05-04)
+- 2026-10-26 G04 evidence + tab fix committed by the owner as `706daf7`; CI run 40342549483 **success**: Release 624/624, Debug 633/633, 0 skipped (includes the 100-restart smoke test). **G04 automated PASS.**
+- 2026-10-26 **G04 gate evidence + tab-selection fix** (uncommitted; the owner commits).
+  - **Tab race (CI run 40335768082 failure):** `ClockWidgetPresenterTests` failed on CI with "Sequence contains no elements": another widget published before the clock, became the automatic selection and kept it, so the clock view was not shown. Product bug too: the island could open on whichever widget loaded first. Fix in `NotchView`: only a tab the **user** picks (click, arrows, Ctrl+Tab, `SelectWidget`) sticks; otherwise the first tab in the user's order is shown; a pick is forgotten when its widget disappears. ADR 0025 §3 amended. New test `Until_the_user_picks_a_tab_the_first_tab_in_order_is_shown` (fails on the old code: the automatic pick stayed on "system").
+  - **100 restarts:** new `tests/DynamicIsland.WindowsSmokeTests/RestartSmokeTests.cs` (Debug only, isolated data folder): seeds settings (consents answered, so no first-run window) and notes/tasks, then starts and closes the real app 100 times. Each run: exit 0, notes/tasks unchanged, `settings.json` byte-identical, no `*corrupt*` or temp files. Afterwards the logs must show no Failed widget, no Error/Critical entry and no `PreviousSessionUnclean`, and the clock widget reported Healthy. 1 m 45 s locally.
+  - **Update-shaped migrations:** `SqlitePersonalDataStore` has an internal constructor taking the migration list (`DefaultMigrations` is internal); ADR 0023 consequence added. New unit tests: `Update_shaped_migration_keeps_notes_and_tasks` (v1 data → rehearsal v2 adds a column and table, data kept, writable; then the current build opens it read-only) and `Failed_update_migration_rolls_back_and_keeps_data` (user_version stays 1, no partial column, a fixed release then migrates). Settings migrations were already covered (`JsonSettingsStoreTests` legacy v0 fixture, failed migration read-only).
+  - `docs/TEST_MATRIX.md`: new **G04** section (G4-1…G4-5); TB1 expects the first tab in order on first open.
+  - **Changed files:**
+    - modified: `docs/ADR/0023-notes-and-tasks-storage.md`, `docs/ADR/0025-tabbed-expanded-island.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `docs/WORK_LOG.md`, `src/DynamicIsland.App/NotchView.xaml.cs`, `src/DynamicIsland.Infrastructure/PersonalData/SqlitePersonalDataStore.cs`, `tests/DynamicIsland.IntegrationTests/WidgetPanelTests.cs`, `tests/DynamicIsland.UnitTests/PersonalData/SqlitePersonalDataStoreTests.cs`
+    - new: `tests/DynamicIsland.WindowsSmokeTests/RestartSmokeTests.cs`
+    - Suggested commit message: `test: G04 evidence (100 restarts, update-shaped migrations); fix first tab selection race`
+
 ## Archived 2026-10-26 (oldest two RECENT entries at P05-03)
 - 2026-10-26 P04-07 + tabs committed by the owner as `b1165d1`; CI run 40335768082 **failure**: 1 integration test (`ClockWidgetPresenterTests.Notch_and_expanded_panel_show_the_clock_and_disabling_clears_them`, tab-selection race), unit and smoke passed. Fixed in the entry above.
 - 2026-10-26 **Owner request: tabbed expanded island — IMPLEMENTED_AWAITING_VALIDATION** (uncommitted). Decisions are in **ADR 0025**; ADR 0018 §6 and ADR 0022 §5 are amended.

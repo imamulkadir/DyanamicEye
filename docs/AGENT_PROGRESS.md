@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P05-03 (accessibility pass) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. P05-01/02 committed. G02/G03/P04/P05 manual rows are still owed by the owner.
-- **Active task status:** P05-03 **uncommitted**. P05-02 committed as `3c2c70f`; CI run 40362826141 **success**. Local real-media test fails on this PC (Windows media service not answering, see BLOCKERS).
+- **Active task:** P05-04 (resource budget, adaptive stats cadence, benchmark) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. P05-01…03 committed. G05 automated evidence recorded in docs/PERFORMANCE.md. G02/G03/P04/P05 manual rows are still owed by the owner.
+- **Active task status:** P05-04 **uncommitted**. P05-03 committed as `244dc01`; CI run 40374482330 **success** (667/667, 677/677, 0 skipped). The local media service recovered (real-media test passes again).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -26,8 +26,8 @@
 - **Last updated:** 2026-10-26 (P05-01 IMPLEMENTED_AWAITING_VALIDATION; next: owner commit, CI, then P05-02)
 
 ## NEXT ACTION (ONE task only)
-**Owner:** review and commit P05-03 (file list in RECENT VERIFIED CHANGES), push, and check that CI is green (CI should pass the real media test). AX1–AX4 in `docs/TEST_MATRIX.md` are the manual checks (keyboard only, Narrator, contrast themes, reduced motion). If convenient, sign out/in or restart Windows so the local media service answers again, then rerun the integration tests.
-**Then agent:** **P05-04** (guide §5 P05: idle CPU/memory and battery scenarios; caching, adaptive timers, suspension when fullscreen/paused/disabled; log benchmark setup/results), then G05 evidence (idle CPU <= 0.5 %, private memory <= 100 MB as goals).
+**Owner:** review and commit P05-04 (file list in RECENT VERIFIED CHANGES), push, and check that CI is green (the Debug job now also runs the ~2 min benchmark). PF1–PF3 in `docs/TEST_MATRIX.md` are the manual battery/long-session checks.
+**Then agent:** if CI is green, record **G05 automated evidence** (docs/PERFORMANCE.md + CI run; memory deviation documented) and start **P06-01** (guide §5 P06: distribution and update integrity — read the P06 section first; installer technology and update trust model are open ADR items).
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -38,7 +38,7 @@
 | P02 — Island shell | P02-01…P02-05 | IN_PROGRESS (01 DONE; 02–05 IMPLEMENTED_AWAITING_VALIDATION) | G02 pending (needs a real multi-DPI/multi-monitor check) |
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
-| P05 — Customization/performance | P05-01…P05-04 | IN_PROGRESS (01–03 IMPLEMENTED_AWAITING_VALIDATION) | G05 pending |
+| P05 — Customization/performance | P05-01…P05-04 | IMPLEMENTED_AWAITING_VALIDATION (01–04) | G05: goals met on the reference machine (idle CPU ~0 %, private 62–77 MB at rest; 94–104 MB after heavy automated use, documented deviation) — docs/PERFORMANCE.md; awaiting CI |
 | P06 — Packaging/updates | P06-01…P06-09 | NOT_STARTED | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
@@ -52,6 +52,17 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-27 **P05-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0029**; results in **docs/PERFORMANCE.md**.
+  - New benchmark `ResourceBenchmarkSmokeTests` (Debug; real app, all widgets on; collapsed / open clock tab / open stats tab / after 40 open-close cycles / paused; writes `benchmark-results.json`; fails only on runaway values).
+  - Finding: each visible stats update cost ~40–80 ms CPU on one non-UI thread (UI thread 1–5 ms; experiments with transparency off, software rendering, frozen text, no UIA client and instrumentation — all reverted — showed it is the window redraw, not readings or UIA). Fix in `MetricsWidget`: 2 s cadence for the first 30 s on screen, then 5 s; wakes only on a real visibility change (repeated calls used to add samples). ADR 0021 §3 amended.
+  - Memory: 62–77 MB at rest; 94–104 MB after 40 automated cycles — not linear with cycles (120 cycles: +25 MB vs +18 MB), documented as a G05 deviation.
+  - Tests: unit `MetricsWidgetTests.A_long_open_stats_tab_slows_to_five_seconds_and_a_reopened_one_starts_quick_again` (deterministic clock; `ManualTimeProvider.PendingTimers` added).
+  - Not done: removing leftover test data folders under `%LOCALAPPDATA%\Temp\DynamicIsland.SmokeTests` (12, from probe runs) — a safety check blocked the agent's wildcard delete; the owner may delete them.
+  - **Changed files:**
+    - modified: `docs/ADR/{0021-metrics-widget.md, README.md}`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (PF1–PF3), `docs/WORK_LOG.md`, `src/DynamicIsland.Widgets/MetricsWidget.cs`, `tests/DynamicIsland.UnitTests/TestSupport/ManualTimeProvider.cs`, `tests/DynamicIsland.UnitTests/Widgets/MetricsWidgetTests.cs`
+    - new: `docs/ADR/0029-resource-budget-and-benchmark.md`, `docs/PERFORMANCE.md`, `tests/DynamicIsland.WindowsSmokeTests/ResourceBenchmarkSmokeTests.cs`
+    - Suggested commit message: `perf: resource benchmark and adaptive stats cadence (P05-04, ADR 0029)`
+- 2026-10-27 P05-03 committed by the owner as `244dc01`; CI run 40374482330 **success**: 667/667 and 677/677, 0 skipped.
 - 2026-10-26 **P05-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0028**.
   - Audit found: no focus mark on the island itself; slider and task check boxes used WPF's dotted black focus rectangle (invisible on black); high contrast ignored; note rows 23 DIP tall, tabs/pin 30; selection shown by color only. Already fine: keyboard flow, UIA patterns and names, reduced motion.
   - **Core:** `IslandTheme.HighContrast(window, windowText, highlight)` (opaque system colors, no tints), `MinTarget` 24 and `MinPrimaryTarget` 32.
@@ -97,16 +108,6 @@
     - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (TH1–TH3), `docs/WORK_LOG.md`, `src/DynamicIsland.App/{ClockView.cs, IslandWindow.xaml.cs, MediaView.cs, MetricsView.cs, NotchView.xaml, NotchView.xaml.cs, NotesView.cs, PersonalDataViews.cs, SettingsWindow.xaml, TasksView.cs, VolumeView.cs, WidgetView.cs}`, `src/DynamicIsland.Core/Shell/IslandStates.cs`, `tests/DynamicIsland.IntegrationTests/NotchVisualTests.cs`
     - new: `docs/ADR/0026-theme-tokens-and-safe-size.md`, `src/DynamicIsland.App/ThemeResources.cs`, `src/DynamicIsland.Core/Shell/IslandTheme.cs`, `src/DynamicIsland.Platform.Windows/Display/WindowsAppTheme.cs`, `tests/DynamicIsland.IntegrationTests/ThemeTests.cs`, `tests/DynamicIsland.IntegrationTests/References/{notch-collapsed-light.png, notch-pinned-light.png}`, `tests/DynamicIsland.UnitTests/Shell/IslandThemeTests.cs`
     - Suggested commit message: `feat: theme tokens, light/dark island and safe size (P05-01, ADR 0026)`
-- 2026-10-26 G04 evidence + tab fix committed by the owner as `706daf7`; CI run 40342549483 **success**: Release 624/624, Debug 633/633, 0 skipped (includes the 100-restart smoke test). **G04 automated PASS.**
-- 2026-10-26 **G04 gate evidence + tab-selection fix** (uncommitted; the owner commits).
-  - **Tab race (CI run 40335768082 failure):** `ClockWidgetPresenterTests` failed on CI with "Sequence contains no elements": another widget published before the clock, became the automatic selection and kept it, so the clock view was not shown. Product bug too: the island could open on whichever widget loaded first. Fix in `NotchView`: only a tab the **user** picks (click, arrows, Ctrl+Tab, `SelectWidget`) sticks; otherwise the first tab in the user's order is shown; a pick is forgotten when its widget disappears. ADR 0025 §3 amended. New test `Until_the_user_picks_a_tab_the_first_tab_in_order_is_shown` (fails on the old code: the automatic pick stayed on "system").
-  - **100 restarts:** new `tests/DynamicIsland.WindowsSmokeTests/RestartSmokeTests.cs` (Debug only, isolated data folder): seeds settings (consents answered, so no first-run window) and notes/tasks, then starts and closes the real app 100 times. Each run: exit 0, notes/tasks unchanged, `settings.json` byte-identical, no `*corrupt*` or temp files. Afterwards the logs must show no Failed widget, no Error/Critical entry and no `PreviousSessionUnclean`, and the clock widget reported Healthy. 1 m 45 s locally.
-  - **Update-shaped migrations:** `SqlitePersonalDataStore` has an internal constructor taking the migration list (`DefaultMigrations` is internal); ADR 0023 consequence added. New unit tests: `Update_shaped_migration_keeps_notes_and_tasks` (v1 data → rehearsal v2 adds a column and table, data kept, writable; then the current build opens it read-only) and `Failed_update_migration_rolls_back_and_keeps_data` (user_version stays 1, no partial column, a fixed release then migrates). Settings migrations were already covered (`JsonSettingsStoreTests` legacy v0 fixture, failed migration read-only).
-  - `docs/TEST_MATRIX.md`: new **G04** section (G4-1…G4-5); TB1 expects the first tab in order on first open.
-  - **Changed files:**
-    - modified: `docs/ADR/0023-notes-and-tasks-storage.md`, `docs/ADR/0025-tabbed-expanded-island.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `docs/WORK_LOG.md`, `src/DynamicIsland.App/NotchView.xaml.cs`, `src/DynamicIsland.Infrastructure/PersonalData/SqlitePersonalDataStore.cs`, `tests/DynamicIsland.IntegrationTests/WidgetPanelTests.cs`, `tests/DynamicIsland.UnitTests/PersonalData/SqlitePersonalDataStoreTests.cs`
-    - new: `tests/DynamicIsland.WindowsSmokeTests/RestartSmokeTests.cs`
-    - Suggested commit message: `test: G04 evidence (100 restarts, update-shaped migrations); fix first tab selection race`
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
@@ -115,6 +116,8 @@
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |
 | 2026-10-25 | P03-02 | same | Smoke project alone: Debug 18 tests ×4, Release 14 ×4 | PASS (some skipped) | All tray actions pass, including restart 3/4 and Safe Mode. The fullscreen test was **skipped** in some runs (Windows refused foreground). |
+| 2026-10-27 | P05-04 | Windows 11 Pro 25H2 x64, 6 logical CPUs, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | PASS | Release 668/668 ×2, Debug 679/679 ×2, **0 skipped**; benchmark numbers in docs/PERFORMANCE.md |
+| 2026-10-27 | P05-03 | GitHub Actions `windows-2025` (`244dc01`) | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40374482330; 667/667 and 677/677, 0 skipped |
 | 2026-10-26 | P05-03 | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | **PASS except 1 environment FAIL** | Release 666/667 ×2, Debug 676/677 ×2, 0 skipped. The 1 failure each time is `Windows_media_sessions_connect_and_read_without_errors`: Windows' `RequestAsync` does not complete on this PC right now (now a clean 5 s failure instead of a hang). Not caused by P05-03 code; CI is the reference. |
 | 2026-10-26 | P05-02 | Windows 11 Pro 25H2 x64, `CI=true` | `dotnet build` Release + Debug (0 warnings), then the full suite `--max-parallel-test-modules 1`, Release ×2 and Debug ×2 | **2 FAILs → fixed** | Release 664/664 ×2; Debug 673/674 ×2: `Try_again_restarts_only_a_failed_enabled_widget` (retry race, product fix) and `TrayActionSmokeTests.Pause…` (menu closed early, driver fix) |
 | 2026-10-26 | P05-02 fixes | same | Rebuild, then the full suite Release ×2 and Debug ×2 | PASS | Release 664/664 ×2, Debug 674/674 ×2, **0 skipped** |
@@ -168,7 +171,7 @@
 | — | P02-01 | multi-monitor, mixed DPI, 125–200 % | Placement on a secondary or high-DPI monitor, fallback when unplugged | PENDING_WINDOWS | Single 100 % monitor on the dev host; covered by unit tests; G02 matrix in P02-02 || 2026-10-25 | P01-04 | GitHub Actions `windows-2025`, owner push | CI workflow (Release + Debug) | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40200547110 |
 
 ## BLOCKERS / RISKS
-- 2026-10-26: on the dev PC, Windows media sessions (`GlobalSystemMediaTransportControlsSessionManager.RequestAsync`) stopped answering (no player running); the real-media integration test fails locally after 5 s until Windows recovers (sign-out/restart). The agent does not restart Explorer or system services.
+- 2026-10-26 (resolved 2026-10-27): on the dev PC, Windows media sessions stopped answering for a while; the real-media test failed locally after 5 s and passed again the next day. Media calls are bounded (ADR 0020).
 - Enterprise policy may block an unsigned per-user executable; never bypass it.
 - Self-update and rollback must handle a read-only portable folder and DB schema compatibility (P06).
 - The dev host is one security patch behind (runtime 10.0.12 / SDK 10.0.401 vs 10.0.13 / 10.0.402). The owner should update before any release build.

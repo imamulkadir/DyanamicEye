@@ -1,6 +1,7 @@
 using System.Globalization;
 using DynamicIsland.Core.Components;
 using DynamicIsland.Core.Metrics;
+using DynamicIsland.UnitTests.TestSupport;
 using DynamicIsland.Widgets;
 
 namespace DynamicIsland.UnitTests.Widgets;
@@ -97,6 +98,47 @@ public sealed class MetricsWidgetTests : IDisposable
     }
 
     [Fact]
+    public async Task A_long_open_stats_tab_slows_to_five_seconds_and_a_reopened_one_starts_quick_again()
+    {
+        var time = new ManualTimeProvider(new DateTimeOffset(2026, 10, 27, 9, 0, 0, TimeSpan.Zero));
+        using var widget = new MetricsWidget(_metrics, time);
+        using var stop = new CancellationTokenSource();
+        _ = widget.RunAsync(new Context(), stop.Token);
+
+        widget.SetExpanded(true);
+        widget.SetExpanded(true); // Repeated calls change nothing and must not add samples.
+        await StepAsync(time, widget, TimeSpan.Zero, expectedSamples: 1);
+        await StepAsync(time, widget, MetricsWidget.BaselineDelay, expectedSamples: 2);
+        for (var i = 0; i < 15; i++)
+        {
+            await StepAsync(time, widget, MetricsWidget.Interval, expectedSamples: 3 + i); // Every 2 s while fresh.
+        }
+
+        // Shown for 30.5 s: now every 5 s.
+        await StepAsync(time, widget, MetricsWidget.Interval, expectedSamples: 17);
+        await StepAsync(time, widget, MetricsWidget.SlowInterval - MetricsWidget.Interval, expectedSamples: 18);
+
+        widget.SetExpanded(false);
+        await WaitForAsync(() => time.PendingTimers == 0, "the loop to go idle");
+        widget.SetExpanded(true); // Shown again: quick cadence again.
+        await StepAsync(time, widget, TimeSpan.Zero, expectedSamples: 19);
+        await StepAsync(time, widget, MetricsWidget.BaselineDelay, expectedSamples: 20);
+        await StepAsync(time, widget, MetricsWidget.Interval, expectedSamples: 21);
+
+        await stop.CancelAsync();
+    }
+
+    /// <summary>Waits until the loop sleeps, advances the clock, then waits for the expected sample count.</summary>
+    private static async Task StepAsync(ManualTimeProvider time, MetricsWidget widget, TimeSpan by, int expectedSamples)
+    {
+        await WaitForAsync(() => time.PendingTimers > 0 || widget.Samples >= expectedSamples, $"sleep before sample {expectedSamples}");
+        time.Advance(by);
+        await WaitForAsync(() => widget.Samples >= expectedSamples && time.PendingTimers > 0, $"sample {expectedSamples} (have {widget.Samples}, timers {time.PendingTimers})");
+        await Task.Delay(20, Ct); // An early extra sample would show up here.
+        Assert.Equal(expectedSamples, widget.Samples);
+    }
+
+    [Fact]
     public async Task Samples_every_two_seconds_while_expanded_and_stop_when_collapsed_or_hidden()
     {
         _ = Start(); // Ends with cancellation in Dispose.
@@ -150,6 +192,16 @@ public sealed class MetricsWidgetTests : IDisposable
     }
 
     private Task Start() => Task.Run(() => _widget.RunAsync(new Context(), _stop.Token), Ct);
+
+    private static async Task WaitForAsync(Func<bool> condition, string what)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "Timed out waiting for " + what);
+            await Task.Delay(10, Ct);
+        }
+    }
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {

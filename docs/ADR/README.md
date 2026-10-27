@@ -58,5 +58,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0026 — Theme tokens, light/dark island and safe size](0026-theme-tokens-and-safe-size.md) — Accepted (P05-01)
 - [0027 — Remembered pin and "Try again" for failed widgets](0027-pin-memory-and-widget-retry.md) — Accepted (P05-02)
 - [0028 — Accessibility pass: focus, names, high contrast, target sizes](0028-accessibility-pass.md) — Accepted (P05-03)
+- [0029 — Resource budget, adaptive stats cadence and the benchmark](0029-resource-budget-and-benchmark.md) — Accepted (P05-04)
 
 Pending: per-user installer technology (P06), updater trust/provenance model (P06).

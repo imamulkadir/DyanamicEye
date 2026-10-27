@@ -20,12 +20,21 @@ public sealed class MetricsWidget(ISystemMetricsService metrics, TimeProvider ti
     public static readonly TimeSpan Interval = TimeSpan.FromSeconds(2);
     public static readonly TimeSpan BaselineDelay = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>
+    /// Adaptive cadence (P05-04, ADR 0029): every <see cref="Interval"/> while the tab is fresh, then every
+    /// <see cref="SlowInterval"/> once it has been on screen for <see cref="FreshPeriod"/> (a pinned stats tab). Each update
+    /// redraws the island, which costs far more than the readings themselves.
+    /// </summary>
+    public static readonly TimeSpan SlowInterval = TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan FreshPeriod = TimeSpan.FromSeconds(30);
+
     private readonly Lock _gate = new();
     private CancellationTokenSource _wake = new();
     private MetricsSnapshot? _snapshot;
     private CpuTimes? _baseline;
     private bool _active = true;
     private bool _expanded;
+    private long _shownAt; // timeProvider timestamp when sampling (re)started.
 
     public event EventHandler? SnapshotChanged;
 
@@ -55,10 +64,12 @@ public sealed class MetricsWidget(ISystemMetricsService metrics, TimeProvider ti
         {
             CancellationToken wake;
             bool sampling;
+            long shownAt;
             lock (_gate)
             {
                 wake = _wake.Token;
                 sampling = _active && _expanded;
+                shownAt = _shownAt;
                 if (!sampling)
                 {
                     _baseline = null; // The next CPU value starts from a fresh baseline.
@@ -69,7 +80,9 @@ public sealed class MetricsWidget(ISystemMetricsService metrics, TimeProvider ti
             if (sampling)
             {
                 var hadBaseline = Sample();
-                delay = hadBaseline ? Interval : BaselineDelay;
+                delay = !hadBaseline ? BaselineDelay
+                    : timeProvider.GetElapsedTime(shownAt) < FreshPeriod ? Interval
+                    : SlowInterval;
             }
 
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, wake);
@@ -84,9 +97,9 @@ public sealed class MetricsWidget(ISystemMetricsService metrics, TimeProvider ti
         }
     }
 
-    public void SetActive(bool active) => Change(() => _active = active);
+    public void SetActive(bool active) => Change(ref _active, active);
 
-    public void SetExpanded(bool expanded) => Change(() => _expanded = expanded);
+    public void SetExpanded(bool expanded) => Change(ref _expanded, expanded);
 
     /// <summary>Resume from sleep: the CPU counters jumped, so start a new baseline.</summary>
     public void OnSystemChanged()
@@ -144,11 +157,22 @@ public sealed class MetricsWidget(ISystemMetricsService metrics, TimeProvider ti
         return cpuPercent is not null;
     }
 
-    private void Change(Action update)
+    /// <summary>Wakes the loop only for a real change: repeated calls must not add samples (or redraws).</summary>
+    private void Change(ref bool field, bool value)
     {
         lock (_gate)
         {
-            update();
+            if (field == value)
+            {
+                return;
+            }
+
+            var wasSampling = _active && _expanded;
+            field = value;
+            if (!wasSampling && _active && _expanded)
+            {
+                _shownAt = timeProvider.GetTimestamp(); // Fresh again: a newly shown tab gets the quick cadence.
+            }
         }
 
         Wake();

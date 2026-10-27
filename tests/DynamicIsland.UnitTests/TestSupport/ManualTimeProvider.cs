@@ -12,6 +12,18 @@ internal sealed class ManualTimeProvider(DateTimeOffset start) : TimeProvider
 
     public override DateTimeOffset GetUtcNow() => UtcNow;
 
+    /// <summary>Timers waiting to fire (tests wait for a loop to start its next delay before advancing).</summary>
+    public int PendingTimers
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _timers.Count(t => t.Due is not null);
+            }
+        }
+    }
+
     public override long GetTimestamp() => UtcNow.UtcTicks;
 
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)

@@ -1,6 +1,6 @@
 # 0021 — System metrics widget
 
-- Status: Accepted
+- Status: Accepted (§3 amended by ADR 0029: 2 s for the first 30 s on screen, then 5 s)
 - Date: 2026-10-26
 - Task: P04-04
 

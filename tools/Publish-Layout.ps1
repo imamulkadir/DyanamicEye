@@ -61,6 +61,16 @@ if ($LASTEXITCODE -ne 0) { throw 'Launcher publish failed.' }
 Copy-Item (Join-Path $launcherOut 'DynamicIsland.Launcher.exe') (Join-Path $layout 'DynamicIsland.exe')
 Remove-Item $launcherOut -Recurse -Force
 
+# The separate updater (ADR 0035) travels inside each payload: an update runs it from the old version's folder.
+Write-Host 'Publishing updater (NativeAOT)...'
+$updaterOut = Join-Path $Output 'updater'
+if (Test-Path $updaterOut) { Remove-Item $updaterOut -Recurse -Force }
+dotnet publish (Join-Path $root 'src' 'DynamicIsland.Updater') -c Release -r win-x64 `
+    -p:Version=$Version -p:DebugType=none -o $updaterOut
+if ($LASTEXITCODE -ne 0) { throw 'Updater publish failed.' }
+Copy-Item (Join-Path $updaterOut 'DynamicIsland.Updater.exe') $payload
+Remove-Item $updaterOut -Recurse -Force
+
 # License texts travel with every package (THIRD_PARTY_NOTICES.md).
 Copy-Item (Join-Path $root 'LICENSE') (Join-Path $layout 'LICENSE.txt')
 Copy-Item (Join-Path $root 'THIRD_PARTY_NOTICES.md') $layout

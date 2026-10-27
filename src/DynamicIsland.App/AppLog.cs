@@ -162,6 +162,14 @@ internal static partial class AppLog
         Message = "Update check: {Outcome} (latest published {LatestVersion})")]
     public static partial void UpdateCheckFinished(ILogger logger, Core.Updates.UpdateCheckOutcome outcome, string? latestVersion);
 
+    [LoggerMessage(EventId = 1063, EventName = "UpdaterStartFailed", Level = LogLevel.Warning,
+        Message = "The updater could not be started ({ErrorType}); nothing was changed")]
+    public static partial void UpdaterStartFailed(ILogger logger, string errorType);
+
+    [LoggerMessage(EventId = 1064, EventName = "UpdateRolledBack", Level = LogLevel.Warning,
+        Message = "The update to {Version} did not start correctly and was rolled back")]
+    public static partial void UpdateRolledBack(ILogger logger, string version);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

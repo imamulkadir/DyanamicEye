@@ -66,12 +66,12 @@ public sealed class UpdateFlow : IDisposable
     private bool _failedInstalling;
 
     /// <param name="downloader">In-app download; <c>null</c> where it is not available (the release page only).</param>
-    public UpdateFlow(ReleaseInfo release, InstallKind kind, UpdatePolicy policy, IUpdateDownloader? downloader, IUpdateInstaller? installer)
+    public UpdateFlow(ReleaseInfo release, UpdatePolicy policy, IUpdateDownloader? downloader, IUpdateInstaller? installer)
     {
         ArgumentNullException.ThrowIfNull(release);
         ArgumentNullException.ThrowIfNull(policy);
         Release = release;
-        Package = UpdatePackages.For(release, kind);
+        Package = UpdatePackages.For(release);
         _downloader = downloader;
         _installer = installer;
         State = new UpdateFlowState(

@@ -146,16 +146,23 @@ public static class AppHost
                 },
                 System.IO.Path.Combine(root, "updates"),
                 Core.Updates.ReleaseSigningKeys.Pinned));
+
+            // The install step hands over to the separate updater (ADR 0035); only a release layout can be swapped.
+            if (Core.Distribution.AppLayout.IsReleasePayload(AppContext.BaseDirectory, System.IO.File.Exists))
+            {
+                builder.Services.AddSingleton<Core.Updates.IUpdateInstaller, LayoutUpdateInstaller>();
+            }
         }
 
-        // Release details and the separate Download/Install approvals (ADR 0033). The in-app download and install arrive
-        // with P06-05/06 (IUpdateDownloader/IUpdateInstaller); until then the window offers the release page.
+        builder.Services.AddSingleton(sp => new Infrastructure.Updates.UpdateHandover(
+            System.IO.Path.Combine(root, "updates"),
+            sp.GetRequiredService<ILoggerFactory>().CreateLogger("DynamicIsland.Updates")));
+
+        // Release details and the separate Download/Install approvals (ADR 0033). Without a pinned signing key there is no
+        // in-app download or install, and the window offers the release page.
         builder.Services.AddSingleton(sp => new UpdateWindowService(
             release => new Core.Updates.UpdateFlow(
                 release,
-                Core.Updates.UpdatePackages.Detect(
-                    System.IO.Path.GetDirectoryName(Core.Distribution.AppLayout.LauncherFor(AppContext.BaseDirectory, System.IO.File.Exists))!,
-                    System.IO.File.Exists),
                 sp.GetRequiredService<Core.Distribution.UpdatePolicy>(),
                 sp.GetService<Core.Updates.IUpdateDownloader>(),
                 sp.GetService<Core.Updates.IUpdateInstaller>()),

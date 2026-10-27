@@ -1,13 +1,49 @@
+using DynamicIsland.Core.Diagnostics;
+using DynamicIsland.Core.Updates;
+using DynamicIsland.Infrastructure;
+using DynamicIsland.Infrastructure.Logging;
+using DynamicIsland.Infrastructure.Updates;
+
 namespace DynamicIsland.Updater;
 
+/// <summary>
+/// Entry point: <c>DynamicIsland.Updater.exe --request &lt;path&gt;</c> (ADR 0035). The request must be the per-user
+/// <c>updates\update-request.json</c>; anything else is refused. Exit codes: 0 committed, 2 rolled back, 3 aborted
+/// (no changes), 4 invalid arguments.
+/// </summary>
 internal static class Program
 {
-    private const int NotImplementedExitCode = 1;
+    private const string RequestSwitch = "--request";
+    private const int Committed = 0;
+    private const int RolledBack = 2;
+    private const int Aborted = 3;
+    private const int InvalidArguments = 4;
 
-    private static int Main()
+    private static int Main(string[] args)
     {
-        // Update installation is implemented in P06. Fail loudly rather than pretend to work.
-        Console.Error.WriteLine("DynamicIsland.Updater is not implemented yet.");
-        return NotImplementedExitCode;
+        var updates = Path.Combine(AppDataPaths.Root, "updates");
+        using var logs = new FileLoggerProvider(
+            new FileLoggerOptions(AppDataPaths.Logs) { FilePrefix = "updater-" },
+            LogRedactor.ForCurrentEnvironment(),
+            TimeProvider.System);
+        var logger = logs.CreateLogger("DynamicIsland.Updater");
+
+        if (args.Length != 2 || !string.Equals(args[0], RequestSwitch, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(Path.GetFullPath(args[1]), Path.Combine(Path.GetFullPath(updates), UpdateRequest.FileName), StringComparison.OrdinalIgnoreCase)
+            || new FileInfo(args[1]) is not { Exists: true, Length: <= UpdateRequest.MaxBytes } file
+            || UpdateRequest.Parse(File.ReadAllText(file.FullName)) is not { } request)
+        {
+            UpdaterLog.InvalidArguments(logger);
+            return InvalidArguments;
+        }
+
+        var swap = new UpdateSwap(updates, new WindowsUpdaterProcesses(), new UninstallEntryVersion(), logger);
+        var result = swap.RunAsync(request, CancellationToken.None).GetAwaiter().GetResult();
+        return result.Outcome switch
+        {
+            SwapOutcome.Committed => Committed,
+            SwapOutcome.RolledBack => RolledBack,
+            _ => Aborted,
+        };
     }
 }

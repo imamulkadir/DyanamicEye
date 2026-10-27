@@ -17,6 +17,7 @@ internal sealed class ProcessAppRunner(string appPath, bool startupLaunch = fals
             WorkingDirectory = Path.GetDirectoryName(appPath)!,
         };
         startInfo.Environment[LauncherContract.SupervisedVariable] = "1";
+        startInfo.Environment[LauncherContract.LauncherPidVariable] = Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
         if (safeMode)
         {

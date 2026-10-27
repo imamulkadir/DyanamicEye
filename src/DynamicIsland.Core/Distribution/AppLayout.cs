@@ -146,21 +146,26 @@ public static partial class AppLayout
     public static string LauncherFor(string appDirectory, Func<string, bool> fileExists)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(appDirectory);
+        var folder = Path.TrimEndingDirectorySeparator(appDirectory);
+        return IsReleasePayload(appDirectory, fileExists)
+            ? Path.Combine(Path.GetDirectoryName(folder)!, RootLauncher)
+            : Path.Combine(folder, LauncherContract.LauncherExecutable);
+    }
+
+    /// <summary>Whether <paramref name="appDirectory"/> is an <c>app-&lt;version&gt;</c> payload with the root launcher and pointer above it.</summary>
+    public static bool IsReleasePayload(string appDirectory, Func<string, bool> fileExists)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(appDirectory);
         ArgumentNullException.ThrowIfNull(fileExists);
 
         var folder = Path.TrimEndingDirectorySeparator(appDirectory);
         var name = Path.GetFileName(folder);
         var parent = Path.GetDirectoryName(folder);
-        if (parent is not null
+        return parent is not null
             && name.StartsWith(PayloadPrefix, StringComparison.OrdinalIgnoreCase)
             && IsValidVersion(name[PayloadPrefix.Length..])
             && fileExists(Path.Combine(parent, PointerFileName))
-            && fileExists(Path.Combine(parent, RootLauncher)))
-        {
-            return Path.Combine(parent, RootLauncher);
-        }
-
-        return Path.Combine(folder, LauncherContract.LauncherExecutable);
+            && fileExists(Path.Combine(parent, RootLauncher));
     }
 
     private static bool SamePath(string path, string? other) =>

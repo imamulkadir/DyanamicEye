@@ -64,5 +64,4 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0032 — Update checks: GitHub releases/latest, schedule and trust](0032-update-checks.md) — Accepted (P06-03)
 - [0033 — Update window: release details, separate Download and Install approvals](0033-update-window-and-approvals.md) — Accepted (P06-04)
 - [0034 — Verified update downloads: signed release manifest and staging](0034-signed-release-manifest.md) — Accepted (P06-05)
-
-Pending: updater trust/provenance model (P06-05).
+- [0035 — Separate updater: payload swap, health handshake and rollback](0035-updater-swap-and-rollback.md) — Accepted (P06-06)

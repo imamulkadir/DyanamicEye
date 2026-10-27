@@ -1,10 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Separate short-lived out-of-process updater (P06). -->
+  <!--
+    Separate short-lived updater (guide P06-06, ADR 0035): swaps to a verified, staged payload after the app exits,
+    waits for the new version's health acknowledgment and rolls back otherwise. Runs from the old payload folder.
+    WinExe (no console window). Published as one NativeAOT file into each app-<version> payload (tools/Publish-Layout.ps1).
+  -->
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <AssemblyName>DynamicIsland.Updater</AssemblyName>
+    <ApplicationIcon>..\..\assets\DynamicIsland.ico</ApplicationIcon>
+    <PublishAot>true</PublishAot>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DynamicIsland.Core\DynamicIsland.Core.csproj" />
+    <ProjectReference Include="..\DynamicIsland.Infrastructure\DynamicIsland.Infrastructure.csproj" />
+  </ItemGroup>
 
 </Project>

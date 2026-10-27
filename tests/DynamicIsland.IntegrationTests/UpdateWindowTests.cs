@@ -12,12 +12,12 @@ namespace DynamicIsland.IntegrationTests;
 /// <summary>The real update window (P06-04, ADR 0033) on an offscreen STA window, with scripted download and install.</summary>
 public sealed class UpdateWindowTests : IDisposable
 {
-    private static readonly ReleaseAsset Setup = new(UpdatePackages.SetupAsset, 51_000_000,
-        new Uri("https://github.com/x/y/releases/download/v1.3.0/" + UpdatePackages.SetupAsset));
+    private static readonly ReleaseAsset Zip = new(UpdatePackages.PortableAsset, 51_000_000,
+        new Uri("https://github.com/x/y/releases/download/v1.3.0/" + UpdatePackages.PortableAsset));
 
     private static readonly ReleaseInfo Release = new(
         new SemanticVersion(1, 3, 0, null), "v1.3.0", "Dynamic Island 1.3.0", new DateTimeOffset(2026, 11, 2, 10, 0, 0, TimeSpan.Zero),
-        new Uri("https://github.com/x/y/releases/tag/v1.3.0"), "## Features\n- **Media** widget\n- <script>alert(1)</script> stays text\n## Fixes\n- Scroll bar", [Setup]);
+        new Uri("https://github.com/x/y/releases/tag/v1.3.0"), "## Features\n- **Media** widget\n- <script>alert(1)</script> stays text\n## Fixes\n- Scroll bar", [Zip]);
 
     private readonly StaDispatcherThread _ui = new();
     private readonly GatedDownloader _downloader = new();
@@ -121,7 +121,7 @@ public sealed class UpdateWindowTests : IDisposable
     [Fact]
     public void Without_in_app_download_the_release_page_is_offered()
     {
-        var window = _ui.Invoke(() => Open(new UpdateFlow(Release, InstallKind.Installed, UpdatePolicy.Allowed, null, null)));
+        var window = _ui.Invoke(() => Open(new UpdateFlow(Release, UpdatePolicy.Allowed, null, null)));
 
         Assert.Equal("_Open release page", _ui.Invoke(() => (string)Button(window, "PrimaryButton").Content));
         _ui.Invoke(window.Close);
@@ -146,7 +146,7 @@ public sealed class UpdateWindowTests : IDisposable
     }
 
     private UpdateFlow Flow(UpdatePolicy? policy = null) =>
-        new(Release, InstallKind.Installed, policy ?? UpdatePolicy.Allowed, _downloader, _installer);
+        new(Release, policy ?? UpdatePolicy.Allowed, _downloader, _installer);
 
     private static UpdateWindow Open(UpdateFlow flow, UpdatePolicy? policy = null, bool show = true)
     {
@@ -227,7 +227,7 @@ public sealed class UpdateWindowTests : IDisposable
         {
             lock (_lock)
             {
-                _next.TrySetResult(new UpdateDownloadResult(new StagedPackage(Setup, @"C:\staging\" + Setup.Name), null));
+                _next.TrySetResult(new UpdateDownloadResult(new StagedPackage(Zip, @"C:\staging\" + Zip.Name), null));
             }
         }
 

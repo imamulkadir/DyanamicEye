@@ -7,8 +7,8 @@ namespace DynamicIsland.UnitTests.Updates;
 /// <summary>The update steps and their separate approvals (P06-04, ADR 0033), with scripted downloader and installer.</summary>
 public sealed class UpdateFlowTests
 {
-    private static readonly ReleaseAsset Setup = new(UpdatePackages.SetupAsset, 51_000_000, new Uri("https://github.com/x/y/releases/download/v1.3.0/" + UpdatePackages.SetupAsset));
-    private static readonly ReleaseAsset Zip = new(UpdatePackages.PortableAsset, 72_000_000, new Uri("https://github.com/x/y/releases/download/v1.3.0/" + UpdatePackages.PortableAsset));
+    private static readonly ReleaseAsset Setup = new(UpdatePackages.SetupAsset, 72_000_000, new Uri("https://github.com/x/y/releases/download/v1.3.0/" + UpdatePackages.SetupAsset));
+    private static readonly ReleaseAsset Zip = new(UpdatePackages.PortableAsset, 51_000_000, new Uri("https://github.com/x/y/releases/download/v1.3.0/" + UpdatePackages.PortableAsset));
 
     private readonly ScriptedDownloader _downloader = new();
     private readonly ScriptedInstaller _installer = new();
@@ -38,7 +38,7 @@ public sealed class UpdateFlowTests
 
         await flow.ApproveInstallAsync();
         Assert.Equal(UpdateStage.Installing, flow.State.Stage);
-        Assert.Equal(Setup, _installer.Installed!.Asset);
+        Assert.Equal(Zip, _installer.Installed!.Asset);
     }
 
     [Fact]
@@ -107,22 +107,18 @@ public sealed class UpdateFlowTests
     }
 
     [Fact]
-    public void Each_copy_gets_its_own_file()
+    public void Installed_and_portable_copies_both_update_from_the_zip()
     {
-        using var installed = Create(InstallKind.Installed);
-        using var portable = Create(InstallKind.Portable);
-
-        Assert.Equal(Setup, installed.Package);
-        Assert.Equal(Zip, portable.Package);
-        Assert.Equal(InstallKind.Installed, UpdatePackages.Detect(@"C:\Apps\DI", p => p == Path.Combine(@"C:\Apps\DI", UpdatePackages.UninstallerFileName)));
-        Assert.Equal(InstallKind.Portable, UpdatePackages.Detect(@"C:\Apps\DI", _ => false));
+        // ADR 0035: the updater swaps in the ZIP's payload; the setup program is only for first installs.
+        Assert.Equal(Zip, UpdatePackages.For(Release(Setup, Zip)));
+        Assert.Null(UpdatePackages.For(Release(Setup)));
     }
 
     [Fact]
     public async Task Without_a_file_or_in_app_download_only_the_release_page_is_offered()
     {
-        using var noFile = new UpdateFlow(Release(Zip), InstallKind.Installed, UpdatePolicy.Allowed, _downloader, _installer);
-        using var noDownloader = new UpdateFlow(Release(Setup, Zip), InstallKind.Installed, UpdatePolicy.Allowed, null, null);
+        using var noFile = new UpdateFlow(Release(Setup), UpdatePolicy.Allowed, _downloader, _installer);
+        using var noDownloader = new UpdateFlow(Release(Setup, Zip), UpdatePolicy.Allowed, null, null);
 
         await noFile.ApproveDownloadAsync();
         await noDownloader.ApproveDownloadAsync();
@@ -157,15 +153,15 @@ public sealed class UpdateFlowTests
     public void Summary_and_progress_texts()
     {
         var culture = CultureInfo.GetCultureInfo("en-US");
-        var release = Release(Setup);
+        var release = Release(Zip);
 
         Assert.Equal("You have version 1.2.0. Released Monday, November 2, 2026. Download size: 48.6 MB.",
-            UpdateMessages.Summary(release, Setup, new SemanticVersion(1, 2, 0, null), TimeZoneInfo.Utc, culture));
+            UpdateMessages.Summary(release, Zip, new SemanticVersion(1, 2, 0, null), TimeZoneInfo.Utc, culture));
         Assert.Equal("12.2 MB of 48.6 MB (25%)", UpdateMessages.Progress(12_750_000, 51_000_000, culture));
     }
 
-    private UpdateFlow Create(InstallKind kind = InstallKind.Installed, UpdatePolicy? policy = null) =>
-        new(Release(Setup, Zip), kind, policy ?? UpdatePolicy.Allowed, _downloader, _installer);
+    private UpdateFlow Create(UpdatePolicy? policy = null) =>
+        new(Release(Setup, Zip), policy ?? UpdatePolicy.Allowed, _downloader, _installer);
 
     private static ReleaseInfo Release(params ReleaseAsset[] assets) => new(
         new SemanticVersion(1, 3, 0, null), "v1.3.0", "Dynamic Island 1.3.0", new DateTimeOffset(2026, 11, 2, 10, 0, 0, TimeSpan.Zero),
@@ -192,7 +188,7 @@ public sealed class UpdateFlowTests
 
         public void Report(long received) => _progress!.Report(received);
 
-        public void Complete() => _next.TrySetResult(new UpdateDownloadResult(new StagedPackage(Setup, string.Empty), null));
+        public void Complete() => _next.TrySetResult(new UpdateDownloadResult(new StagedPackage(Zip, string.Empty), null));
 
         public void Fail(string problem) => _next.TrySetResult(new UpdateDownloadResult(null, problem));
     }

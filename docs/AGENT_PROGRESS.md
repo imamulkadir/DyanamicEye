@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P06-04 (update window: release details, separate Download and Install approvals) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. P06-01…03 committed. G02/G03/P04/P05/P06 manual rows are still owed by the owner.
-- **Active task status:** P06-04 **uncommitted**. P06-03 committed as `b67034d`; CI run 40473690280 **success**.
+- **Active task:** P06-07 (data migration safety) is next. P06-06 is implemented and uncommitted (the owner commits). P06-01…05 are committed (P06-05 as `6e874f0`). G02/G03/P04/P05/P06 manual rows are still owed by the owner, plus SG1 (the signing key).
+- **Active task status:** P06-06 IMPLEMENTED_AWAITING_VALIDATION (uncommitted). P06-05 IMPLEMENTED_AWAITING_VALIDATION (`6e874f0`); CI run 40552549896 **success** (837 tests).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,11 +23,15 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-27 (P06-04 IMPLEMENTED_AWAITING_VALIDATION; next: owner commit, CI, then P06-05)
+- **Last updated:** 2026-10-28 (P06-06 implemented; next is P06-07)
 
 ## NEXT ACTION (ONE task only)
-**Owner:** review and commit P06-04 (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. Manual: UP5–UP7 in `docs/TEST_MATRIX.md` (notification with the fake cached release from ADR 0033, keyboard/Narrator, scaling and themes).
-**Then agent:** **P06-05** download and verify: implement `IUpdateDownloader` (ADR 0033 seam) — download the matching asset to a temp staging folder with progress and cancel, verify size and SHA-256 (published `.sha256` asset) and provenance (signature/pinned key when available; otherwise send the user to the release page and never run it), validate the package contents and version; disk-space and interrupted-download errors as plain sentences. Never execute anything from the release body. Registering the downloader turns on the Download button; install stays P06-06.
+**Owner (once, before the first release): SG1.** In PowerShell 7 run `pwsh tools\New-ReleaseSigningKey.ps1`. Back up the private `.pem` offline and give the agent **only** the printed public key. The agent then pins it in `ReleaseSigningKeys.Pinned`, which registers the verified downloader (ADR 0034). Until then the update window keeps offering the release page. This is not blocking for the next agent task.
+
+**Then agent: P06-07 — data migration safety.** (guide §5 P06-07; ADR 0035 leaves the hook point)
+- **Scope:** before the swap (or before the new app first opens the database), take a pre-update snapshot of settings and the personal-data DB; check schema compatibility; run migrations in a transaction; recover gracefully from a failed migration. Never roll the binary back blindly against a DB the new version already migrated; selective restore only after explicit validation.
+- **Start by reading:** `Infrastructure/PersonalData/SqlitePersonalDataStore.cs` (migrations, quarantine, read-only), `Infrastructure/PersonalData/DataBackupService.cs` (backup/restore), `Infrastructure/Updates/UpdateSwap.cs` (rollback path).
+- **Tests:** failed migration → old data intact and app usable; rollback after a migrated DB → snapshot restored or the old version refuses safely; clean restart.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -39,7 +43,7 @@
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
 | P05 — Customization/performance | P05-01…P05-04 | IMPLEMENTED_AWAITING_VALIDATION (01–04) | **G05 automated PASS** 2026-10-27, CI run 40437920943 (`802906f`): goals met on the reference machine (idle CPU ~0 %, private 62–77 MB at rest; 94–104 MB after heavy automated use, documented deviation) — docs/PERFORMANCE.md; manual rows owed |
-| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–04 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
+| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–06 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
 ### G01 evidence (guide §5: "corrupt settings recover; simulated widget failure isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app")
@@ -52,6 +56,22 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-28 **P06-06 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0035**.
+  - **Updater** (`DynamicIsland.Updater.exe`, NativeAOT, shipped inside each payload by `Publish-Layout.ps1`): accepts only `--request <per-user updates\update-request.json>`. Steps: validate → wait for app + launcher exit (30 s) → re-verify size/SHA-256 → guarded extract to `app-<v>.partial` → rename → swap root files with `.bak` → atomic `current.json` `{new, old}` → launch → wait 60 s for `health-<v>.ack` → commit (cleanup, HKCU `DisplayVersion`) or roll back (stop tree, restore pointer and root files, delete `app-<new>`, write `last-update-failed.json`, restart old). Exit codes 0/2/3/4.
+  - **App side:** `UpdateHandover` (release-layout and writable checks, request file, health ack derived from the payload folder name, rollback note taken once); `LayoutUpdateInstaller` (`IUpdateInstaller`: starts the updater from its own payload, exits with code 0); the launcher passes `DYNAMICISLAND_LAUNCHER_PID`; a tray notification after a rollback. The installer is registered only with a pinned key **and** a release payload (`AppLayout.IsReleasePayload`).
+  - **Supersedes ADR 0033 on one point:** installed and portable copies both update in place from the portable ZIP (`UpdatePackages.For(release)`; `InstallKind`/`Detect` removed). The installer's `[UninstallDelete]` now removes `app-*` and `current.json`.
+  - **Other:** updater log event renumbered 3100 → 3004 (3100 belongs to PersonalData).
+  - **Tests:** `UpdateSwapTests` (15): commit; missing ack → rollback; app still running; SHA mismatch; traversal; no app in archive; locked launcher; same/older version; package outside staging; request parsing; app hand-over → swap → real health-ack round trip; refusals (dev folder, unstaged, setup asset); ack only for the awaited version; rollback note taken once. `UpdateFlowTests`/`UpdateWindowTests` moved to the ZIP. Manual rows **UP8–UP11** added to `TEST_MATRIX.md` (need SG1).
+  - **Verification 2026-10-28, Windows 11 Pro 25H2 build 26200, x64:** `dotnet restore --locked-mode` OK; Release and Debug builds 0 warnings; full suites with `--max-parallel-test-modules 1`: **Release 839/839, Debug 852/852**. Updater AOT publish (earlier in this task): 4 MB, no warnings, exit 4 on bad arguments.
+  - **Changed files:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `packaging/installer/DynamicIsland.iss`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, AppLog.cs, TrayController.cs}`, `src/DynamicIsland.Core/Distribution/AppLayout.cs`, `src/DynamicIsland.Core/Lifecycle/ExitReason.cs`, `src/DynamicIsland.Core/Updates/{UpdateFlow.cs, UpdatePackages.cs}`, `src/DynamicIsland.Launcher/ProcessAppRunner.cs`, `src/DynamicIsland.Updater/{DynamicIsland.Updater.csproj, Program.cs, packages.lock.json}`, `tests/DynamicIsland.IntegrationTests/UpdateWindowTests.cs`, `tests/DynamicIsland.UnitTests/Architecture/DependencyBoundaryTests.cs`, `tests/DynamicIsland.UnitTests/Updates/UpdateFlowTests.cs`, `tools/Publish-Layout.ps1`
+    - new: `docs/ADR/0035-updater-swap-and-rollback.md`, `src/DynamicIsland.App/LayoutUpdateInstaller.cs`, `src/DynamicIsland.Core/Updates/UpdateRequest.cs`, `src/DynamicIsland.Infrastructure/Updates/{UpdateHandover.cs, UpdateSwap.cs}`, `src/DynamicIsland.Updater/WindowsUpdaterProcesses.cs`, `tests/DynamicIsland.UnitTests/Updates/UpdateSwapTests.cs`
+    - Suggested commit message: `feat: separate updater with payload swap, health handshake and rollback (P06-06, ADR 0035)`
+- 2026-10-27 **P06-05 IMPLEMENTED_AWAITING_VALIDATION**: verified update downloads. Decisions are in **ADR 0034** (owner chose a signed manifest).
+  - **What it is:** an ECDSA P-256 release manifest plus signature against pinned keys; the download streams to per-user staging with progress, cancel and a 30 s stall timeout; size and SHA-256 must match the signed values; free space is checked; the package content is validated (PE header, or the ZIP layout with traversal guards). Nothing is run.
+  - **Files:** `Core/Updates/ReleaseManifest.cs`, `Infrastructure/Updates/GitHubUpdateDownloader.cs`, `Infrastructure/Updates/UpdatePackageValidator.cs`, `tools/New-ReleaseSigningKey.ps1`, `tools/New-ReleaseManifest.ps1`, plus tests. The downloader is registered in `AppHost` only when a key is pinned.
+  - **Commit note:** it was committed by the owner as `6e874f0`, under the stale message "full tray menu, settings service, restart contract (P03-02 in progress)". The commit **actually contains P06-05**; that message was left over from an earlier session's WIP suggestion.
+  - **Local verification 2026-10-27:** `dotnet restore --locked-mode` OK; Release build 0 warnings; unit 697/697; integration 112/112. CI run 40552549896 **success** (837 tests).
 - 2026-10-27 **P06-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0033**.
   - **Core/Updates:** `UpdateFlow` (Review → Download approval → Downloading with progress/cancel → ReadyToInstall → separate Install approval / Later → Installing; Failed + Retry of the failed step only; Managed and ManualOnly end states; `IUpdateDownloader`/`IUpdateInstaller` seams for P06-05/06), `UpdatePackages` (installed = `unins000.exe` at the layout root → Setup EXE, else portable ZIP; 1024-based sizes), `ReleaseNotes` (Markdown → plain sections; links keep words, never addresses; bounded), `UpdateMessages.Summary/Progress/Newer`; `UpdateChecker.TakeNotice` + `UpdateCheckState.NotifiedVersion` (announce once per version, survives restarts, also for a cached answer).
   - **Platform:** `Win32TrayIcon.ShowNotification` (`NIF_INFO`, `NIIF_RESPECT_QUIET_TIME`) and `TrayIconEvent.NotificationSelect` (`NIN_BALLOONUSERCLICK`).
@@ -200,6 +220,6 @@
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **finish P03-02 per NEXT ACTION** (G02 still owed by the owner).
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P06-07 per NEXT ACTION** (G02–G06 manual rows and SG1 still owed by the owner).
 - Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

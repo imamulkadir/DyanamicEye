@@ -21,7 +21,8 @@ public sealed class DependencyBoundaryTests
         ["DynamicIsland.App"] = [Core, "DynamicIsland.Widgets", "DynamicIsland.Platform.Windows", "DynamicIsland.Infrastructure"],
         // Launcher reuses crash policy (Core) and crash store/logging (Infrastructure); never UI or OS adapters (ADR 0006).
         ["DynamicIsland.Launcher"] = [Core, "DynamicIsland.Infrastructure"],
-        ["DynamicIsland.Updater"] = [],
+        // Updater: swap engine and logging (Infrastructure), contracts (Core); never UI or OS adapters (ADR 0035).
+        ["DynamicIsland.Updater"] = [Core, "DynamicIsland.Infrastructure"],
     };
 
     private static readonly string[] ForbiddenCoreAssemblyPrefixes =

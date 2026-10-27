@@ -116,6 +116,15 @@ public partial class App : Application
         _host.Services.GetRequiredService<TrayController>().Start(); // Disposed (icon removed) with the host on exit.
         _host.Services.GetRequiredService<ShortcutController>().Start(); // Registered only when turned on (ADR 0017).
 
+        // Updater handshake (ADR 0035): confirm this version started, and say once when the last update was rolled back.
+        var handover = _host.Services.GetRequiredService<Infrastructure.Updates.UpdateHandover>();
+        handover.AcknowledgeHealth(AppContext.BaseDirectory);
+        if (handover.TakeFailedVersion() is { } failedVersion)
+        {
+            AppLog.UpdateRolledBack(_logger, failedVersion);
+            _host.Services.GetRequiredService<TrayController>().AnnounceRollback(failedVersion);
+        }
+
         if (Onboarding.IsNeeded(settingsService.Current, launch))
         {
             // Owned by the island, so it is never taken for the app's main window and closes with it.

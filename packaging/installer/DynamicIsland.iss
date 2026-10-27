@@ -68,6 +68,9 @@ Filename: "{app}\DynamicIsland.exe"; Description: "{cm:LaunchProgram,Dynamic Isl
 
 [UninstallDelete]
 Type: files; Name: "{app}\managed.json"
+; In-app updates (ADR 0035) add payloads and rewrite current.json that the installer did not place itself.
+Type: filesandordirs; Name: "{app}\app-*"
+Type: files; Name: "{app}\current.json"
 
 [Code]
 const

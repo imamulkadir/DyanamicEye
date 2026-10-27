@@ -42,6 +42,9 @@ public static class LauncherContract
     /// <summary>Set to <c>1</c> by the launcher for the app it supervises: restarts are then done by exiting with 3/4.</summary>
     public const string SupervisedVariable = "DYNAMICISLAND_SUPERVISED";
 
+    /// <summary>The supervising launcher's process id, so an update waits for it to exit before replacing it (ADR 0035).</summary>
+    public const string LauncherPidVariable = "DYNAMICISLAND_LAUNCHER_PID";
+
     /// <summary>Launcher argument: wait for this process id to exit before starting the app (used by unsupervised restarts).</summary>
     public const string AfterPidSwitch = "--after-pid";
 

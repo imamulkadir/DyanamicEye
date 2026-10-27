@@ -172,6 +172,51 @@ public sealed class UpdateCheckerTests
     }
 
     [Fact]
+    public async Task A_new_version_is_announced_once_even_across_restarts()
+    {
+        using (var first = Create())
+        {
+            Assert.Null(first.TakeNotice()); // Nothing checked yet.
+            _source.Next = Found("1.3.0");
+            await first.CheckAsync(manual: false, Ct);
+
+            Assert.Equal("1.3.0", first.TakeNotice()!.Version.ToString());
+            Assert.Null(first.TakeNotice());
+        }
+
+        using var restarted = Create();
+        _time.Advance(TimeSpan.FromHours(1));
+        Assert.Equal(UpdateCheckOutcome.NotDue, (await restarted.CheckAsync(manual: false, Ct)).Outcome);
+        Assert.Null(restarted.TakeNotice()); // The cached answer, already announced.
+
+        _time.Advance(UpdateChecker.Interval);
+        _source.Next = Found("1.4.0");
+        await restarted.CheckAsync(manual: false, Ct);
+        Assert.Equal("1.4.0", restarted.TakeNotice()!.Version.ToString());
+    }
+
+    [Fact]
+    public async Task A_cached_unannounced_update_is_announced_after_a_restart()
+    {
+        _store.Save(UpdateCheckState.Empty with { LastAttemptUtc = Start, LastSuccessUtc = Start, Latest = Found("1.3.0").Release });
+        using var checker = Create();
+
+        Assert.Equal(UpdateCheckOutcome.NotDue, (await checker.CheckAsync(manual: false, Ct)).Outcome);
+        Assert.Equal("1.3.0", checker.TakeNotice()!.Version.ToString());
+        Assert.Equal(0, _source.Requests);
+    }
+
+    [Fact]
+    public async Task Being_up_to_date_announces_nothing()
+    {
+        using var checker = Create();
+        _source.Next = Found("1.2.0");
+        await checker.CheckAsync(manual: false, Ct);
+
+        Assert.Null(checker.TakeNotice());
+    }
+
+    [Fact]
     public void Messages_say_what_happened_in_plain_words()
     {
         var culture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
@@ -181,6 +226,9 @@ public sealed class UpdateCheckerTests
             UpdateMessages.Describe(new UpdateCheckResult(UpdateCheckOutcome.UpdateAvailable, release, Start), Installed, TimeZoneInfo.Utc, culture), StringComparison.Ordinal);
         Assert.Equal("You have the latest version, 1.2.0 (checked 11/3/2026 9:00 AM).",
             UpdateMessages.Describe(new UpdateCheckResult(UpdateCheckOutcome.UpToDate, release, Start), Installed, TimeZoneInfo.Utc, culture));
+        Assert.StartsWith("Version 1.3.0 is available", // A cached answer after a restart.
+            UpdateMessages.Describe(new UpdateCheckResult(UpdateCheckOutcome.NotDue, release, Start), Installed, TimeZoneInfo.Utc, culture), StringComparison.Ordinal);
+        Assert.Null(UpdateMessages.Newer(new UpdateCheckResult(UpdateCheckOutcome.NotDue, release, Start), new SemanticVersion(1, 3, 0, null)));
         Assert.Contains("Couldn't reach GitHub", UpdateMessages.Describe(new UpdateCheckResult(UpdateCheckOutcome.Failed), Installed, TimeZoneInfo.Utc, culture), StringComparison.Ordinal);
     }
 

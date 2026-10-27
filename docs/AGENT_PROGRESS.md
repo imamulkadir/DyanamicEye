@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P06-03 (update checks against GitHub releases/latest) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. P06-01/02 committed. G02/G03/P04/P05/P06 manual rows are still owed by the owner.
-- **Active task status:** P06-03 **uncommitted**. P06-02 + SDK pin committed as `150a187`; CI run 40463039773 **success** (712/712, 725/725, 0 skipped; ZIP and installer built on CI).
+- **Active task:** P06-04 (update window: release details, separate Download and Install approvals) IMPLEMENTED_AWAITING_VALIDATION, uncommitted. P06-01…03 committed. G02/G03/P04/P05/P06 manual rows are still owed by the owner.
+- **Active task status:** P06-04 **uncommitted**. P06-03 committed as `b67034d`; CI run 40473690280 **success**.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,11 +23,11 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-26 (P05-01 IMPLEMENTED_AWAITING_VALIDATION; next: owner commit, CI, then P05-02)
+- **Last updated:** 2026-10-27 (P06-04 IMPLEMENTED_AWAITING_VALIDATION; next: owner commit, CI, then P06-05)
 
 ## NEXT ACTION (ONE task only)
-**Owner:** review and commit P06-03 (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. Manual: UP1–UP4 in `docs/TEST_MATRIX.md` (Check for updates, offline, daily check log line, managed).
-**Then agent:** **P06-04** update UI: version, release date, formatted download size, notes sections (features/fixes) as plain text, release link, progress/cancel/retry, **separate download approval and install approval**, never silent. The download/verify itself is P06-05 and the swap P06-06 — P06-04 can stop at a confirmed "Download" approval with a stubbed downloader if needed; keep each step reviewable.
+**Owner:** review and commit P06-04 (file list in RECENT VERIFIED CHANGES), push, and check that CI is green. Manual: UP5–UP7 in `docs/TEST_MATRIX.md` (notification with the fake cached release from ADR 0033, keyboard/Narrator, scaling and themes).
+**Then agent:** **P06-05** download and verify: implement `IUpdateDownloader` (ADR 0033 seam) — download the matching asset to a temp staging folder with progress and cancel, verify size and SHA-256 (published `.sha256` asset) and provenance (signature/pinned key when available; otherwise send the user to the release page and never run it), validate the package contents and version; disk-space and interrupted-download errors as plain sentences. Never execute anything from the release body. Registering the downloader turns on the Download button; install stays P06-06.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -39,7 +39,7 @@
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
 | P05 — Customization/performance | P05-01…P05-04 | IMPLEMENTED_AWAITING_VALIDATION (01–04) | **G05 automated PASS** 2026-10-27, CI run 40437920943 (`802906f`): goals met on the reference machine (idle CPU ~0 %, private 62–77 MB at rest; 94–104 MB after heavy automated use, documented deviation) — docs/PERFORMANCE.md; manual rows owed |
-| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–03 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
+| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–04 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
 ### G01 evidence (guide §5: "corrupt settings recover; simulated widget failure isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app")
@@ -52,6 +52,17 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-27 **P06-04 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0033**.
+  - **Core/Updates:** `UpdateFlow` (Review → Download approval → Downloading with progress/cancel → ReadyToInstall → separate Install approval / Later → Installing; Failed + Retry of the failed step only; Managed and ManualOnly end states; `IUpdateDownloader`/`IUpdateInstaller` seams for P06-05/06), `UpdatePackages` (installed = `unins000.exe` at the layout root → Setup EXE, else portable ZIP; 1024-based sizes), `ReleaseNotes` (Markdown → plain sections; links keep words, never addresses; bounded), `UpdateMessages.Summary/Progress/Newer`; `UpdateChecker.TakeNotice` + `UpdateCheckState.NotifiedVersion` (announce once per version, survives restarts, also for a cached answer).
+  - **Platform:** `Win32TrayIcon.ShowNotification` (`NIF_INFO`, `NIIF_RESPECT_QUIET_TIME`) and `TrayIconEvent.NotificationSelect` (`NIN_BALLOONUSERCLICK`).
+  - **App:** `UpdateWindow` (version, date, size, notes as text, release link, progress bar, two step-dependent buttons, focus on the notes so Enter never approves, closing cancels a download), `UpdateWindowService` (steps outlive the window: Later → reopen → Install now), scheduler `UpdateFound` → tray notification → window; tray item "Update available (X)…"; Settings › Updates **View update…**. No downloader/installer registered yet → the window offers **Open release page** (ADR 0033 §6).
+  - Found while writing UP5: a cached update after a restart came back as `NotDue` and would not reach the tray/Settings/notice — fixed with `UpdateMessages.Newer` (unit-tested).
+  - **Tests:** unit `UpdateFlowTests` (11 tests, 15 cases), `ReleaseNotesTests` (5), `UpdateCheckerTests` (+3 notice), `TrayMenuModelTests` (+1), store round trip with `notifiedVersion`; integration `UpdateWindowTests` (8 cases: details, separate approvals, progress, cancel, close cancels, failure + retry, managed ×2, release page only, Later keeps the package), `SettingsWindowTests` (View update), `Win32TrayIconTests` (+1 mapping). No real toast is shown by tests.
+  - **Changed files:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (UP5–UP7), `docs/WORK_LOG.md`, `src/DynamicIsland.App/{App.xaml.cs, AppHost.cs, SettingsWindow.xaml, SettingsWindow.xaml.cs, TrayController.cs, UpdateCheckScheduler.cs}`, `src/DynamicIsland.Core/Shell/TrayMenu.cs`, `src/DynamicIsland.Core/Updates/{UpdateChecker.cs, UpdateContracts.cs, UpdateMessages.cs}`, `src/DynamicIsland.Infrastructure/Updates/JsonUpdateStateStore.cs`, `src/DynamicIsland.Platform.Windows/{NativeMethods.cs, Tray/Win32TrayIcon.cs}`, `tests/DynamicIsland.IntegrationTests/{SettingsWindowTests.cs, Win32TrayIconTests.cs}`, `tests/DynamicIsland.UnitTests/Shell/TrayMenuModelTests.cs`, `tests/DynamicIsland.UnitTests/Updates/{GitHubReleaseSourceTests.cs, UpdateCheckerTests.cs}`
+    - new: `docs/ADR/0033-update-window-and-approvals.md`, `src/DynamicIsland.App/{UpdateWindow.xaml, UpdateWindow.xaml.cs, UpdateWindowService.cs}`, `src/DynamicIsland.Core/Updates/{ReleaseNotes.cs, UpdateFlow.cs, UpdatePackages.cs}`, `tests/DynamicIsland.IntegrationTests/UpdateWindowTests.cs`, `tests/DynamicIsland.UnitTests/Updates/{ReleaseNotesTests.cs, UpdateFlowTests.cs}`
+    - Suggested commit message: `feat: update window with separate download and install approvals (P06-04, ADR 0033)`
+- 2026-10-27 P06-03 committed by the owner as `b67034d`; CI run 40473690280 **success**.
 - 2026-10-27 **P06-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0032**.
   - **Core/Updates:** `SemanticVersion` (SemVer 2.0 precedence, `v` prefix, build metadata ignored), `UpdateContracts` (`ReleaseInfo`, `ReleaseAsset`, `ReleaseFetch`, `IReleaseSource`, `IUpdateChecker`, `UpdateCheckState`, `IUpdateStateStore`), `GitHubReleaseParser` (stable only; SemVer tag; HTTPS github.com URLs inside the repo only; sizes ≤ 1 GB; ≤ 50 assets; notes plain text ≤ 20,000 chars; response ≤ 1 MB), `UpdateChecker` (policy > consent; 24 h + 0–2 h jitter; backoff 1 h doubling to 24 h; honors GitHub reset; manual cooldown 1 min; ETag/304; cache), `UpdateMessages`.
   - **Infrastructure/Updates:** `GitHubReleaseSource` (unauthenticated; User-Agent, Accept, API version, If-None-Match; 15 s timeout; 404/304/403/429 handling), `JsonUpdateStateStore` (`data/update-check.json`, atomic, re-validated on load), `OfflineReleaseSource` (Debug tests under the data-root hook never reach the network).
@@ -100,21 +111,12 @@
     - new: `docs/ADR/0029-resource-budget-and-benchmark.md`, `docs/PERFORMANCE.md`, `tests/DynamicIsland.WindowsSmokeTests/ResourceBenchmarkSmokeTests.cs`
     - Suggested commit message: `perf: resource benchmark and adaptive stats cadence (P05-04, ADR 0029)`
 - 2026-10-27 P05-03 committed by the owner as `244dc01`; CI run 40374482330 **success**: 667/667 and 677/677, 0 skipped.
-- 2026-10-26 **P05-03 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0028**.
-  - Audit found: no focus mark on the island itself; slider and task check boxes used WPF's dotted black focus rectangle (invisible on black); high contrast ignored; note rows 23 DIP tall, tabs/pin 30; selection shown by color only. Already fine: keyboard flow, UIA patterns and names, reduced motion.
-  - **Core:** `IslandTheme.HighContrast(window, windowText, highlight)` (opaque system colors, no tints), `MinTarget` 24 and `MinPrimaryTarget` 32.
-  - **App:** `IslandSurface.FocusStroke` (2 DIP inner outline while keyboard-focused); `ThemeResources.WithFocusRing` for the volume slider and task check boxes (TasksView edit now swaps the ring, not the check box — the first version threw "already the logical child", caught by `NotesAndTasksViewTests`); tabs 36×32, pin 32×32, note rows and check boxes ≥ 24 high; checked toggles get an accent outline; `IslandWindow` uses the high-contrast palette when `SystemParameters.HighContrast`, re-applied on `WM_SYSCOLORCHANGE`, `SPI_SETHIGHCONTRAST` and "ImmersiveColorSet".
-  - **Media robustness (found while testing):** the integration suite hung because `GlobalSystemMediaTransportControlsSessionManager.RequestAsync` stopped completing on this PC (no player running). `WindowsMediaSessionService` now bounds every WinRT call with `CallTimeout` = 5 s (start → unavailable, reads → no media, commands → false). ADR 0020 amended.
-  - **Tests:** new integration `AccessibilityAuditTests` (every interactive control on every tab of all six real widget views has a UIA name and meets 24/32 DIP; must check ≥ 20 controls — the first version checked none because `IsVisible` is false offscreen, fixed; then found the 23 DIP note row); unit `IslandThemeTests.High_contrast_uses_only_the_users_system_colors_without_tints`; `NotchVisualTests` new `notch-pinned-highcontrast.png` and regenerated pinned/expanded/tabs/light references (checked by eye); helpers in `NotesAndTasksViewTests` and `VolumeAndLayoutTests` follow the focus-ring wrapper.
-  - **Changed files:**
-    - modified: `docs/ADR/{0020-media-widget.md, README.md}`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md` (AX1–AX4), `docs/WORK_LOG.md`, `src/DynamicIsland.App/{IslandSurface.cs, IslandWindow.xaml.cs, NotchView.xaml, NotchView.xaml.cs, NotesView.cs, TasksView.cs, ThemeResources.cs, VolumeView.cs}`, `src/DynamicIsland.Core/Shell/IslandTheme.cs`, `src/DynamicIsland.Platform.Windows/Media/WindowsMediaSessionService.cs`, `tests/DynamicIsland.IntegrationTests/{NotchVisualTests.cs, NotesAndTasksViewTests.cs, VolumeAndLayoutTests.cs, References/notch-expanded.png, References/notch-pinned.png, References/notch-pinned-light.png, References/notch-pinned-tabs.png}`, `tests/DynamicIsland.UnitTests/Shell/IslandThemeTests.cs`
-    - new: `docs/ADR/0028-accessibility-pass.md`, `tests/DynamicIsland.IntegrationTests/AccessibilityAuditTests.cs`, `tests/DynamicIsland.IntegrationTests/References/notch-pinned-highcontrast.png`
-    - Suggested commit message: `feat: accessibility pass - focus marks, high contrast, target sizes (P05-03, ADR 0028); bound media session calls`
-- 2026-10-26 P05-02 committed by the owner as `3c2c70f`; CI run 40362826141 **success**.
 
 ## TEST EVIDENCE (current task; older rows in `docs/WORK_LOG.md`)
 | UTC date | Task | Host / OS | Exact command or manual scenario | Outcome | Notes |
 |---|---|---|---|---|---|
+| 2026-10-27 | P06-04 | Windows 11 Pro 25H2 x64, `CI=true`, SDK 10.0.401 | `dotnet build` Release + Debug (0 warnings); full suite `--max-parallel-test-modules 1` Release ×2, Debug ×2 | PASS | Release 795/795 ×2, Debug 808/808 ×2, **0 skipped** |
+| 2026-10-27 | P06-03 | GitHub Actions `windows-2025` (`b67034d`) | CI workflow incl. packaging | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40473690280 |
 | 2026-10-25 | P03-01 | GitHub Actions `windows-2025` | CI workflow | PASS | https://github.com/imamulkadir/DyanamicEye/actions/runs/40208475923 |
 | 2026-10-25 | P03-02 | Windows 11 Pro 25H2 x64, 1 monitor at 100 % | `dotnet build` Release + Debug | PASS | 0 warnings (earlier attempts failed on IDE0005; fixed). One Debug build hit a transient "temporary files folder is full / insufficient resources" MSBuild error: disk 27 GB free, RAM 7.9 GB free, no leaks found; the rebuild passed. |
 | 2026-10-25 | P03-02 | same | Unit tests | PASS | 322/322 |

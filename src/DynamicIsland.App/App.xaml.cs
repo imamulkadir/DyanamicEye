@@ -136,7 +136,10 @@ public partial class App : Application
         _host.Services.GetRequiredService<PinMemory>().Start(); // Restores the pin from the last session (ADR 0027).
         if (!launch.SafeMode)
         {
-            _host.Services.GetRequiredService<UpdateCheckScheduler>().Start(); // Daily, consent and IT policy apply (ADR 0032).
+            var scheduler = _host.Services.GetRequiredService<UpdateCheckScheduler>();
+            var tray = _host.Services.GetRequiredService<TrayController>();
+            scheduler.UpdateFound += (_, release) => Dispatcher.BeginInvoke(() => tray.AnnounceUpdate(release)); // Once per version (ADR 0033).
+            scheduler.Start(); // Daily, consent and IT policy apply (ADR 0032).
         }
 
         // Tray "Pause" also pauses optional background work (ADR 0013).

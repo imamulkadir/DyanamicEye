@@ -41,7 +41,8 @@ public sealed record TrayMenuItem(
 public static class TrayMenuModel
 {
     /// <param name="updatesManaged">Self-update is turned off by IT (ADR 0031): the update item is greyed out with the reason.</param>
-    public static IReadOnlyList<TrayMenuItem> Build(IslandState state, bool safeMode, IReadOnlyList<MonitorInfo> monitors, string? islandMonitorId, bool updatesManaged = false)
+    /// <param name="availableVersion">A newer version is known (ADR 0033): the update item opens its details instead of checking.</param>
+    public static IReadOnlyList<TrayMenuItem> Build(IslandState state, bool safeMode, IReadOnlyList<MonitorInfo> monitors, string? islandMonitorId, bool updatesManaged = false, string? availableVersion = null)
     {
         ArgumentNullException.ThrowIfNull(monitors);
 
@@ -57,7 +58,12 @@ public static class TrayMenuModel
             new(TrayCommand.DisplayMenu, "_Display", AutomationId: "Tray.Display", Children: DisplayItems(monitors, islandMonitorId)),
             TrayMenuItem.Separator,
             new(TrayCommand.Settings, "_Settings…", AutomationId: "Tray.Settings"),
-            new(TrayCommand.CheckForUpdates, "Check for _updates…", Enabled: !updatesManaged, ToolTip: updatesManaged ? "Updates are managed for this copy" : null, AutomationId: "Tray.CheckForUpdates"),
+            new(
+                TrayCommand.CheckForUpdates,
+                availableVersion is not null && !updatesManaged ? $"_Update available ({availableVersion})…" : "Check for _updates…",
+                Enabled: !updatesManaged,
+                ToolTip: updatesManaged ? "Updates are managed for this copy" : null,
+                AutomationId: "Tray.CheckForUpdates"),
             new(TrayCommand.OpenLogs, "Open _logs folder", AutomationId: "Tray.OpenLogs"),
             TrayMenuItem.Separator,
             new(TrayCommand.ToggleSafeMode, safeMode ? "_Leave Safe Mode (restart)" : "Restart in Safe _Mode", AutomationId: "Tray.ToggleSafeMode"),

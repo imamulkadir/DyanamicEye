@@ -12,6 +12,9 @@ public enum TrayIconEvent
 
     /// <summary>Right click, Shift+F10 or the Menu key: show the context menu.</summary>
     ContextMenu,
+
+    /// <summary>The user selected the notification shown by <see cref="Win32TrayIcon.ShowNotification"/>.</summary>
+    NotificationSelect,
 }
 
 /// <summary>
@@ -26,8 +29,11 @@ public sealed unsafe class Win32TrayIcon : IDisposable
 
     private const int NinSelect = 0x0400;
     private const int NinKeySelect = 0x0401;
+    private const int NinBalloonUserClick = 0x0405;
     private const int WmContextMenu = 0x007B;
     private const int MaxTooltipLength = 127;
+    private const int MaxInfoLength = 255;
+    private const int MaxInfoTitleLength = 63;
 
     private static readonly uint TaskbarCreatedMessage = NativeMethods.RegisterWindowMessage("TaskbarCreated");
 
@@ -73,6 +79,27 @@ public sealed unsafe class Win32TrayIcon : IDisposable
             var data = CreateData(NativeMethods.NifTip | NativeMethods.NifShowTip);
             NativeMethods.ShellNotifyIcon(NativeMethods.NimModify, &data);
         }
+    }
+
+    /// <summary>
+    /// Shows a Windows notification from the icon (a toast on Windows 10/11). Windows decides whether it appears:
+    /// Focus assist / Do not disturb and the user's notification settings are respected, and new users' first hour is quiet.
+    /// </summary>
+    /// <returns>Whether the shell accepted it.</returns>
+    public bool ShowNotification(string title, string text)
+    {
+        ArgumentNullException.ThrowIfNull(title);
+        ArgumentNullException.ThrowIfNull(text);
+        if (!IsAdded)
+        {
+            return false;
+        }
+
+        var data = CreateData(NativeMethods.NifInfo);
+        Copy(text, data.Info, MaxInfoLength);
+        Copy(title, data.InfoTitle, MaxInfoTitleLength);
+        data.InfoFlags = NativeMethods.NiifInfo | NativeMethods.NiifRespectQuietTime;
+        return NativeMethods.ShellNotifyIcon(NativeMethods.NimModify, &data);
     }
 
     public void Remove()
@@ -124,6 +151,7 @@ public sealed unsafe class Win32TrayIcon : IDisposable
             NinSelect => TrayIconEvent.Select,
             NinKeySelect => TrayIconEvent.KeySelect,
             WmContextMenu => TrayIconEvent.ContextMenu,
+            NinBalloonUserClick => TrayIconEvent.NotificationSelect,
             _ => TrayIconEvent.None,
         };
     }
@@ -196,6 +224,17 @@ public sealed unsafe class Win32TrayIcon : IDisposable
 
         data.Tip[tip.Length] = '\0';
         return data;
+    }
+
+    private static void Copy(string text, char* target, int maxLength)
+    {
+        var span = text.AsSpan(0, Math.Min(text.Length, maxLength));
+        for (var i = 0; i < span.Length; i++)
+        {
+            target[i] = span[i];
+        }
+
+        target[span.Length] = '\0';
     }
 
     private static string Truncate(string tooltip) =>

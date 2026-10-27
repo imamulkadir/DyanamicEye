@@ -121,7 +121,7 @@ public sealed class GitHubReleaseSourceTests : IDisposable
         Assert.Equal(UpdateCheckState.Empty, store.Load());
 
         var release = GitHubReleaseParser.Parse(SemanticVersionAndParserTests.Release(), Repo)!;
-        var state = new UpdateCheckState(DateTimeOffset.UnixEpoch.AddDays(20000), DateTimeOffset.UnixEpoch.AddDays(20000), 0, null, "\"e\"", release, false);
+        var state = new UpdateCheckState(DateTimeOffset.UnixEpoch.AddDays(20000), DateTimeOffset.UnixEpoch.AddDays(20000), 0, null, "\"e\"", release, false) { NotifiedVersion = "1.3.0" };
         store.Save(state);
         var loaded = store.Load();
 

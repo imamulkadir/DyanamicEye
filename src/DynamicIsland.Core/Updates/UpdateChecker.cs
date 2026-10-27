@@ -92,6 +92,32 @@ public sealed class UpdateChecker(
         }
     }
 
+    /// <summary>
+    /// The available update to announce in the tray (ADR 0033), once per version: returns it and remembers it, or
+    /// <c>null</c> when there is none or it was already announced.
+    /// </summary>
+    public ReleaseInfo? TakeNotice()
+    {
+        _gate.Wait();
+        try
+        {
+            var state = _state ??= store.Load();
+            if (UpdateMessages.Newer(Last, installed) is not { } latest
+                || string.Equals(state.NotifiedVersion, latest.Version.ToString(), StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            _state = state with { NotifiedVersion = latest.Version.ToString() };
+            store.Save(_state);
+            return latest;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public void Dispose() => _gate.Dispose();
 
     private (UpdateCheckState State, UpdateCheckResult Result) Apply(UpdateCheckState state, ReleaseFetch fetch, DateTimeOffset now)

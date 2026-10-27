@@ -88,6 +88,15 @@ public sealed class TrayMenuModelTests
     }
 
     [Fact]
+    public void A_known_update_names_its_version_in_the_menu()
+    {
+        Assert.Equal("_Update available (1.3.0)…", TrayMenuModel.Build(IslandState.Collapsed, false, [Primary], null, availableVersion: "1.3.0")
+            .Single(i => i.Command == TrayCommand.CheckForUpdates).Label);
+        Assert.Equal("Check for _updates…", TrayMenuModel.Build(IslandState.Collapsed, false, [Primary], null, updatesManaged: true, availableVersion: "1.3.0")
+            .Single(i => i.Command == TrayCommand.CheckForUpdates).Label);
+    }
+
+    [Fact]
     public void Display_order_is_left_to_right_then_top_to_bottom()
     {
         var below = Primary with { Id = "below-id", Bounds = new(0, 1080, 1920, 1080), IsPrimary = false };

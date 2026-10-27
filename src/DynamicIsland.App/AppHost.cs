@@ -136,6 +136,22 @@ public static class AppHost
             TimeSpan.FromMinutes(Random.Shared.Next(0, (int)Core.Updates.UpdateChecker.MaxJitter.TotalMinutes))));
         builder.Services.AddSingleton<Core.Updates.IUpdateChecker>(sp => sp.GetRequiredService<Core.Updates.UpdateChecker>());
         builder.Services.AddSingleton<UpdateCheckScheduler>();
+        // Release details and the separate Download/Install approvals (ADR 0033). The in-app download and install arrive
+        // with P06-05/06 (IUpdateDownloader/IUpdateInstaller); until then the window offers the release page.
+        builder.Services.AddSingleton(sp => new UpdateWindowService(
+            release => new Core.Updates.UpdateFlow(
+                release,
+                Core.Updates.UpdatePackages.Detect(
+                    System.IO.Path.GetDirectoryName(Core.Distribution.AppLayout.LauncherFor(AppContext.BaseDirectory, System.IO.File.Exists))!,
+                    System.IO.File.Exists),
+                sp.GetRequiredService<Core.Distribution.UpdatePolicy>(),
+                sp.GetService<Core.Updates.IUpdateDownloader>(),
+                sp.GetService<Core.Updates.IUpdateInstaller>()),
+            flow => new UpdateWindow(
+                flow,
+                Core.Updates.SemanticVersion.TryParse(sp.GetRequiredService<AppInfo>().DisplayVersion) ?? new Core.Updates.SemanticVersion(0, 0, 0, null),
+                sp.GetRequiredService<Core.Distribution.UpdatePolicy>(),
+                sp.GetRequiredService<ILogger<UpdateWindow>>())));
 
         // IT-managed copies never update themselves (ADR 0031); read once at start.
         builder.Services.AddSingleton(_ => Platform.Windows.Startup.UpdatePolicyReader.Read(
@@ -170,7 +186,8 @@ public static class AppHost
                     sp.GetRequiredService<Core.PersonalData.IDataBackupService>(),
                     () => sp.GetRequiredService<RestartService>().Restart(launch.SafeMode),
                     sp.GetRequiredService<Core.Distribution.UpdatePolicy>(),
-                    sp.GetRequiredService<Core.Updates.IUpdateChecker>()),
+                    sp.GetRequiredService<Core.Updates.IUpdateChecker>(),
+                    release => sp.GetRequiredService<UpdateWindowService>().Show(release)),
                 sp.GetRequiredService<ILogger<SettingsWindow>>());
         }));
         builder.Services.AddSingleton(sp => new TrayController(
@@ -185,7 +202,11 @@ public static class AppHost
             sp.GetRequiredService<FileLoggerOptions>().Directory,
             sp.GetRequiredService<ILogger<TrayController>>(),
             () => sp.GetRequiredService<SettingsWindowService>().ShowAndCheckForUpdates(),
-            sp.GetRequiredService<Core.Distribution.UpdatePolicy>().SelfUpdateDisabled));
+            sp.GetRequiredService<Core.Distribution.UpdatePolicy>().SelfUpdateDisabled,
+            () => Core.Updates.UpdateMessages.Newer(
+                sp.GetRequiredService<Core.Updates.IUpdateChecker>().Last,
+                Core.Updates.SemanticVersion.TryParse(sp.GetRequiredService<AppInfo>().DisplayVersion) ?? new Core.Updates.SemanticVersion(0, 0, 0, null)),
+            release => sp.GetRequiredService<UpdateWindowService>().Show(release)));
         builder.Services.AddSingleton<Win32FullscreenDetector>();
         builder.Services.AddSingleton<IFullscreenDetector>(sp => sp.GetRequiredService<Win32FullscreenDetector>());
         builder.Services.AddSingleton(sp => new FullscreenCoordinator(

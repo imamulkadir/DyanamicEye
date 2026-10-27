@@ -169,6 +169,9 @@ internal static unsafe partial class NativeMethods
     public const uint NifIcon = 0x02;
     public const uint NifTip = 0x04;
     public const uint NifShowTip = 0x80;
+    public const uint NifInfo = 0x10;
+    public const uint NiifInfo = 0x01;
+    public const uint NiifRespectQuietTime = 0x80;
     public const uint NotifyIconVersion4 = 4;
     public const int SmCxSmIcon = 49;
     public const int SmCySmIcon = 50;

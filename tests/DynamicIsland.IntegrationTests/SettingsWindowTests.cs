@@ -27,6 +27,7 @@ public sealed class SettingsWindowTests : IDisposable
     private ShortcutState _shortcutState = ShortcutState.Off;
     private Core.Distribution.UpdatePolicy _updatePolicy = Core.Distribution.UpdatePolicy.Allowed;
     private Core.Updates.IUpdateChecker? _updates;
+    private Core.Updates.ReleaseInfo? _shownUpdate;
 
     public void Dispose()
     {
@@ -292,6 +293,12 @@ public sealed class SettingsWindowTests : IDisposable
         Assert.Equal(1, checker.ManualChecks);
         Assert.Equal("Updates", _ui.Invoke(() => (string)((TabItem)((TabControl)window.FindName("Pages")).SelectedItem).Header));
         Assert.True(_ui.Invoke(() => ((Button)window.FindName("CheckUpdatesButton")).IsEnabled));
+
+        // The details and the Download/Install approvals are one click away (ADR 0033).
+        var view = _ui.Invoke(() => (Button)window.FindName("ViewUpdateButton"));
+        Assert.Equal(Visibility.Visible, _ui.Invoke(() => view.Visibility));
+        _ui.Invoke(() => view.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)));
+        Assert.Same(release, _shownUpdate);
         _ui.Invoke(window.Close);
     }
 
@@ -321,7 +328,8 @@ public sealed class SettingsWindowTests : IDisposable
             new NoBackup(),
             () => false,
             _updatePolicy,
-            _updates);
+            _updates,
+            release => _shownUpdate = release);
         var builder = new DiagnosticBundleBuilder(Path.Combine(_root, "logs"), Path.Combine(_root, "data"), new LogRedactor([]), TimeProvider.System);
         var window = new SettingsWindow(_settings, new FixedMonitors([Primary, Second]), builder, context, NullLogger<SettingsWindow>.Instance)
         {

@@ -35,7 +35,8 @@ public sealed record SettingsWindowContext(
     IDataBackupService Backup,
     Func<bool> Restart,
     Core.Distribution.UpdatePolicy? UpdatePolicy = null,
-    Core.Updates.IUpdateChecker? Updates = null);
+    Core.Updates.IUpdateChecker? Updates = null,
+    Action<Core.Updates.ReleaseInfo>? ShowUpdate = null);
 
 /// <summary>
 /// Settings window (guide P03-03, ADR 0014): edits a <see cref="SettingsEditor"/> draft and saves it explicitly through
@@ -48,6 +49,7 @@ public partial class SettingsWindow : Window
     private readonly ISettingsService _settings;
     private readonly DiagnosticBundleBuilder _diagnostics;
     private readonly SettingsWindowContext _context;
+    private Core.Updates.ReleaseInfo? _availableUpdate;
     private readonly ILogger _logger;
     private readonly SettingsEditor _editor;
     private DiagnosticPreview? _report;
@@ -220,12 +222,25 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void ShowUpdateResult(Core.Updates.UpdateCheckResult result) =>
+    private void ShowUpdateResult(Core.Updates.UpdateCheckResult result)
+    {
         UpdateStatusText.Text = Core.Updates.UpdateMessages.Describe(
             result,
             Core.Updates.SemanticVersion.TryParse(_context.Version) ?? new Core.Updates.SemanticVersion(0, 0, 0, null),
             TimeZoneInfo.Local,
             CultureInfo.CurrentCulture);
+        _availableUpdate = Core.Updates.UpdateMessages.Newer(result, Core.Updates.SemanticVersion.TryParse(_context.Version) ?? new Core.Updates.SemanticVersion(0, 0, 0, null));
+        ViewUpdateButton.Visibility = _availableUpdate is not null && _context.ShowUpdate is not null ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Opens the update window: release details and the separate Download and Install approvals (ADR 0033).</summary>
+    private void OnViewUpdate(object sender, RoutedEventArgs e)
+    {
+        if (_availableUpdate is { } release)
+        {
+            _context.ShowUpdate?.Invoke(release);
+        }
+    }
 
     /// <summary>IT-managed copies never update themselves (ADR 0031): say so and lock the daily check option.</summary>
     private void ShowUpdatePolicy(Core.Distribution.UpdatePolicy policy)

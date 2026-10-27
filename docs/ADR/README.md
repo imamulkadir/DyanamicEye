@@ -62,5 +62,6 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0030 — Release layout: stable launcher and immutable versioned payloads](0030-release-layout.md) — Accepted (P06-01)
 - [0031 — Per-user installer (Inno Setup) and the IT-managed update policy](0031-per-user-installer.md) — Accepted (P06-02)
 - [0032 — Update checks: GitHub releases/latest, schedule and trust](0032-update-checks.md) — Accepted (P06-03)
+- [0033 — Update window: release details, separate Download and Install approvals](0033-update-window-and-approvals.md) — Accepted (P06-04)
 
 Pending: updater trust/provenance model (P06-05).

@@ -94,6 +94,9 @@ public sealed record UpdateCheckState(
     bool NoReleases)
 {
     public static UpdateCheckState Empty { get; } = new(null, null, 0, null, null, null, false);
+
+    /// <summary>The newest version the tray has already announced, so each version is announced once (ADR 0033).</summary>
+    public string? NotifiedVersion { get; init; }
 }
 
 public interface IUpdateStateStore

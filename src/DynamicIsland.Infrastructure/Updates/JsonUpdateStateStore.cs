@@ -39,7 +39,10 @@ public sealed class JsonUpdateStateStore(string dataDirectory) : IUpdateStateSto
                 Time(root["retryAfterUtc"]),
                 (string?)root["etag"],
                 root["latest"] is JsonObject latest ? Release(latest) : null,
-                (bool?)root["noReleases"] ?? false);
+                (bool?)root["noReleases"] ?? false)
+            {
+                NotifiedVersion = SemanticVersion.TryParse((string?)root["notifiedVersion"])?.ToString(),
+            };
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or FormatException)
         {
@@ -59,6 +62,7 @@ public sealed class JsonUpdateStateStore(string dataDirectory) : IUpdateStateSto
             ["retryAfterUtc"] = Text(state.RetryAfterUtc),
             ["etag"] = state.ETag,
             ["noReleases"] = state.NoReleases,
+            ["notifiedVersion"] = state.NotifiedVersion,
             ["latest"] = state.Latest is { } latest ? Node(latest) : null,
         };
 

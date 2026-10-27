@@ -35,6 +35,9 @@ public sealed class TrayController : IDisposable
     private readonly Action _openSettings;
     private readonly Action _checkForUpdates;
     private readonly bool _updatesManaged;
+    private readonly Func<Core.Updates.ReleaseInfo?> _availableUpdate;
+    private readonly Action<Core.Updates.ReleaseInfo>? _showUpdate;
+    private Core.Updates.ReleaseInfo? _announced;
     private readonly string _logsFolder;
     private readonly ILogger<TrayController> _logger;
     private readonly HwndSource _messageWindow;
@@ -53,10 +56,14 @@ public sealed class TrayController : IDisposable
         string logsFolder,
         ILogger<TrayController> logger,
         Action? checkForUpdates = null,
-        bool updatesManaged = false)
+        bool updatesManaged = false,
+        Func<Core.Updates.ReleaseInfo?>? availableUpdate = null,
+        Action<Core.Updates.ReleaseInfo>? showUpdate = null)
     {
         _checkForUpdates = checkForUpdates ?? openSettings;
         _updatesManaged = updatesManaged;
+        _availableUpdate = availableUpdate ?? (() => null);
+        _showUpdate = showUpdate;
         _state = state;
         _lifecycle = lifecycle;
         _launch = launch;
@@ -95,6 +102,26 @@ public sealed class TrayController : IDisposable
         }
     }
 
+    /// <summary>
+    /// Announces a newly found version with a Windows notification (once per version, ADR 0033); selecting it opens the
+    /// update window. Windows' Do not disturb and notification settings decide whether it appears.
+    /// </summary>
+    public void AnnounceUpdate(Core.Updates.ReleaseInfo release)
+    {
+        ArgumentNullException.ThrowIfNull(release);
+        _announced = release;
+        _icon.ShowNotification("Dynamic Island update", $"Version {release.Version} is available. Select to see what's new.");
+    }
+
+    /// <summary>What selecting the notification does (tests; the shell sends <c>NIN_BALLOONUSERCLICK</c>).</summary>
+    public void OnNotificationSelected()
+    {
+        if ((_availableUpdate() ?? _announced) is { } release && _showUpdate is not null)
+        {
+            _showUpdate(release);
+        }
+    }
+
     public void Dispose()
     {
         _menu.IsOpen = false;
@@ -123,6 +150,10 @@ public sealed class TrayController : IDisposable
                 ShowMenu();
                 handled = true;
                 break;
+            case TrayIconEvent.NotificationSelect:
+                OnNotificationSelected();
+                handled = true;
+                break;
         }
 
         return IntPtr.Zero;
@@ -130,7 +161,8 @@ public sealed class TrayController : IDisposable
 
     private void ShowMenu()
     {
-        var model = TrayMenuModel.Build(_state.State, _launch.SafeMode, _monitors.GetMonitors(), _islandMonitorId(), _updatesManaged);
+        var model = TrayMenuModel.Build(_state.State, _launch.SafeMode, _monitors.GetMonitors(), _islandMonitorId(), _updatesManaged,
+            _showUpdate is null ? null : _availableUpdate()?.Version.ToString());
         _menu.Items.Clear();
         foreach (var item in model)
         {
@@ -216,7 +248,15 @@ public sealed class TrayController : IDisposable
                 _openSettings();
                 break;
             case TrayCommand.CheckForUpdates:
-                _checkForUpdates();
+                if (_availableUpdate() is { } release && _showUpdate is not null)
+                {
+                    _showUpdate(release);
+                }
+                else
+                {
+                    _checkForUpdates();
+                }
+
                 break;
             case TrayCommand.OpenLogs:
                 OpenLogsFolder();

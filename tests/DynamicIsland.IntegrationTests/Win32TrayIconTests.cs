@@ -52,6 +52,7 @@ public sealed class Win32TrayIconTests : IDisposable
     [InlineData(0x0400, TrayIconEvent.Select)]
     [InlineData(0x0401, TrayIconEvent.KeySelect)]
     [InlineData(0x007B, TrayIconEvent.ContextMenu)]
+    [InlineData(0x0405, TrayIconEvent.NotificationSelect)] // NIN_BALLOONUSERCLICK: the update notification (ADR 0033).
     [InlineData(0x0200, TrayIconEvent.None)]
     public void Version4_callback_events_are_mapped(int notification, TrayIconEvent expected)
     {

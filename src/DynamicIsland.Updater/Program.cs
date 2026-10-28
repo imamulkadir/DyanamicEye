@@ -37,7 +37,7 @@ internal static class Program
             return InvalidArguments;
         }
 
-        var swap = new UpdateSwap(updates, new WindowsUpdaterProcesses(), new UninstallEntryVersion(), logger);
+        var swap = new UpdateSwap(updates, AppDataPaths.Data, new WindowsUpdaterProcesses(), new UninstallEntryVersion(), logger);
         var result = swap.RunAsync(request, CancellationToken.None).GetAwaiter().GetResult();
         return result.Outcome switch
         {

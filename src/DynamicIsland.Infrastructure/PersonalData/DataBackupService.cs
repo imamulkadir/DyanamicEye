@@ -242,7 +242,7 @@ public sealed partial class DataBackupService(
     /// Online backup of the live database. The backup step only waits for a lock when the connections have a busy
     /// handler (a checkpoint or a writer may hold one briefly), so both get a timeout, plus a few retries.
     /// </summary>
-    private static void SnapshotDatabase(string source, string destination)
+    internal static void SnapshotDatabase(string source, string destination)
     {
         const int SqliteBusy = 5;
         const int SqliteLocked = 6;
@@ -411,7 +411,7 @@ public sealed partial class DataBackupService(
         return (total, Convert.ToHexString(hash.GetHashAndReset()));
     }
 
-    private static int? SettingsSchema(string path)
+    internal static int? SettingsSchema(string path)
     {
         try
         {
@@ -428,7 +428,7 @@ public sealed partial class DataBackupService(
         }
     }
 
-    private static (int Schema, int Notes, int Tasks)? InspectDatabase(string path)
+    internal static (int Schema, int Notes, int Tasks)? InspectDatabase(string path)
     {
         try
         {

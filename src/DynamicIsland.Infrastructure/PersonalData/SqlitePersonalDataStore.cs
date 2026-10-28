@@ -7,8 +7,8 @@ namespace DynamicIsland.Infrastructure.PersonalData;
 
 /// <summary>
 /// Notes and tasks in <c>data\islands.db</c> (ADR 0023). All work is serialized and runs off the caller's thread; every
-/// write is one transaction. A corrupt file is moved aside and replaced; a database from a newer version is opened
-/// read-only. Logs carry event names, counts and error codes — never note or task text.
+/// write is one transaction. A corrupt file is moved aside and replaced; a database from a newer version, or one whose
+/// upgrade step failed (rolled back), is opened read-only. Logs carry event names, counts and error codes — never note or task text.
 /// </summary>
 public sealed partial class SqlitePersonalDataStore : IPersonalDataStore, IDisposable
 {
@@ -326,19 +326,31 @@ public sealed partial class SqlitePersonalDataStore : IPersonalDataStore, IDispo
 
                 for (var v = version; v < target; v++)
                 {
-                    using var transaction = connection.BeginTransaction();
-                    using (var migrate = Command(connection, transaction, _migrations[v]))
+                    try
                     {
-                        migrate.ExecuteNonQuery();
-                    }
+                        using var transaction = connection.BeginTransaction();
+                        using (var migrate = Command(connection, transaction, _migrations[v]))
+                        {
+                            migrate.ExecuteNonQuery();
+                        }
 
-                    using (var stamp = Command(connection, transaction, $"PRAGMA user_version = {v + 1};"))
+                        using (var stamp = Command(connection, transaction, $"PRAGMA user_version = {v + 1};"))
+                        {
+                            stamp.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                        StoreLog.Migrated(_logger, v, v + 1);
+                    }
+                    catch (SqliteException ex) when (ex.SqliteErrorCode is not (SqliteCorrupt or SqliteNotADatabase))
                     {
-                        stamp.ExecuteNonQuery();
+                        // The step's transaction rolled back, so the data is exactly as before (ADR 0036). Keep it
+                        // readable but never write to a half-upgraded schema; the pre-update snapshot stays untouched.
+                        Volatile.Write(ref _readOnly, true);
+                        StoreLog.MigrationFailed(_logger, v, v + 1, ex.SqliteErrorCode);
+                        builder.Mode = SqliteOpenMode.ReadOnly;
+                        break;
                     }
-
-                    transaction.Commit();
-                    StoreLog.Migrated(_logger, v, v + 1);
                 }
             }
         }
@@ -383,5 +395,9 @@ public sealed partial class SqlitePersonalDataStore : IPersonalDataStore, IDispo
         [LoggerMessage(EventId = 3102, EventName = "PersonalDataReadOnly", Level = LogLevel.Warning,
             Message = "Notes and tasks database has schema {Found}, newer than {Supported}; opened read-only")]
         public static partial void NewerSchemaReadOnly(ILogger logger, int found, int supported);
+
+        [LoggerMessage(EventId = 3103, EventName = "PersonalDataMigrationFailed", Level = LogLevel.Error,
+            Message = "Notes and tasks database upgrade from schema {From} to {To} failed (SQLite error {ErrorCode}); data unchanged, opened read-only")]
+        public static partial void MigrationFailed(ILogger logger, int from, int to, int errorCode);
     }
 }

@@ -208,7 +208,10 @@ public sealed class SqlitePersonalDataStoreTests : IDisposable
 
         using (var broken = Create([.. SqlitePersonalDataStore.DefaultMigrations, "ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0; INSERT INTO missing_table VALUES (1);"]))
         {
-            await Assert.ThrowsAsync<SqliteException>(() => broken.CountNotesAsync(Ct));
+            // Recovered gracefully (ADR 0036): still readable, never written to while the upgrade is incomplete.
+            Assert.Equal(2, await broken.CountNotesAsync(Ct));
+            Assert.True(broken.IsReadOnly);
+            Assert.Equal(PersonalDataResult.ReadOnly, await broken.AddNoteAsync("must not be written", Ct));
         }
 
         SqliteConnection.ClearAllPools();

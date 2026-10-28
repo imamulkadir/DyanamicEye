@@ -79,10 +79,11 @@ public partial class App : Application
         _lifecycle.ShutdownRequested += OnShutdownRequested;
 
         // A restore approved in Settings is applied now, before settings or the database are opened (ADR 0024).
-        Infrastructure.PersonalData.DataBackupService.ApplyPendingRestore(
-            _host.Services.GetRequiredService<Infrastructure.Settings.SettingsStoreOptions>().DataDirectory,
-            _host.Services.GetRequiredService<TimeProvider>(),
-            _logger);
+        var dataDirectory = _host.Services.GetRequiredService<Infrastructure.Settings.SettingsStoreOptions>().DataDirectory;
+        Infrastructure.PersonalData.DataBackupService.ApplyPendingRestore(dataDirectory, _host.Services.GetRequiredService<TimeProvider>(), _logger);
+
+        // After a rolled-back update, data the failed version upgraded is swapped for the validated pre-update copy (ADR 0036).
+        Infrastructure.PersonalData.PreUpdateRecovery.Apply(dataDirectory, _host.Services.GetRequiredService<TimeProvider>(), _logger);
 
         var store = _host.Services.GetRequiredService<ISettingsStore>();
         var token = _lifecycle.ApplicationStopping;

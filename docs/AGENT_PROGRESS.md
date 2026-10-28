@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P06-07 (data migration safety) is next. P06-06 is implemented and uncommitted (the owner commits). P06-01…05 are committed (P06-05 as `6e874f0`). G02/G03/P04/P05/P06 manual rows are still owed by the owner, plus SG1 (the signing key).
-- **Active task status:** P06-06 IMPLEMENTED_AWAITING_VALIDATION (uncommitted). P06-05 IMPLEMENTED_AWAITING_VALIDATION (`6e874f0`); CI run 40552549896 **success** (837 tests).
+- **Active task:** P06-08 (portable fallback, managed/manual mode, cancel and disk-space failures) is next. P06-07 is implemented and uncommitted (the owner commits). P06-06 committed as `a0b22be`. G02/G03/P04/P05/P06 manual rows are still owed by the owner, plus SG1 (the signing key).
+- **Active task status:** P06-07 IMPLEMENTED_AWAITING_VALIDATION (uncommitted). P06-06 IMPLEMENTED_AWAITING_VALIDATION (`a0b22be`); CI run 40557626796 **success**.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,15 +23,19 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-28 (P06-06 implemented; next is P06-07)
+- **Last updated:** 2026-10-28 (P06-07 implemented; next is P06-08)
 
 ## NEXT ACTION (ONE task only)
 **Owner (once, before the first release): SG1.** In PowerShell 7 run `pwsh tools\New-ReleaseSigningKey.ps1`. Back up the private `.pem` offline and give the agent **only** the printed public key. The agent then pins it in `ReleaseSigningKeys.Pinned`, which registers the verified downloader (ADR 0034). Until then the update window keeps offering the release page. This is not blocking for the next agent task.
 
-**Then agent: P06-07 — data migration safety.** (guide §5 P06-07; ADR 0035 leaves the hook point)
-- **Scope:** before the swap (or before the new app first opens the database), take a pre-update snapshot of settings and the personal-data DB; check schema compatibility; run migrations in a transaction; recover gracefully from a failed migration. Never roll the binary back blindly against a DB the new version already migrated; selective restore only after explicit validation.
-- **Start by reading:** `Infrastructure/PersonalData/SqlitePersonalDataStore.cs` (migrations, quarantine, read-only), `Infrastructure/PersonalData/DataBackupService.cs` (backup/restore), `Infrastructure/Updates/UpdateSwap.cs` (rollback path).
-- **Tests:** failed migration → old data intact and app usable; rollback after a migrated DB → snapshot restored or the old version refuses safely; clean restart.
+**Then agent: P06-08 — portable update fallback, IT-managed/manual mode, failure paths.** (guide §5 P06-08)
+- **Scope:**
+  - **Read-only folder:** a portable copy in a folder it can't write (today `UpdateHandover` refuses with `layout-read-only` and the window shows a sentence) gets a clear fallback: download the ZIP to a user-chosen or Downloads folder and open it, with no elevation.
+  - **Managed:** confirm managed/manual mode end to end (ADR 0031 policy; the window `Managed` stage).
+  - **Download failures:** cancel the download and handle not enough disk space with plain messages (`GitHubUpdateDownloader` already checks free space; verify the UI path).
+  - **Signing:** document that code signing is optional and that nothing guarantees SmartScreen acceptance.
+- **Start by reading:** `src/DynamicIsland.App/LayoutUpdateInstaller.cs`, `src/DynamicIsland.Infrastructure/Updates/UpdateHandover.cs`, `src/DynamicIsland.Core/Updates/UpdateFlow.cs`, `docs/ADR/0033*`, `docs/ADR/0035*`.
+- **Tests:** read-only layout → fallback offered, nothing elevated; cancel → staging cleaned; disk full → plain message; managed → no download.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -43,7 +47,7 @@
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
 | P05 — Customization/performance | P05-01…P05-04 | IMPLEMENTED_AWAITING_VALIDATION (01–04) | **G05 automated PASS** 2026-10-27, CI run 40437920943 (`802906f`): goals met on the reference machine (idle CPU ~0 %, private 62–77 MB at rest; 94–104 MB after heavy automated use, documented deviation) — docs/PERFORMANCE.md; manual rows owed |
-| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–06 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
+| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–07 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
 ### G01 evidence (guide §5: "corrupt settings recover; simulated widget failure isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app")
@@ -56,7 +60,34 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
-- 2026-10-28 **P06-06 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0035**.
+- 2026-10-28 **P06-07 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0036**.
+  - **Pre-update snapshot** (`Infrastructure/Updates/PreUpdateSnapshot`):
+    - The updater copies `settings.json(.bak)`, `islands.db` and `-wal` into `data\pre-update-<UTC>\` with a `snapshot.json` marker (from/to/state).
+    - When: after the app exits and the package is re-verified, before the layout changes.
+    - A failed copy → abort `snapshot-failed`, nothing changed. The newest 2 snapshots are kept.
+    - The marker is set to Committed or RolledBack by the swap.
+  - **Recovery after a rollback** (`Infrastructure/PersonalData/PreUpdateRecovery`, called in `App.OnStartup` after `ApplyPendingRestore`, before the stores open):
+    - Only if the live settings or DB schema is newer than this version supports.
+    - The snapshot is validated like a backup restore (SQLite online backup folds the WAL, `quick_check`, schema range, settings schema).
+    - It is then applied through the ADR 0024 pending-restore path. The upgraded files are kept in `rollback-<UTC>`.
+    - Otherwise the result is `Kept` or `Invalid`, and the stores stay read-only as before.
+    - Each snapshot is checked once.
+  - **Failed DB migration:** the step's transaction rolls back; the store logs `PersonalDataMigrationFailed` (3103) and opens read-only instead of throwing on every call.
+  - `DataBackupService.SnapshotDatabase/SettingsSchema/InspectDatabase` are now `internal` so they can be reused.
+  - **Tests:**
+    - `PreUpdateRecoveryTests` (6, real SQLite): restore + keep aside, compatible kept, newer settings alone, invalid snapshot never restored, nothing without a rollback, copy set + keep 2.
+    - `UpdateSwapTests` (+1 locked data → abort; snapshot state asserted on commit and rollback).
+    - The store's failed-migration test now expects read-only.
+    - Manual row **UP12** added.
+  - **Verification 2026-10-28, Windows 11 Pro 25H2 build 26200, x64:**
+    - Release and Debug builds: 0 warnings.
+    - Full suites with `--max-parallel-test-modules 1`: **Release 846/846, Debug 859/859**.
+    - Updater NativeAOT publish: 4.2 MB, no warnings, exit 4 on no arguments.
+  - **Changed files:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `src/DynamicIsland.App/App.xaml.cs`, `src/DynamicIsland.Infrastructure/PersonalData/{DataBackupService.cs, SqlitePersonalDataStore.cs}`, `src/DynamicIsland.Infrastructure/Updates/UpdateSwap.cs`, `src/DynamicIsland.Updater/Program.cs`, `tests/DynamicIsland.UnitTests/PersonalData/SqlitePersonalDataStoreTests.cs`, `tests/DynamicIsland.UnitTests/Updates/UpdateSwapTests.cs`
+    - new: `docs/ADR/0036-update-data-safety.md`, `src/DynamicIsland.Infrastructure/PersonalData/PreUpdateRecovery.cs`, `src/DynamicIsland.Infrastructure/Updates/PreUpdateSnapshot.cs`, `tests/DynamicIsland.UnitTests/PersonalData/PreUpdateRecoveryTests.cs`
+    - Suggested commit message: `feat: pre-update data snapshot, safe migrations and recovery after rollback (P06-07, ADR 0036)`
+- 2026-10-28 **P06-06 IMPLEMENTED_AWAITING_VALIDATION**, committed by the owner as `a0b22be`; CI run 40557626796 **success**. Decisions are in **ADR 0035**.
   - **Updater** (`DynamicIsland.Updater.exe`, NativeAOT, shipped inside each payload by `Publish-Layout.ps1`): accepts only `--request <per-user updates\update-request.json>`. Steps: validate → wait for app + launcher exit (30 s) → re-verify size/SHA-256 → guarded extract to `app-<v>.partial` → rename → swap root files with `.bak` → atomic `current.json` `{new, old}` → launch → wait 60 s for `health-<v>.ack` → commit (cleanup, HKCU `DisplayVersion`) or roll back (stop tree, restore pointer and root files, delete `app-<new>`, write `last-update-failed.json`, restart old). Exit codes 0/2/3/4.
   - **App side:** `UpdateHandover` (release-layout and writable checks, request file, health ack derived from the payload folder name, rollback note taken once); `LayoutUpdateInstaller` (`IUpdateInstaller`: starts the updater from its own payload, exits with code 0); the launcher passes `DYNAMICISLAND_LAUNCHER_PID`; a tray notification after a rollback. The installer is registered only with a pinned key **and** a release payload (`AppLayout.IsReleasePayload`).
   - **Supersedes ADR 0033 on one point:** installed and portable copies both update in place from the portable ZIP (`UpdatePackages.For(release)`; `InstallKind`/`Detect` removed). The installer's `[UninstallDelete]` now removes `app-*` and `current.json`.
@@ -220,6 +251,6 @@
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P06-07 per NEXT ACTION** (G02–G06 manual rows and SG1 still owed by the owner).
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P06-08 per NEXT ACTION** (G02–G06 manual rows and SG1 still owed by the owner).
 - Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

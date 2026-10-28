@@ -65,3 +65,4 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0033 — Update window: release details, separate Download and Install approvals](0033-update-window-and-approvals.md) — Accepted (P06-04)
 - [0034 — Verified update downloads: signed release manifest and staging](0034-signed-release-manifest.md) — Accepted (P06-05)
 - [0035 — Separate updater: payload swap, health handshake and rollback](0035-updater-swap-and-rollback.md) — Accepted (P06-06)
+- [0036 — Data safety around updates: pre-update snapshot, failed migrations, newer data after rollback](0036-update-data-safety.md) — Accepted (P06-07)

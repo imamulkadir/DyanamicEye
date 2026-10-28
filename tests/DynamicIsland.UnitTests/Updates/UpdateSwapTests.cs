@@ -24,6 +24,9 @@ public sealed class UpdateSwapTests : IDisposable
     {
         Directory.CreateDirectory(Root);
         Directory.CreateDirectory(Updates);
+        Directory.CreateDirectory(Data);
+        File.WriteAllText(Path.Combine(Data, "settings.json"), "settings");
+        File.WriteAllText(Path.Combine(Data, "islands.db"), "db");
         File.WriteAllText(Path.Combine(Root, AppLayout.PointerFileName), OldPointer);
         File.WriteAllText(Path.Combine(Root, AppLayout.RootLauncher), "old-launcher");
         File.WriteAllText(Path.Combine(Root, "LICENSE.txt"), "old-license");
@@ -35,6 +38,8 @@ public sealed class UpdateSwapTests : IDisposable
     private string Root => _temp.Combine("layout");
 
     private string Updates => _temp.Combine("updates");
+
+    private string Data => _temp.Combine("data");
 
     private string OldPayload => AppLayout.PayloadFolder(Root, OldVersion);
 
@@ -64,6 +69,9 @@ public sealed class UpdateSwapTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(Updates, NewVersion)), "The staged package is removed after commit.");
         Assert.Equal(NewVersion, _recorder.Version);
         Assert.Single(_processes.Started);
+        var snapshot = Assert.Single(Directory.GetDirectories(Data, PreUpdateSnapshot.FolderPrefix + "*"));
+        Assert.Equal((OldVersion, NewVersion, SnapshotState.Committed), PreUpdateSnapshot.Read(snapshot));
+        Assert.Equal("settings", File.ReadAllText(Path.Combine(snapshot, "settings.json")));
     }
 
     [Fact]
@@ -84,6 +92,24 @@ public sealed class UpdateSwapTests : IDisposable
         Assert.Equal(2, _processes.Started.Count); // New version, then the restored old version.
         Assert.Contains(NewVersion, File.ReadAllText(Path.Combine(Updates, UpdateHandshake.LastFailureFile)), StringComparison.Ordinal);
         Assert.Null(_recorder.Version);
+        Assert.Equal(SnapshotState.RolledBack, PreUpdateSnapshot.Read(Assert.Single(Directory.GetDirectories(Data, PreUpdateSnapshot.FolderPrefix + "*")))?.State);
+    }
+
+    [Fact]
+    public async Task Data_that_cannot_be_copied_aborts_before_anything_changes()
+    {
+        using (new FileStream(Path.Combine(Data, "islands.db"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            var result = await CreateSwap().RunAsync(Request(Package()), Ct);
+
+            Assert.Equal(SwapOutcome.Aborted, result.Outcome);
+            Assert.Equal("snapshot-failed:IOException", result.Reason);
+        }
+
+        Assert.Equal(OldPointer, File.ReadAllText(Path.Combine(Root, AppLayout.PointerFileName)));
+        Assert.False(Directory.Exists(NewPayload));
+        Assert.Empty(_processes.Started);
+        Assert.Empty(Directory.GetDirectories(Data, PreUpdateSnapshot.FolderPrefix + "*"));
     }
 
     [Fact]
@@ -255,7 +281,7 @@ public sealed class UpdateSwapTests : IDisposable
     private static StagedPackage Staged(string path) => new(Asset(UpdatePackages.PortableAsset), path);
 
     private UpdateSwap CreateSwap(TimeSpan? healthTimeout = null) =>
-        new(Updates, _processes, _recorder, NullLogger.Instance, TimeSpan.FromSeconds(1), healthTimeout ?? TimeSpan.FromSeconds(5));
+        new(Updates, Data, _processes, _recorder, NullLogger.Instance, TimeSpan.FromSeconds(1), healthTimeout ?? TimeSpan.FromSeconds(5));
 
     private UpdateRequest Request(string package, string version = NewVersion)
     {

@@ -48,6 +48,7 @@ public sealed record SwapResult(SwapOutcome Outcome, string? Reason);
 /// </summary>
 public sealed partial class UpdateSwap(
     string updatesFolder,
+    string dataFolder,
     IUpdaterProcesses processes,
     IInstalledVersionRecorder versionRecorder,
     ILogger logger,
@@ -63,6 +64,7 @@ public sealed partial class UpdateSwap(
     private readonly string _updates = Path.GetFullPath(updatesFolder);
     private readonly TimeSpan _exitTimeout = exitTimeout ?? DefaultExitTimeout;
     private readonly TimeSpan _healthTimeout = healthTimeout ?? DefaultHealthTimeout;
+    private string? _snapshot;
 
     public async Task<SwapResult> RunAsync(UpdateRequest request, CancellationToken cancellationToken)
     {
@@ -87,6 +89,16 @@ public sealed partial class UpdateSwap(
         if (!await MatchesAsync(request, cancellationToken).ConfigureAwait(false))
         {
             return Abort("package-mismatch");
+        }
+
+        // 3b. Copy the user's data while nothing can change it (ADR 0036); no snapshot, no update.
+        try
+        {
+            _snapshot = PreUpdateSnapshot.Take(dataFolder, layout.Pointer.Current, request.Version, DateTimeOffset.UtcNow);
+        }
+        catch (IOException ex)
+        {
+            return Abort("snapshot-failed:" + ex.GetType().Name);
         }
 
         // 4. Extract the new payload next to the old one; nothing in use is touched.
@@ -268,6 +280,7 @@ public sealed partial class UpdateSwap(
 
     private void Commit(UpdateRequest request, Layout layout, List<(string Target, bool Existed)> replaced)
     {
+        MarkSnapshot(SnapshotState.Committed);
         foreach (var (target, _) in replaced)
         {
             TryDelete(target + ".bak");
@@ -298,6 +311,9 @@ public sealed partial class UpdateSwap(
         {
             processes.StopTree(pid);
         }
+
+        // The old version compares its data with the snapshot at its next start (the new one may have upgraded it).
+        MarkSnapshot(SnapshotState.RolledBack);
 
         WriteAtomic(layout.PointerPath, layout.PointerText);
         Cleanup(null, replaced, layout.Root);
@@ -404,8 +420,26 @@ public sealed partial class UpdateSwap(
     [LoggerMessage(EventId = 3002, Level = LogLevel.Warning, Message = "Update aborted without changes ({Reason})")]
     private static partial void LogAborted(ILogger logger, string reason);
 
+    [LoggerMessage(EventId = 3009, Level = LogLevel.Warning, Message = "The pre-update snapshot could not be marked {State} ({ErrorType})")]
+    private static partial void LogSnapshotMarkFailed(ILogger logger, SnapshotState state, string errorType);
+
     [LoggerMessage(EventId = 3003, Level = LogLevel.Error, Message = "The previous version could not be restarted after a rollback ({ErrorType})")]
     private static partial void LogRestartOldFailed(ILogger logger, string errorType);
+
+    private void MarkSnapshot(SnapshotState state)
+    {
+        try
+        {
+            if (_snapshot is not null)
+            {
+                PreUpdateSnapshot.Mark(_snapshot, state);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            LogSnapshotMarkFailed(logger, state, ex.GetType().Name);
+        }
+    }
 
     private sealed record Layout(string Root, string PointerPath, LayoutPointer Pointer, string PointerText);
 }

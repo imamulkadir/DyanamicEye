@@ -47,7 +47,7 @@ function Invoke-Gh {
 }
 
 # 1. A stable draft created by the Release workflow.
-$release = Invoke-Gh release view $Tag --repo $Repo --json isDraft,isPrerelease | ConvertFrom-Json
+$release = Invoke-Gh release view $Tag --repo $Repo --json 'isDraft,isPrerelease' | ConvertFrom-Json
 if (-not $release.isDraft) { throw "$Tag is already published. Create a new version instead of re-signing a published release." }
 if ($release.isPrerelease) { throw "$Tag is a pre-release; it carries no manifest." }
 

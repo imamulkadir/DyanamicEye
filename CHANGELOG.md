@@ -9,7 +9,11 @@ text: use headings and bullet points, not HTML.
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-10-28
+## [0.1.1] - 2026-10-28
+
+### Fixed
+
+- Test release for the in-app update.
 
 ### Added
 

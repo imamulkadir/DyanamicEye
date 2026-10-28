@@ -20,6 +20,11 @@ public sealed partial class UpdateHandover(string updatesFolder, ILogger logger)
 
     public string RequestPath => Path.Combine(_updates, UpdateRequest.FileName);
 
+    /// <summary>Whether the release layout around <paramref name="appDirectory"/> exists and its root can be written (ADR 0037).</summary>
+    public static bool CanUpdateInPlace(string appDirectory) =>
+        AppLayout.IsReleasePayload(appDirectory, File.Exists)
+        && CanWrite(Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(appDirectory)))!);
+
     /// <summary>Checks the copy can be updated in place and writes <see cref="RequestPath"/>.</summary>
     /// <param name="appDirectory">The running payload folder (<c>app-&lt;version&gt;</c>).</param>
     /// <returns><c>null</c> when the request was written; otherwise a short reason code for the log.</returns>

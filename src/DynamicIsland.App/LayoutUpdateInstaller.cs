@@ -20,6 +20,9 @@ public sealed class LayoutUpdateInstaller(UpdateHandover handover, LifecycleCoor
     private const string NotPossible = "This copy can't update itself. Download the new version from the release page.";
     private const string ReadOnly = "This copy's folder can't be changed, so it can't update itself. Download the new version from the release page.";
 
+    /// <summary>Probed each time: the folder may become writable (or not) while the app runs.</summary>
+    public bool CanInstallInPlace => UpdateHandover.CanUpdateInPlace(AppContext.BaseDirectory);
+
     public Task<string?> InstallAsync(StagedPackage package, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(package);

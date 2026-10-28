@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P06-08 (portable fallback, managed/manual mode, cancel and disk-space failures) is next. P06-07 is implemented and uncommitted (the owner commits). P06-06 committed as `a0b22be`. G02/G03/P04/P05/P06 manual rows are still owed by the owner, plus SG1 (the signing key).
-- **Active task status:** P06-07 IMPLEMENTED_AWAITING_VALIDATION (uncommitted). P06-06 IMPLEMENTED_AWAITING_VALIDATION (`a0b22be`); CI run 40557626796 **success**.
+- **Active task:** P06-09 (CI GitHub Release pipeline) is next. P06-08 is implemented and uncommitted (the owner commits). P06-07 committed as `8d12a16`. G02/G03/P04/P05/P06 manual rows are still owed by the owner, plus SG1 (the signing key).
+- **Active task status:** P06-08 IMPLEMENTED_AWAITING_VALIDATION (uncommitted). P06-07 IMPLEMENTED_AWAITING_VALIDATION (`8d12a16`); CI run 40640163799 **FAILED** on a pre-existing test race (`UpdateWindowTests.Cancel_returns…`), fixed in the P06-08 change set.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,19 +23,22 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-28 (P06-07 implemented; next is P06-08)
+- **Last updated:** 2026-10-28 (P06-08 implemented; CI race fixed; next is P06-09)
 
 ## NEXT ACTION (ONE task only)
 **Owner (once, before the first release): SG1.** In PowerShell 7 run `pwsh tools\New-ReleaseSigningKey.ps1`. Back up the private `.pem` offline and give the agent **only** the printed public key. The agent then pins it in `ReleaseSigningKeys.Pinned`, which registers the verified downloader (ADR 0034). Until then the update window keeps offering the release page. This is not blocking for the next agent task.
 
-**Then agent: P06-08 — portable update fallback, IT-managed/manual mode, failure paths.** (guide §5 P06-08)
+**First check:** CI on the commit that contains P06-08 must be green (it includes the fix for the `Cancel_returns…` race that failed run 40640163799). If it is red, diagnose that before starting P06-09.
+
+**Then agent: P06-09 — CI GitHub Release pipeline.** (guide §5 P06-09; ADRs 0030, 0031, 0034, 0037)
 - **Scope:**
-  - **Read-only folder:** a portable copy in a folder it can't write (today `UpdateHandover` refuses with `layout-read-only` and the window shows a sentence) gets a clear fallback: download the ZIP to a user-chosen or Downloads folder and open it, with no elevation.
-  - **Managed:** confirm managed/manual mode end to end (ADR 0031 policy; the window `Managed` stage).
-  - **Download failures:** cancel the download and handle not enough disk space with plain messages (`GitHubUpdateDownloader` already checks free space; verify the UI path).
-  - **Signing:** document that code signing is optional and that nothing guarantees SmartScreen acceptance.
-- **Start by reading:** `src/DynamicIsland.App/LayoutUpdateInstaller.cs`, `src/DynamicIsland.Infrastructure/Updates/UpdateHandover.cs`, `src/DynamicIsland.Core/Updates/UpdateFlow.cs`, `docs/ADR/0033*`, `docs/ADR/0035*`.
-- **Tests:** read-only layout → fallback offered, nothing elevated; cancel → staging cleaned; disk full → plain message; managed → no download.
+  - A tag-triggered workflow with pinned actions (by SHA): restore `--locked-mode`, build, run the tests, then `tools/Publish-Layout.ps1 -Installer` for x64.
+  - SHA-256 files, release notes from `CHANGELOG.md` or the tag message, optional provenance attestation.
+  - Stable and beta tags go to the right channel (pre-release flag).
+  - The signed manifest is created only after a successful publish.
+- **Signing key:** the private key must never be in CI unless the owner explicitly decides that. Default to a draft release that the owner signs locally with `tools/New-ReleaseManifest.ps1` (ADR 0034), then publishes. Record that in an ADR.
+- **Start by reading:** `.github/workflows/ci.yml`, `tools/Publish-Layout.ps1`, `tools/New-ReleaseManifest.ps1`, `docs/ADR/0034*`.
+- **Tests:** validate the workflow syntax (for example with `actionlint`, if available offline; otherwise review it); run the publish script dry run locally; nothing is pushed or tagged by the agent.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -47,7 +50,7 @@
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
 | P05 — Customization/performance | P05-01…P05-04 | IMPLEMENTED_AWAITING_VALIDATION (01–04) | **G05 automated PASS** 2026-10-27, CI run 40437920943 (`802906f`): goals met on the reference machine (idle CPU ~0 %, private 62–77 MB at rest; 94–104 MB after heavy automated use, documented deviation) — docs/PERFORMANCE.md; manual rows owed |
-| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–07 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
+| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–08 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
 ### G01 evidence (guide §5: "corrupt settings recover; simulated widget failure isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app")
@@ -60,7 +63,29 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
-- 2026-10-28 **P06-07 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0036**.
+- 2026-10-28 **P06-08 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0037**.
+  - **Read-only folder fallback:**
+    - `IUpdateInstaller.CanInstallInPlace` is a default interface member set to `true`. `LayoutUpdateInstaller` uses `UpdateHandover.CanUpdateInPlace`: a release payload whose root accepts a probe file.
+    - The check runs after each download. When it fails, the flow ends in the new stage **`ReadyToUnpack`**: plain instructions plus **Show file**, which opens File Explorer with the verified ZIP selected (`ShellLauncher.TryRevealFile`).
+    - No install, no elevation.
+  - **Managed/manual:** unchanged and confirmed: `Managed` (IT policy or `/MANAGED=1`) and `ManualOnly` (no key, dev build, or no ZIP).
+  - **Cancel and disk space:** these existed and are now tested. Cancel deletes the `.partial` file and returns to the details. The free-space pre-check is testable through an injectable `freeBytes` parameter on `GitHubUpdateDownloader`.
+  - **Signing:** stays optional. ADR 0037 forbids any SmartScreen or antivirus promise; P07-04 docs must say so.
+  - **CI fix:** CI run 40640163799 (`8d12a16`) failed on `UpdateWindowTests.Cancel_returns_to_the_details_and_closing_cancels_too`. The test clicked Cancel before the window rendered "Downloading", so the wait matched the stale "Download" text and the re-check failed after 670 ms. It now waits for "_Cancel download" first. 25 local repeats of the class before the fix did not reproduce it, because only the CI runner is slow enough.
+  - **Tests:**
+    - unit: `UpdateFlowTests` (+1 read-only → ReadyToUnpack, no install), `GitHubUpdateDownloaderTests` (+1 disk space stops before requesting the file).
+    - integration: `UpdateWindowTests` (+1 Show file and instructions), new `UpdateLayoutAccessTests` (2: a real deny-CreateFiles ACL flips the probe; a non-layout folder is never in place).
+    - `TEST_MATRIX.md`: UP11 reworded for **Show file**; UP13 added (cancel, disk space).
+  - **Verification 2026-10-28, Windows 11 Pro 25H2 build 26200, x64:**
+    - Release and Debug builds: 0 warnings.
+    - Full suites with `--max-parallel-test-modules 1`: **Release 851 total, 850 passed, 0 failed, 1 skipped**; Debug 864/864.
+    - A later Release run of the smoke project alone skipped none, so the skip was a conditional smoke skip.
+    - Integration rerun after the race fix: 115/115.
+  - **Changed files:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`, `src/DynamicIsland.App/{LayoutUpdateInstaller.cs, ShellLauncher.cs, UpdateWindow.xaml.cs}`, `src/DynamicIsland.Core/Updates/UpdateFlow.cs`, `src/DynamicIsland.Infrastructure/Updates/{GitHubUpdateDownloader.cs, UpdateHandover.cs}`, `tests/DynamicIsland.IntegrationTests/UpdateWindowTests.cs`, `tests/DynamicIsland.UnitTests/Updates/{GitHubUpdateDownloaderTests.cs, UpdateFlowTests.cs}`
+    - new: `docs/ADR/0037-update-fallbacks-and-failures.md`, `tests/DynamicIsland.IntegrationTests/UpdateLayoutAccessTests.cs`
+    - Suggested commit message: `feat: read-only folder update fallback, disk-space and cancel coverage; fix update window test race (P06-08, ADR 0037)`
+- 2026-10-28 **P06-07 IMPLEMENTED_AWAITING_VALIDATION**, committed by the owner as `8d12a16`. CI run 40640163799 failed on a test race; the fix is in P06-08. Decisions are in **ADR 0036**.
   - **Pre-update snapshot** (`Infrastructure/Updates/PreUpdateSnapshot`):
     - The updater copies `settings.json(.bak)`, `islands.db` and `-wal` into `data\pre-update-<UTC>\` with a `snapshot.json` marker (from/to/state).
     - When: after the app exits and the package is re-verified, before the layout changes.
@@ -251,6 +276,6 @@
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P06-08 per NEXT ACTION** (G02–G06 manual rows and SG1 still owed by the owner).
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P06-09 per NEXT ACTION** (G02–G06 manual rows and SG1 still owed by the owner).
 - Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

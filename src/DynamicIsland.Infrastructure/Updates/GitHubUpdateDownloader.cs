@@ -16,7 +16,13 @@ namespace DynamicIsland.Infrastructure.Updates;
 /// </summary>
 /// <param name="publicKeys">The pinned keys (<see cref="ReleaseSigningKeys.Pinned"/>; test keys in tests).</param>
 /// <param name="stallTimeout">No bytes for this long counts as an interrupted download (default <see cref="DefaultStallTimeout"/>).</param>
-public sealed class GitHubUpdateDownloader(HttpClient http, string stagingRoot, IReadOnlyList<string> publicKeys, TimeSpan? stallTimeout = null) : IUpdateDownloader
+/// <param name="freeBytes">Free space of the staging drive (tests); <c>null</c> result means unknown.</param>
+public sealed class GitHubUpdateDownloader(
+    HttpClient http,
+    string stagingRoot,
+    IReadOnlyList<string> publicKeys,
+    TimeSpan? stallTimeout = null,
+    Func<string, long?>? freeBytes = null) : IUpdateDownloader
 {
     public static readonly TimeSpan DefaultStallTimeout = TimeSpan.FromSeconds(30);
 
@@ -53,7 +59,7 @@ public sealed class GitHubUpdateDownloader(HttpClient http, string stagingRoot, 
             }
 
             var folder = PrepareStaging(release.Version);
-            if (FreeBytes(folder) is { } free && free < file.SizeBytes + SpareBytes)
+            if ((freeBytes ?? FreeBytes)(folder) is { } free && free < file.SizeBytes + SpareBytes)
             {
                 return Fail("disk-space", NotEnoughSpace);
             }

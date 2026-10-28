@@ -15,6 +15,10 @@ namespace DynamicIsland.App;
 /// </summary>
 public partial class UpdateWindow : Window
 {
+    /// <summary>Manual path for a copy in a folder it can't change (ADR 0037); never asks for administrator rights.</summary>
+    internal const string UnpackInstructions =
+        "Downloaded and checked. This copy's folder can't be changed, so it can't update itself. Close Dynamic Island, then unzip this file into a folder you can change (or ask whoever manages this PC).";
+
     private readonly UpdateFlow _flow;
     private readonly UpdatePolicy _policy;
     private readonly ILogger _logger;
@@ -76,6 +80,7 @@ public partial class UpdateWindow : Window
             UpdateStage.Downloading => (null, "_Cancel download", "Downloading…"),
             UpdateStage.ReadyToInstall => ("_Install now", "_Later", "Downloaded. Installing closes Dynamic Island, updates it and starts it again; your settings and notes are kept."),
             UpdateStage.Installing => (null, "_Close", "Installing…"),
+            UpdateStage.ReadyToUnpack => ("_Show file", "_Close", UnpackInstructions),
             _ => ("_Retry", "_Close", state.Problem ?? "Something went wrong."),
         };
 
@@ -101,6 +106,14 @@ public partial class UpdateWindow : Window
                 break;
             case UpdateStage.ManualOnly:
                 OnReleaseLink(sender, e);
+                break;
+            case UpdateStage.ReadyToUnpack:
+                if ((_flow.StagedPath is { } path ? ShellLauncher.TryRevealFile(path) : "no-file") is { } errorType)
+                {
+                    AppLog.OpenFolderFailed(_logger, errorType);
+                    StatusText.Text = UnpackInstructions + " The file could not be shown; download it from the release page instead.";
+                }
+
                 break;
         }
     }

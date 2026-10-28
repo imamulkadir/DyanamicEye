@@ -72,12 +72,31 @@ public sealed class UpdateWindowTests : IDisposable
     }
 
     [Fact]
+    public async Task A_copy_in_a_folder_it_cannot_change_offers_the_verified_file_not_an_install()
+    {
+        _installer.CanInstallInPlace = false;
+        var window = _ui.Invoke(() => Open(Flow()));
+
+        _ui.Invoke(() => Click(window, "PrimaryButton"));
+        await WaitFor(() => _downloader.Downloads == 1);
+        _downloader.Complete();
+
+        await WaitFor(() => _ui.Invoke(() => Button(window, "PrimaryButton").Content as string) == "_Show file");
+        Assert.StartsWith("Downloaded and checked. This copy's folder can't be changed", _ui.Invoke(() => Text(window, "StatusText")), StringComparison.Ordinal);
+        Assert.Equal("_Close", _ui.Invoke(() => (string)Button(window, "SecondaryButton").Content));
+        Assert.Equal(0, _installer.Installs);
+        _ui.Invoke(window.Close); // Show file opens File Explorer: covered by the manual row UP11.
+    }
+
+    [Fact]
     public async Task Cancel_returns_to_the_details_and_closing_cancels_too()
     {
         var window = _ui.Invoke(() => Open(Flow()));
         _ui.Invoke(() => Click(window, "PrimaryButton"));
         await WaitFor(() => _downloader.Downloads == 1);
 
+        // Wait for the Downloading render first: before it, the button still shows the old "Download" text (CI race).
+        await WaitFor(() => _ui.Invoke(() => Button(window, "SecondaryButton").Content as string) == "_Cancel download");
         _ui.Invoke(() => Click(window, "SecondaryButton"));
         await WaitFor(() => _ui.Invoke(() => Button(window, "PrimaryButton").Content as string) == "_Download (48.6 MB)");
         Assert.True(_ui.Invoke(() => window.IsVisible));
@@ -245,6 +264,8 @@ public sealed class UpdateWindowTests : IDisposable
         private int _installs;
 
         public int Installs => Volatile.Read(ref _installs);
+
+        public bool CanInstallInPlace { get; set; } = true;
 
         public Task<string?> InstallAsync(StagedPackage package, CancellationToken cancellationToken)
         {

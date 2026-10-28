@@ -194,6 +194,21 @@ public sealed class GitHubUpdateDownloaderTests : IDisposable
     }
 
     [Fact]
+    public async Task Not_enough_free_space_stops_before_downloading()
+    {
+        var release = Publish((UpdatePackages.PortableAsset, Zip("1.3.0")));
+        var downloader = new GitHubUpdateDownloader(new HttpClient(new RouteHandler(this)), _staging, [PublicKey], TimeSpan.FromMilliseconds(300),
+            freeBytes: _ => GitHubUpdateDownloader.SpareBytes);
+
+        var result = await downloader.DownloadAsync(release, Asset(release, UpdatePackages.PortableAsset), new SyncProgress(_ => { }), Ct);
+
+        Assert.Equal(GitHubUpdateDownloader.NotEnoughSpace, result.Problem);
+        Assert.Equal("disk-space", downloader.LastFailure);
+        Assert.DoesNotContain(_requested, u => u.EndsWith(UpdatePackages.PortableAsset, StringComparison.Ordinal));
+        Assert.Empty(Directory.GetFiles(Path.Combine(_staging, "1.3.0")));
+    }
+
+    [Fact]
     public async Task Only_the_version_being_downloaded_stays_in_staging()
     {
         Directory.CreateDirectory(Path.Combine(_staging, "1.2.0"));

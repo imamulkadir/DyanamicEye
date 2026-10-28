@@ -20,6 +20,12 @@ public interface IUpdateDownloader
 /// <summary>Hands a verified package to the updater (guide P06-06), which closes and restarts the app.</summary>
 public interface IUpdateInstaller
 {
+    /// <summary>
+    /// Whether this copy can be updated where it is (checked after each download). <c>false</c> for a portable copy in a
+    /// folder the user can't change: the flow then hands the verified file to the user instead (P06-08, ADR 0037).
+    /// </summary>
+    bool CanInstallInPlace => true;
+
     /// <returns><c>null</c> once the updater has taken over; otherwise a short plain sentence for the user.</returns>
     Task<string?> InstallAsync(StagedPackage package, CancellationToken cancellationToken);
 }
@@ -41,6 +47,12 @@ public enum UpdateStage
     ReadyToInstall,
 
     Installing,
+
+    /// <summary>
+    /// Downloaded and verified, but this copy's folder can't be changed (ADR 0037): the user unpacks the file themselves.
+    /// <see cref="UpdateFlow.StagedPath"/> is the file. Nothing is elevated or installed.
+    /// </summary>
+    ReadyToUnpack,
 
     /// <summary>The last step failed; <see cref="UpdateFlowState.Problem"/> says why and Retry repeats that step.</summary>
     Failed,
@@ -89,6 +101,18 @@ public sealed class UpdateFlow : IDisposable
     public ReleaseAsset? Package { get; }
 
     public UpdateFlowState State { get; private set; }
+
+    /// <summary>The verified file once downloaded (shown to the user in <see cref="UpdateStage.ReadyToUnpack"/>).</summary>
+    public string? StagedPath
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _staged?.Path;
+            }
+        }
+    }
 
     /// <summary>The user approved the download (or selected Retry after a failed one).</summary>
     public async Task ApproveDownloadAsync()
@@ -140,7 +164,8 @@ public sealed class UpdateFlow : IDisposable
             if (result.Package is { } package)
             {
                 _staged = package;
-                Set(new UpdateFlowState(UpdateStage.ReadyToInstall, Package!.SizeBytes, Package.SizeBytes));
+                Set(new UpdateFlowState(
+                    _installer!.CanInstallInPlace ? UpdateStage.ReadyToInstall : UpdateStage.ReadyToUnpack, Package!.SizeBytes, Package.SizeBytes));
             }
             else if (result.Problem is { } problem && !cancel.IsCancellationRequested)
             {

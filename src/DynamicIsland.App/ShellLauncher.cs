@@ -25,6 +25,28 @@ internal static class ShellLauncher
         }
     }
 
+    /// <summary>Opens File Explorer with <paramref name="file"/> selected.</summary>
+    /// <returns>The exception type name on failure (for logging), otherwise <c>null</c>.</returns>
+    public static string? TryRevealFile(string file)
+    {
+        try
+        {
+            if (!File.Exists(file))
+            {
+                return nameof(FileNotFoundException);
+            }
+
+            var startInfo = new ProcessStartInfo("explorer.exe") { UseShellExecute = false };
+            startInfo.ArgumentList.Add("/select," + Path.GetFullPath(file));
+            Process.Start(startInfo)?.Dispose();
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception)
+        {
+            return ex.GetType().Name;
+        }
+    }
+
     /// <summary>Opens an https link (only https is accepted) in the default browser.</summary>
     /// <returns>The exception type name on failure (for logging), otherwise <c>null</c>.</returns>
     public static string? TryOpenLink(Uri link)

@@ -42,6 +42,22 @@ public sealed class UpdateFlowTests
     }
 
     [Fact]
+    public async Task A_copy_that_cannot_change_its_folder_gets_the_verified_file_instead_of_an_install()
+    {
+        using var flow = Create();
+        _installer.CanInstallInPlace = false;
+        _downloader.Complete();
+
+        await flow.ApproveDownloadAsync();
+        await flow.ApproveInstallAsync();
+        await flow.RetryAsync();
+
+        Assert.Equal(UpdateStage.ReadyToUnpack, flow.State.Stage);
+        Assert.EndsWith(UpdatePackages.PortableAsset, flow.StagedPath, StringComparison.Ordinal); // Shown with Show file.
+        Assert.Equal(0, _installer.Installs);
+    }
+
+    [Fact]
     public async Task Install_is_ignored_before_a_download()
     {
         using var flow = Create();
@@ -196,6 +212,8 @@ public sealed class UpdateFlowTests
     private sealed class ScriptedInstaller : IUpdateInstaller
     {
         public string? Problem { get; set; }
+
+        public bool CanInstallInPlace { get; set; } = true;
 
         public int Installs { get; private set; }
 

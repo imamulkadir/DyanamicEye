@@ -9,8 +9,6 @@ text: use headings and bullet points, not HTML.
 
 ## [Unreleased]
 
-## [0.1.0-beta.1] - 2026-10-28
-
 ### Added
 
 - Release pipeline dry run.

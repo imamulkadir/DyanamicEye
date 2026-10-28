@@ -130,11 +130,14 @@ public sealed partial record ReleaseManifest(SemanticVersion Version, IReadOnlyL
 }
 
 /// <summary>
-/// The project's release-signing public keys (ADR 0034), pinned in the app. Empty until the owner generates the key
-/// pair (<c>tools/New-ReleaseSigningKey.ps1</c>); while empty, no download can be verified, so the update window only
-/// offers the release page.
+/// The project's release-signing public keys (ADR 0034), pinned in the app. A manifest must verify against one of them.
+/// Rotation: add the new key, ship that version, then sign with the new key and later remove the old one.
 /// </summary>
 public static class ReleaseSigningKeys
 {
-    public static IReadOnlyList<string> Pinned { get; } = [];
+    public static IReadOnlyList<string> Pinned { get; } =
+    [
+        // Owner key, created 2026-10-28 with tools/New-ReleaseSigningKey.ps1 (SG1). ECDSA P-256 SubjectPublicKeyInfo.
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAErPW/PpHS5SJ5Vozvh8IBd02Y+p9JBEmKEpeLxZa5UVBewVIe5XGFZQj9aetIL5ww2MLlJWmauvr31+jjzkRY3w==",
+    ];
 }

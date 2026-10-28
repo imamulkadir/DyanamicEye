@@ -51,6 +51,22 @@ public sealed class ReleaseManifestTests
     }
 
     [Fact]
+    public void Every_pinned_release_key_is_a_valid_p256_public_key()
+    {
+        Assert.NotEmpty(ReleaseSigningKeys.Pinned);
+        Assert.All(ReleaseSigningKeys.Pinned, pinned =>
+        {
+            using var key = ECDsa.Create();
+            var bytes = Convert.FromBase64String(pinned);
+            key.ImportSubjectPublicKeyInfo(bytes, out var read);
+            Assert.Equal(bytes.Length, read);
+            Assert.Equal(256, key.KeySize);
+            Assert.Equal(ECCurve.NamedCurves.nistP256.Oid.Value, key.ExportParameters(false).Curve.Oid.Value);
+        });
+        Assert.Equal(ReleaseSigningKeys.Pinned.Count, ReleaseSigningKeys.Pinned.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact]
     public void A_p384_key_is_not_accepted()
     {
         using var p384 = ECDsa.Create(ECCurve.NamedCurves.nistP384);

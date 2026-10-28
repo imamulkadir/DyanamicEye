@@ -23,15 +23,15 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-28 (P06-09 implemented; P06 code complete; next is the G06 owner checks, then P07-01)
+- **Last updated:** 2026-10-28 (SG1 done: owner key pinned, uncommitted; RL1 run by the owner, result pending; P06-09 committed as `8507b9e`)
 
 ## NEXT ACTION (ONE task only)
 **Owner (once, before the first release): SG1.** In PowerShell 7 run `pwsh tools\New-ReleaseSigningKey.ps1`. Back up the private `.pem` offline and give the agent **only** the printed public key. The agent then pins it in `ReleaseSigningKeys.Pinned`, which registers the verified downloader (ADR 0034). Until then the update window keeps offering the release page. This is not blocking for the next agent task.
 
 **Owner (G06):**
-1. **SG1:** run `pwsh tools\New-ReleaseSigningKey.ps1`, back up the `.pem` offline, and give the agent the public key only. The agent pins it.
-2. **RL1:** a pre-release dry run of the Release workflow (TEST_MATRIX). It needs no key.
-3. After SG1 and a build with the pinned key: **RL2** (first signed release), then **UP8–UP13**, **IN1–IN5** and **SG2**. These are the G06 manual rows.
+1. ~~SG1~~ **done 2026-10-28**: the public key is pinned in `ReleaseSigningKeys.Pinned` (uncommitted). Commit `src/DynamicIsland.Core/Updates/ReleaseManifest.cs` and `tests/DynamicIsland.UnitTests/Updates/ReleaseManifestTests.cs`.
+2. **RL1** (pre-release dry run): the owner pushed `v0.1.0-beta.1`. Report whether `gh attestation verify` succeeded and whether the draft had 4 files and the notes. Then delete the draft and the tag, and restore `CHANGELOG.md` so the `### Added` list sits under `[Unreleased]` again.
+3. **RL2:** release `0.1.0` signed with `tools/Complete-Release.ps1` (needs the commit from step 1). Install it portable and installed. Then release `0.1.1` (bump `<Version>`, add a CHANGELOG section) and run **UP8–UP13**, **IN1–IN5** and **SG2** against it.
 
 **Then agent: P07-01 — threat-model review** (guide §5 P07-01). Start it only with owner approval while G06 is open, as was done for P03–P06.
 - **Scope:** dependency and license check, including the open item on the REDIST status of `Microsoft.Windows.SDK.NET.dll` noted under P02; secrets audit; an archive path-traversal test (already covered in `UpdateSwapTests`/`UpdatePackageValidator`: cite it); input validation; unexpected permission denials.
@@ -60,7 +60,21 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
-- 2026-10-28 **P06-09 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0038**.
+- 2026-10-28 **SG1 done (owner) — release key pinned** (uncommitted; the owner commits).
+  - The owner ran `tools/New-ReleaseSigningKey.ps1` and gave only the public key.
+    - Checked as an ECDSA **P-256** SubjectPublicKeyInfo (91 bytes, all read, curve nistP256).
+    - Pinned in `ReleaseSigningKeys.Pinned` (`Core/Updates/ReleaseManifest.cs`) with a comment.
+  - **Effect:** `AppHost` now registers the verified downloader, and the installer on release layouts, so in-app updates become possible for builds that contain this key.
+  - **New unit test** `ReleaseManifestTests.Every_pinned_release_key_is_a_valid_p256_public_key`: non-empty, valid P-256, no duplicates. The `Complete-Release.ps1` pinned-key extraction was checked against the real file and finds the key.
+  - **Key file:** `C:\Users\imamu\DynamicIsland-release-signing-key.pem` is outside the repo. Only its ACL was read, never its contents. The ACL shows `SYSTEM`, `Administrators` and `IMAMUL\imamu` (Full), not only the owner as SG1 expected.
+    - On a personal PC this is low risk: administrators can take any file anyway.
+    - To tighten it: `icacls "$HOME\DynamicIsland-release-signing-key.pem" /remove:g "NT AUTHORITY\SYSTEM" "BUILTIN\Administrators"`.
+  - **Tests 2026-10-28, Windows 11 Pro 25H2 build 26200, x64:**
+    - Release build 0 warnings; full Release suite **857/857**.
+    - Debug full suite **868/870**: 2 errors from `ResourceBenchmarkSmokeTests.Collapsed_open_and_paused_states_stay_within_the_resource_budget` ("UI element not found", then `islands.db` in use during cleanup). The Debug smoke project re-run alone passed **28/28 twice**.
+    - Assessment: intermittent, like the P03-02 benchmark flakes. The key only affects the update window path, which this test doesn't use. **Watch CI**; if it recurs, diagnose the benchmark's UI wait and its data-folder cleanup.
+  - **Changed files:** `src/DynamicIsland.Core/Updates/ReleaseManifest.cs`, `tests/DynamicIsland.UnitTests/Updates/ReleaseManifestTests.cs`, `docs/AGENT_PROGRESS.md`. Suggested message: `feat: pin the release signing key (SG1, ADR 0034)`.
+- 2026-10-28 **P06-09 IMPLEMENTED_AWAITING_VALIDATION**, committed by the owner as `8507b9e`. Decisions are in **ADR 0038**.
   - **`.github/workflows/release.yml`:**
     - Runs on a `v*` tag. The tag must be SemVer and its X.Y.Z must equal `Directory.Build.props` `<Version>`; `CHANGELOG.md` must have a section for it.
     - Locked restore, then Release and Debug builds and tests, then `Publish-Layout.ps1 -Installer`.

@@ -1,0 +1,118 @@
+# Builds a GitHub release from a version tag (P06-09, ADR 0038).
+# This workflow:
+#   1. builds, tests and packages x64 (portable ZIP + per-user installer + .sha256);
+#   2. attests build provenance;
+#   3. creates a DRAFT release with the CHANGELOG section as its notes.
+# It never sees the release signing key. The owner then runs tools/Complete-Release.ps1 locally, which:
+#   - downloads the exact draft files and checks their hashes and provenance;
+#   - signs the release manifest (ADR 0034) and uploads it;
+#   - publishes the release.
+# The app only offers in-app updates for releases with a valid signed manifest.
+#   vX.Y.Z          stable: once published, it becomes GitHub's "latest" release, which the app checks (ADR 0032).
+#   vX.Y.Z-beta.N   pre-release: never "latest", so the app never offers it; manual install only.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  release:
+    name: Build, test and draft release (windows-2025, x64)
+    runs-on: windows-2025
+    timeout-minutes: 45
+    permissions:
+      contents: write      # Create the draft release and upload its files.
+      id-token: write      # Sign the provenance attestation (Sigstore, keyless).
+      attestations: write  # Store the attestation on GitHub.
+    steps:
+      # Actions pinned by full commit SHA (tag in comment), same as ci.yml. Verify before bumping.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET SDK from global.json
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      # The tag decides the version. Its X.Y.Z must equal <Version> in Directory.Build.props, and CHANGELOG.md must
+      # have a section for it.
+      - name: Check tag, version and release notes
+        id: version
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ($env:TAG -notmatch '^v((0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?)$') {
+            throw "Tag '$env:TAG' is not v<SemVer>."
+          }
+          $version = $Matches[1]
+          $prerelease = [bool]$Matches[5]
+          $props = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version | Select-Object -First 1
+          if ($version.Split('-')[0] -ne $props) { throw "Tag $version does not match <Version>$props</Version> in Directory.Build.props." }
+          ./tools/Get-ReleaseNotes.ps1 -Version $version | Set-Content release-notes.md -Encoding utf8NoBOM
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$($prerelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+      - name: Restore (locked)
+        run: dotnet restore DynamicIsland.sln --locked-mode
+
+      - name: Build (Release, warnings as errors)
+        run: dotnet build DynamicIsland.sln -c Release --no-restore
+
+      - name: Test (Release)
+        run: dotnet test --solution DynamicIsland.sln -c Release --no-build --max-parallel-test-modules 1
+
+      - name: Build (Debug, test hooks)
+        run: dotnet build DynamicIsland.sln -c Debug --no-restore
+
+      - name: Test (Debug, crash injection)
+        run: dotnet test --solution DynamicIsland.sln -c Debug --no-build --max-parallel-test-modules 1
+
+      - name: Package (portable ZIP, installer, hashes)
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: ./tools/Publish-Layout.ps1 -Installer -Version $env:VERSION
+
+      # Free for public repositories. Lets anyone check that a file was built by this workflow from this commit:
+      #   gh attestation verify <file> --repo imamulkadir/DyanamicEye
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/DynamicIsland-Portable-win-x64.zip
+            artifacts/DynamicIsland-Setup-win-x64.exe
+
+      # Always a draft: nothing is visible to users, or to the app's update check, until the owner signs and publishes.
+      - name: Create draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          $files = 'DynamicIsland-Portable-win-x64.zip', 'DynamicIsland-Setup-win-x64.exe' | ForEach-Object { "artifacts/$_"; "artifacts/$_.sha256" }
+          $flags = @('--draft', '--verify-tag', '--title', "Dynamic Island $env:VERSION", '--notes-file', 'release-notes.md')
+          if ($env:PRERELEASE -eq 'true') { $flags += '--prerelease' } else { $flags += '--latest=false' }
+          gh release create $env:TAG @files @flags
+          if ($LASTEXITCODE -ne 0) { throw 'Creating the draft release failed.' }

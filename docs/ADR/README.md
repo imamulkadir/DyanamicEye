@@ -67,3 +67,4 @@ Security, privacy, OS support, cost and maintenance impact; follow-up tasks.
 - [0035 — Separate updater: payload swap, health handshake and rollback](0035-updater-swap-and-rollback.md) — Accepted (P06-06)
 - [0036 — Data safety around updates: pre-update snapshot, failed migrations, newer data after rollback](0036-update-data-safety.md) — Accepted (P06-07)
 - [0037 — Update fallbacks: read-only folders, managed copies, cancel and disk space, optional code signing](0037-update-fallbacks-and-failures.md) — Accepted (P06-08)
+- [0038 — Release pipeline: tag-built drafts, provenance, owner-signed manifest](0038-release-pipeline.md) — Accepted (P06-09)

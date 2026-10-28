@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P06-09 (CI GitHub Release pipeline) is next. P06-08 is implemented and uncommitted (the owner commits). P06-07 committed as `8d12a16`. G02/G03/P04/P05/P06 manual rows are still owed by the owner, plus SG1 (the signing key).
-- **Active task status:** P06-08 IMPLEMENTED_AWAITING_VALIDATION (uncommitted). P06-07 IMPLEMENTED_AWAITING_VALIDATION (`8d12a16`); CI run 40640163799 **FAILED** on a pre-existing test race (`UpdateWindowTests.Cancel_returns…`), fixed in the P06-08 change set.
+- **Active task:** P06 is complete in code (P06-01…09); **G06 waits for the owner** (SG1, RL1/RL2, UP/IN rows). P06-09 is implemented and uncommitted (the owner commits). P06-08 committed as `629c1a3`. G02/G03/P04/P05/P06 manual rows are still owed by the owner, plus SG1 (the signing key).
+- **Active task status:** P06-09 IMPLEMENTED_AWAITING_VALIDATION (uncommitted). P06-08 IMPLEMENTED_AWAITING_VALIDATION (`629c1a3`); CI run 40643274045 **success** (the race fix held on CI).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,22 +23,19 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-28 (P06-08 implemented; CI race fixed; next is P06-09)
+- **Last updated:** 2026-10-28 (P06-09 implemented; P06 code complete; next is the G06 owner checks, then P07-01)
 
 ## NEXT ACTION (ONE task only)
 **Owner (once, before the first release): SG1.** In PowerShell 7 run `pwsh tools\New-ReleaseSigningKey.ps1`. Back up the private `.pem` offline and give the agent **only** the printed public key. The agent then pins it in `ReleaseSigningKeys.Pinned`, which registers the verified downloader (ADR 0034). Until then the update window keeps offering the release page. This is not blocking for the next agent task.
 
-**First check:** CI on the commit that contains P06-08 must be green (it includes the fix for the `Cancel_returns…` race that failed run 40640163799). If it is red, diagnose that before starting P06-09.
+**Owner (G06):**
+1. **SG1:** run `pwsh tools\New-ReleaseSigningKey.ps1`, back up the `.pem` offline, and give the agent the public key only. The agent pins it.
+2. **RL1:** a pre-release dry run of the Release workflow (TEST_MATRIX). It needs no key.
+3. After SG1 and a build with the pinned key: **RL2** (first signed release), then **UP8–UP13**, **IN1–IN5** and **SG2**. These are the G06 manual rows.
 
-**Then agent: P06-09 — CI GitHub Release pipeline.** (guide §5 P06-09; ADRs 0030, 0031, 0034, 0037)
-- **Scope:**
-  - A tag-triggered workflow with pinned actions (by SHA): restore `--locked-mode`, build, run the tests, then `tools/Publish-Layout.ps1 -Installer` for x64.
-  - SHA-256 files, release notes from `CHANGELOG.md` or the tag message, optional provenance attestation.
-  - Stable and beta tags go to the right channel (pre-release flag).
-  - The signed manifest is created only after a successful publish.
-- **Signing key:** the private key must never be in CI unless the owner explicitly decides that. Default to a draft release that the owner signs locally with `tools/New-ReleaseManifest.ps1` (ADR 0034), then publishes. Record that in an ADR.
-- **Start by reading:** `.github/workflows/ci.yml`, `tools/Publish-Layout.ps1`, `tools/New-ReleaseManifest.ps1`, `docs/ADR/0034*`.
-- **Tests:** validate the workflow syntax (for example with `actionlint`, if available offline; otherwise review it); run the publish script dry run locally; nothing is pushed or tagged by the agent.
+**Then agent: P07-01 — threat-model review** (guide §5 P07-01). Start it only with owner approval while G06 is open, as was done for P03–P06.
+- **Scope:** dependency and license check, including the open item on the REDIST status of `Microsoft.Windows.SDK.NET.dll` noted under P02; secrets audit; an archive path-traversal test (already covered in `UpdateSwapTests`/`UpdatePackageValidator`: cite it); input validation; unexpected permission denials.
+- **Output:** `docs/THREAT_MODEL.md` (assets, trust boundaries, threats, mitigations with test or ADR links, open risks); fix only concrete gaps found.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -50,7 +47,7 @@
 | P03 — Tray/settings/startup | P03-01…P03-05 | IN_PROGRESS (01–05 IMPLEMENTED_AWAITING_VALIDATION; started with owner approval while G02 is open) | G03 pending (owner hardware checks) |
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
 | P05 — Customization/performance | P05-01…P05-04 | IMPLEMENTED_AWAITING_VALIDATION (01–04) | **G05 automated PASS** 2026-10-27, CI run 40437920943 (`802906f`): goals met on the reference machine (idle CPU ~0 %, private 62–77 MB at rest; 94–104 MB after heavy automated use, documented deviation) — docs/PERFORMANCE.md; manual rows owed |
-| P06 — Packaging/updates | P06-01…P06-09 | IN_PROGRESS (01–08 IMPLEMENTED_AWAITING_VALIDATION) | G06 pending |
+| P06 — Packaging/updates | P06-01…P06-09 | IMPLEMENTED_AWAITING_VALIDATION (01–09) | G06 pending: owner rows SG1, RL1, RL2, UP8–UP13, IN1–IN5 |
 | P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
 
 ### G01 evidence (guide §5: "corrupt settings recover; simulated widget failure isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app")
@@ -63,7 +60,33 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
-- 2026-10-28 **P06-08 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0037**.
+- 2026-10-28 **P06-09 IMPLEMENTED_AWAITING_VALIDATION** (uncommitted; the owner commits). Decisions are in **ADR 0038**.
+  - **`.github/workflows/release.yml`:**
+    - Runs on a `v*` tag. The tag must be SemVer and its X.Y.Z must equal `Directory.Build.props` `<Version>`; `CHANGELOG.md` must have a section for it.
+    - Locked restore, then Release and Debug builds and tests, then `Publish-Layout.ps1 -Installer`.
+    - `actions/attest-build-provenance@4d101475…` (v4.2.2, released 2026-08-06; the SHA was looked up with `gh api`) attests the ZIP and the EXE.
+    - Creates a **draft** release: the files, `.sha256`, and the notes. `--prerelease` for `-label` tags; otherwise `--latest=false` until publishing.
+    - No secrets.
+  - **`tools/Complete-Release.ps1`** (owner, local):
+    - Refuses anything other than a stable draft.
+    - The private key must match a key pinned in `ReleaseSigningKeys`.
+    - Downloads the draft files to a new temp folder and checks each against its `.sha256` and `gh attestation verify`.
+    - `New-ReleaseManifest.ps1` signs those bytes; the script uploads `.json` and `.sig`. `-Publish` publishes the release as latest.
+  - **`tools/Get-ReleaseNotes.ps1`** extracts the changelog section and fails if it is missing or empty. New **`CHANGELOG.md`** has an `[Unreleased]` section.
+  - **Tests:**
+    - New `ReleasePipelineTests` (5 cases): every `uses:` in every workflow is pinned by a 40-hex SHA; the release workflow uses no `secrets.`/`RELEASE_SIGNING_KEY`/`New-ReleaseManifest` and creates drafts only; tests run before packaging, then attestation, then the draft; the changelog has a section.
+    - Local dry runs (PowerShell 7) of the workflow's tag-check script:
+      - `v0.1.0` fails because the CHANGELOG section is missing; `v0.2.0` fails on the version mismatch; `v1.0` fails as not SemVer.
+      - With a temporary changelog, `v0.1.0` gives `prerelease=false` with the notes and `v0.1.0-beta.1` gives `prerelease=true`.
+      - `Complete-Release.ps1` refuses the `v1.0.0-beta.1` and `1.0.0` tags before any network or key use.
+      - Both new scripts parse without errors.
+    - Not validated: the workflow YAML itself; there is no offline linter (no actionlint/pyyaml). It is validated by the owner's RL1 dry run (TEST_MATRIX RL1/RL2 added).
+  - **Verification 2026-10-28, Windows 11 Pro 25H2 build 26200, x64:** Release build 0 warnings; unit tests **726/726**. Integration and smoke were not re-run because no product code changed since P06-08's full run.
+  - **Changed files:**
+    - modified: `docs/ADR/README.md`, `docs/AGENT_PROGRESS.md`, `docs/TEST_MATRIX.md`
+    - new: `.github/workflows/release.yml`, `CHANGELOG.md`, `docs/ADR/0038-release-pipeline.md`, `tests/DynamicIsland.UnitTests/Architecture/ReleasePipelineTests.cs`, `tools/Complete-Release.ps1`, `tools/Get-ReleaseNotes.ps1`
+    - Suggested commit message: `ci: tag-built draft releases with provenance and owner-signed manifest (P06-09, ADR 0038)`
+- 2026-10-28 **P06-08 IMPLEMENTED_AWAITING_VALIDATION**, committed by the owner as `629c1a3`; CI run 40643274045 **success**. Decisions are in **ADR 0037**.
   - **Read-only folder fallback:**
     - `IUpdateInstaller.CanInstallInPlace` is a default interface member set to `true`. `LayoutUpdateInstaller` uses `UpdateHandover.CanUpdateInPlace`: a release payload whose root accepts a probe file.
     - The check runs after each download. When it fails, the flow ends in the new stage **`ReadyToUnpack`**: plain instructions plus **Show file**, which opens File Explorer with the verified ZIP selected (`ShellLauncher.TryRevealFile`).
@@ -276,6 +299,6 @@
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **P06-09 per NEXT ACTION** (G02–G06 manual rows and SG1 still owed by the owner).
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **G06 owner checks, then P07-01 per NEXT ACTION** (G02–G06 manual rows and SG1 still owed by the owner).
 - Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

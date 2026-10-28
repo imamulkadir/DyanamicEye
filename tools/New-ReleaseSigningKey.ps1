@@ -5,7 +5,8 @@
 .DESCRIPTION
     Writes an ECDSA P-256 private key (PKCS#8 PEM) to -Path, readable only by you, and prints the public key.
     - The PUBLIC key goes into the app (Core/Updates/ReleaseManifest.cs, ReleaseSigningKeys.Pinned); it is not secret.
-    - The PRIVATE key signs every release manifest (tools/New-ReleaseManifest.ps1; later a GitHub Actions secret, P06-09).
+    - The PRIVATE key signs every release manifest, on your own PC only (tools/Complete-Release.ps1; never a CI secret,
+      ADR 0038).
       Never commit it, never paste it into an issue or chat. Keep an offline backup: if it is lost, already installed
       copies can no longer verify updates until users install a new version by hand; if it leaks, anyone could sign
       "updates" — then replace the key and publish a version with only the new public key.

@@ -108,7 +108,7 @@ public sealed class UpdateSwapTests : IDisposable
 
         Assert.Equal(OldPointer, File.ReadAllText(Path.Combine(Root, AppLayout.PointerFileName)));
         Assert.False(Directory.Exists(NewPayload));
-        Assert.Empty(_processes.Started);
+        AssertOldRestarted();
         Assert.Empty(Directory.GetDirectories(Data, PreUpdateSnapshot.FolderPrefix + "*"));
     }
 
@@ -135,6 +135,7 @@ public sealed class UpdateSwapTests : IDisposable
 
         Assert.Equal("package-mismatch", result.Reason);
         AssertUnchanged();
+        AssertOldRestarted();
     }
 
     [Fact]
@@ -148,6 +149,7 @@ public sealed class UpdateSwapTests : IDisposable
         Assert.False(File.Exists(_temp.Combine("evil.txt")));
         Assert.False(Directory.Exists(NewPayload + ".partial"));
         AssertUnchanged();
+        AssertOldRestarted();
     }
 
     [Fact]
@@ -159,6 +161,7 @@ public sealed class UpdateSwapTests : IDisposable
 
         Assert.Equal("bad-archive", result.Reason);
         AssertUnchanged();
+        AssertOldRestarted();
     }
 
     [Fact]
@@ -172,6 +175,27 @@ public sealed class UpdateSwapTests : IDisposable
         Assert.StartsWith("extract-failed", result.Reason, StringComparison.Ordinal);
         locked.Dispose();
         AssertUnchanged();
+        AssertOldRestarted();
+    }
+
+    [Fact]
+    public async Task Abort_after_the_app_exited_restarts_it_and_says_nothing_was_installed()
+    {
+        var handover = new UpdateHandover(Updates, NullLogger.Instance);
+        File.WriteAllText(Path.Combine(Updates, UpdateRequest.FileName), "{}");
+        using (new FileStream(Path.Combine(Root, "LICENSE.txt"), FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var result = await CreateSwap().RunAsync(Request(Package()), Ct);
+
+            Assert.Equal(SwapOutcome.Aborted, result.Outcome);
+        }
+
+        AssertUnchanged();
+        AssertOldRestarted();
+        Assert.Empty(Directory.GetDirectories(Data, PreUpdateSnapshot.FolderPrefix + "*")); // Nothing changed, so no snapshot is kept.
+        Assert.False(File.Exists(Path.Combine(Updates, UpdateRequest.FileName)));
+        Assert.True(File.Exists(Path.Combine(Updates, NewVersion, UpdatePackages.PortableAsset))); // Kept for a retry.
+        Assert.Equal(new UpdateFailure(NewVersion, Installed: false), handover.TakeFailure());
     }
 
     [Theory]
@@ -223,7 +247,7 @@ public sealed class UpdateSwapTests : IDisposable
 
         Assert.Equal(SwapOutcome.Committed, result.Outcome);
         Assert.False(File.Exists(handover.RequestPath));
-        Assert.Null(handover.TakeFailedVersion());
+        Assert.Null(handover.TakeFailure());
     }
 
     [Fact]
@@ -269,11 +293,11 @@ public sealed class UpdateSwapTests : IDisposable
         _processes.OnStart = _ => { };
         await CreateSwap(TimeSpan.FromMilliseconds(300)).RunAsync(Request(Package()), Ct);
 
-        Assert.Equal(NewVersion, handover.TakeFailedVersion());
-        Assert.Null(handover.TakeFailedVersion());
+        Assert.Equal(new UpdateFailure(NewVersion, Installed: true), handover.TakeFailure());
+        Assert.Null(handover.TakeFailure());
 
         File.WriteAllText(Path.Combine(Updates, UpdateHandshake.LastFailureFile), """{"version":"..\\x"}""");
-        Assert.Null(handover.TakeFailedVersion());
+        Assert.Null(handover.TakeFailure());
     }
 
     private static ReleaseAsset Asset(string name) => new(name, 1, new Uri("https://github.com/x/y/releases/download/v1.1.0/" + name));
@@ -330,6 +354,9 @@ public sealed class UpdateSwapTests : IDisposable
         Assert.Empty(Directory.GetFiles(Root, "*.new"));
         Assert.Empty(Directory.GetFiles(Root, "*.bak"));
     }
+
+    /// <summary>The app had already exited for the update, so the untouched old version must be started again.</summary>
+    private void AssertOldRestarted() => Assert.Single(_processes.Started);
 
     private sealed class FakeProcesses : IUpdaterProcesses
     {

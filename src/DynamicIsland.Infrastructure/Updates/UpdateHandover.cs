@@ -7,9 +7,16 @@ using Microsoft.Extensions.Logging;
 
 namespace DynamicIsland.Infrastructure.Updates;
 
+/// <param name="Version">The version that was not kept.</param>
+/// <param name="Installed">
+/// <c>true</c> when it was installed but did not start correctly and was rolled back; <c>false</c> when the updater
+/// stopped before changing anything (for example a locked file).
+/// </param>
+public sealed record UpdateFailure(string Version, bool Installed);
+
 /// <summary>
 /// App side of the updater protocol (ADR 0035): writes the hand-over request for a staged, verified package, and on the
-/// next start acknowledges the new version's health or picks up the updater's rollback note. Files only; starting the
+/// next start acknowledges the new version's health or picks up the updater's failure note. Files only; starting the
 /// updater and exiting are the caller's job.
 /// </summary>
 public sealed partial class UpdateHandover(string updatesFolder, ILogger logger)
@@ -109,9 +116,9 @@ public sealed partial class UpdateHandover(string updatesFolder, ILogger logger)
         }
     }
 
-    /// <summary>Reads and removes the updater's rollback note, so it is shown once.</summary>
-    /// <returns>The version that failed to start, or <c>null</c>.</returns>
-    public string? TakeFailedVersion()
+    /// <summary>Reads and removes the updater's failure note (rollback or abort), so it is shown once.</summary>
+    /// <returns>The failed update, or <c>null</c>.</returns>
+    public UpdateFailure? TakeFailure()
     {
         var path = Path.Combine(_updates, UpdateHandshake.LastFailureFile);
         var note = ReadSmallJson(path);
@@ -130,7 +137,8 @@ public sealed partial class UpdateHandover(string updatesFolder, ILogger logger)
         }
 
         var version = StringOf(note, "version");
-        return version is not null && AppLayout.IsValidVersion(version) ? version : null;
+        var installed = note["installed"] is not JsonValue flag || !flag.TryGetValue(out bool value) || value;
+        return version is not null && AppLayout.IsValidVersion(version) ? new UpdateFailure(version, installed) : null;
     }
 
     private static JsonObject? ReadSmallJson(string path)

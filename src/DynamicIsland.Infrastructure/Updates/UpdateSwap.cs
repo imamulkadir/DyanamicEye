@@ -34,7 +34,10 @@ public enum SwapOutcome
     /// <summary>The new version was installed but failed; the old version was restored and started again.</summary>
     RolledBack,
 
-    /// <summary>Nothing was changed (invalid request, app still running, package mismatch, bad archive).</summary>
+    /// <summary>
+    /// Nothing was changed (invalid request, app still running, package mismatch, bad archive, locked file). Once the
+    /// app has exited for the update, the old version is started again.
+    /// </summary>
     Aborted,
 }
 
@@ -88,7 +91,7 @@ public sealed partial class UpdateSwap(
         // 3. Re-verify the staged package (time of check vs time of use).
         if (!await MatchesAsync(request, cancellationToken).ConfigureAwait(false))
         {
-            return Abort("package-mismatch");
+            return AbortAndRestart(request, layout, "package-mismatch");
         }
 
         // 3b. Copy the user's data while nothing can change it (ADR 0036); no snapshot, no update.
@@ -98,7 +101,7 @@ public sealed partial class UpdateSwap(
         }
         catch (IOException ex)
         {
-            return Abort("snapshot-failed:" + ex.GetType().Name);
+            return AbortAndRestart(request, layout, "snapshot-failed:" + ex.GetType().Name);
         }
 
         // 4. Extract the new payload next to the old one; nothing in use is touched.
@@ -112,7 +115,7 @@ public sealed partial class UpdateSwap(
             if (!Extract(request, layout.Root, partial, replaced))
             {
                 Cleanup(partial, replaced, layout.Root);
-                return Abort("bad-archive");
+                return AbortAndRestart(request, layout, "bad-archive");
             }
 
             Directory.Move(partial, newPayload);
@@ -121,7 +124,7 @@ public sealed partial class UpdateSwap(
         {
             Cleanup(partial, replaced, layout.Root);
             DeleteDirectory(newPayload);
-            return Abort("extract-failed:" + ex.GetType().Name);
+            return AbortAndRestart(request, layout, "extract-failed:" + ex.GetType().Name);
         }
 
         // 5–6. Repoint, launch, wait for the health acknowledgment.
@@ -320,7 +323,48 @@ public sealed partial class UpdateSwap(
         DeleteDirectory(AppLayout.PayloadFolder(layout.Root, request.Version));
         TryDelete(Path.Combine(_updates, UpdateHandshake.AwaitingHealthFile));
         WriteAtomic(Path.Combine(_updates, UpdateHandshake.LastFailureFile), new JsonObject { ["version"] = request.Version, ["reason"] = reason }.ToJsonString());
+        RestartOld(layout);
 
+        LogRolledBack(logger, request.Version, reason);
+        return new SwapResult(SwapOutcome.RolledBack, reason);
+    }
+
+    /// <summary>
+    /// The app has already exited for the update, but nothing was changed: start the old version again and leave a note
+    /// so it can say the update was not installed. The unused data snapshot is removed.
+    /// </summary>
+    private SwapResult AbortAndRestart(UpdateRequest request, Layout layout, string reason)
+    {
+        LogAborted(logger, reason);
+        if (_snapshot is not null)
+        {
+            try
+            {
+                DeleteDirectory(_snapshot);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Harmless; old snapshots are pruned by the next update.
+            }
+        }
+
+        try
+        {
+            WriteAtomic(Path.Combine(_updates, UpdateHandshake.LastFailureFile),
+                new JsonObject { ["version"] = request.Version, ["reason"] = reason, ["installed"] = false }.ToJsonString());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Only the notice is lost; restarting matters more.
+        }
+
+        TryDelete(Path.Combine(_updates, UpdateRequest.FileName));
+        RestartOld(layout);
+        return new SwapResult(SwapOutcome.Aborted, reason);
+    }
+
+    private void RestartOld(Layout layout)
+    {
         try
         {
             processes.StartLauncher(Path.Combine(layout.Root, AppLayout.RootLauncher));
@@ -329,9 +373,6 @@ public sealed partial class UpdateSwap(
         {
             LogRestartOldFailed(logger, ex.GetType().Name);
         }
-
-        LogRolledBack(logger, request.Version, reason);
-        return new SwapResult(SwapOutcome.RolledBack, reason);
     }
 
     /// <summary>Undo root-file swaps (restore .bak, remove files that did not exist) and remove a partial payload.</summary>
@@ -423,7 +464,7 @@ public sealed partial class UpdateSwap(
     [LoggerMessage(EventId = 3009, Level = LogLevel.Warning, Message = "The pre-update snapshot could not be marked {State} ({ErrorType})")]
     private static partial void LogSnapshotMarkFailed(ILogger logger, SnapshotState state, string errorType);
 
-    [LoggerMessage(EventId = 3003, Level = LogLevel.Error, Message = "The previous version could not be restarted after a rollback ({ErrorType})")]
+    [LoggerMessage(EventId = 3003, Level = LogLevel.Error, Message = "The previous version could not be restarted after a failed update ({ErrorType})")]
     private static partial void LogRestartOldFailed(ILogger logger, string errorType);
 
     private void MarkSnapshot(SnapshotState state)

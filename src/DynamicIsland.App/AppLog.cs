@@ -170,6 +170,10 @@ internal static partial class AppLog
         Message = "The update to {Version} did not start correctly and was rolled back")]
     public static partial void UpdateRolledBack(ILogger logger, string version);
 
+    [LoggerMessage(EventId = 1065, EventName = "UpdateNotInstalled", Level = LogLevel.Warning,
+        Message = "The update to {Version} could not be installed; nothing was changed")]
+    public static partial void UpdateNotInstalled(ILogger logger, string version);
+
     [LoggerMessage(EventId = 1010, EventName = "UnhandledException", Level = LogLevel.Critical,
         Message = "Unhandled exception on {Source}; the app will exit")]
     public static partial void UnhandledException(ILogger logger, Exception exception, string source);

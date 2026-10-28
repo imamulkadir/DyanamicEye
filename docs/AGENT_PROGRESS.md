@@ -23,15 +23,13 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-28 (SG1 done: owner key pinned, uncommitted; RL1 PASS on run 40645911137; P06-09 committed as `8507b9e`)
+- **Last updated:** 2026-10-28 (UP11 run by the agent: (b) PASS, (a) found the abort-without-restart bug, fixed (ADR 0035 amendment), awaiting validation; uncommitted)
 
 ## NEXT ACTION (ONE task only)
-**Owner (once, before the first release): SG1.** In PowerShell 7 run `pwsh tools\New-ReleaseSigningKey.ps1`. Back up the private `.pem` offline and give the agent **only** the printed public key. The agent then pins it in `ReleaseSigningKeys.Pinned`, which registers the verified downloader (ADR 0034). Until then the update window keeps offering the release page. This is not blocking for the next agent task.
-
-**Owner (G06):**
-1. ~~SG1~~ **done 2026-10-28**: the public key is pinned in `ReleaseSigningKeys.Pinned` (uncommitted). Commit `src/DynamicIsland.Core/Updates/ReleaseManifest.cs` and `tests/DynamicIsland.UnitTests/Updates/ReleaseManifestTests.cs`.
-2. ~~RL1~~ **PASS 2026-10-28.** Release run 40645911137 passed every step (tests in both configurations, packaging, attestation, draft). Attestation 60707323 covers both packages, and the API finds one attestation for each package's SHA-256 from the build log. The owner has already deleted the draft and the tag. **Still to do:** restore `CHANGELOG.md` so the `### Added` list sits under `[Unreleased]` again (the `0.1.0-beta.1` section is still in the working copy).
-3. **RL2:** release `0.1.0` signed with `tools/Complete-Release.ps1` (needs the commit from step 1). Install it portable and installed. Then release `0.1.1` (bump `<Version>`, add a CHANGELOG section) and run **UP8–UP13**, **IN1–IN5** and **SG2** against it.
+**Owner (G06), remaining manual rows** (agent gives step-by-step instructions on request):
+1. **UP11 (a)** re-run after a release that contains the abort-restart fix (it is the old payload's updater that runs), **UP13 (b)** (low disk space; optional, automated), **UP10** (rollback with a deliberately broken `0.1.2`), the UP9 uninstall part, and the "no update" check on the newest copy.
+2. **IN1, IN3–IN5** (IN2 passed); G02–G05 manual rows still owed.
+3. Done 2026-10-28: SG1, RL1, **RL2**, **SG2**, **UP8**, **UP9**, **UP12**, **UP13 (a)**, **UP11 (b)** (see RECENT VERIFIED CHANGES).
 
 **Then agent: P07-01 — threat-model review** (guide §5 P07-01). Start it only with owner approval while G06 is open, as was done for P03–P06.
 - **Scope:** dependency and license check, including the open item on the REDIST status of `Microsoft.Windows.SDK.NET.dll` noted under P02; secrets audit; an archive path-traversal test (already covered in `UpdateSwapTests`/`UpdatePackageValidator`: cite it); input validation; unexpected permission denials.
@@ -60,6 +58,32 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-28 **G06 UP11 run by the agent on real Windows; abort-restart fix IMPLEMENTED_AWAITING_VALIDATION** (uncommitted).
+  - **How:** fresh 0.1.0 portable copies from the published ZIP, driven through UI Automation (tray icon → Check for updates → View update → Download / Install / Show file). Test copies removed afterwards.
+  - **UP11 (b) PASS:** with Write and Delete-child denied on the copy's folder, the window offered **Show file** instead of Install, and Explorer opened `updates\0.1.1` with the ZIP selected.
+  - **UP11 (a) FAIL, now fixed:** with `LICENSE.txt` locked, the abort itself was correct (`extract-failed:IOException`, copy unchanged), but the updater never restarted the old version and left a `Taken` snapshot and `update-request.json`. Started by hand, 0.1.0 ran healthy.
+  - **Fix (ADR 0035 amendment):**
+    - `UpdateSwap.AbortAndRestart`: after a valid request and app exit, an abort restarts the old launcher, removes the unused snapshot and the request, keeps the staged package, and writes a failure note with `"installed": false`.
+    - `UpdateHandover.TakeFailure()` returns `UpdateFailure(Version, Installed)` and replaces `TakeFailedVersion`.
+    - `TrayController.AnnounceUpdateFailure` shows the abort message or the rollback message; new event 1065 `UpdateNotInstalled`.
+  - **Changed files:**
+    - `src/DynamicIsland.Infrastructure/Updates/UpdateSwap.cs`, `UpdateHandover.cs`
+    - `src/DynamicIsland.App/App.xaml.cs`, `AppLog.cs`, `TrayController.cs`
+    - `tests/DynamicIsland.UnitTests/Updates/UpdateSwapTests.cs`: 4 abort tests assert the restart, and there is a new `Abort_after_the_app_exited_restarts_it_and_says_nothing_was_installed`.
+    - `docs/ADR/0035-updater-swap-and-rollback.md`, `docs/TEST_MATRIX.md`, this file.
+  - **Tests 2026-10-28, Windows 11 Pro 25H2 build 26200:**
+    - Release build 0 warnings; unit tests **728/728**; full Release suite **858/858**.
+    - Full Debug suite **869/871**: 2 errors in the Debug smoke project. Re-run alone, it passed **28/28**. Second occurrence of this intermittent failure; diagnose if it recurs (see the SG1 entry).
+  - **Validation:** the updater in the *old* payload runs, so the fix can only be checked on a real update *from* a release that contains it (for example 0.1.2 → 0.1.3).
+- 2026-10-28 **RL2 PASS (owner) — first signed releases; in-app update works.**
+  - **Releases:** `v0.1.0` (Release run 40681670581) and `v0.1.1` (run 40695597536, commit `b8766c0`) were both signed and published as latest with `tools/Complete-Release.ps1 -Publish`. Both packages passed the SHA-256 and provenance checks, and each release has 6 assets including `DynamicIsland-release.json` and `.sig`.
+  - **Fix:** `Complete-Release.ps1` line 50 now quotes `--json 'isDraft,isPrerelease'`. PowerShell had passed the unquoted list as an array, so `gh` received 2 arguments (`accepts at most 1 arg(s), received 2`). Committed by the owner in `b8766c0`.
+  - **UP8/UP9/UP12**, checked on disk by the agent on Windows 11 Pro 25H2 build 26200:
+    - Portable copy (`%USERPROFILE%\Apps\DynamicIsland-Portable`) and installed copy (`%LOCALAPPDATA%\Programs\DynamicIsland`): each has `current.json {"current":"0.1.1","previous":"0.1.0"}` and both payload folders.
+    - The HKCU uninstall entry shows `DisplayVersion 0.1.1`.
+    - Two `pre-update-*` snapshots are in state `Committed`.
+    - `updater-20261028.log` has event 3000 "Update to 0.1.1 committed" twice, with no warnings or errors during the updates.
+    - The owner confirmed the note and task were kept and there was no UAC prompt.
 - 2026-10-28 **SG1 done (owner) — release key pinned** (uncommitted; the owner commits).
   - The owner ran `tools/New-ReleaseSigningKey.ps1` and gave only the public key.
     - Checked as an ECDSA **P-256** SubjectPublicKeyInfo (91 bytes, all read, curve nistP256).

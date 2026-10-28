@@ -71,3 +71,21 @@ Inputs from earlier tasks:
   still-running app (abort without changes), bad checksum (abort), corrupt or traversing archive (abort), and a clean
   restart afterwards.
 - P06-07 adds the pre-update data snapshot and the schema checks around the swap.
+
+## Amendment 2026-10-28 (G06 UP11): restart after an abort
+- **Found on real Windows:** with `LICENSE.txt` locked, the updater correctly aborted without changes
+  (`extract-failed:IOException`, event 3002). But the app had already exited for the update, and the updater did not
+  start it again, so the island stayed closed until it was started by hand.
+- **Decision:** once the request is valid and the app has exited, every abort (`package-mismatch`,
+  `snapshot-failed:*`, `bad-archive`, `extract-failed:*`) also:
+  - starts the old launcher again (event 3003 if that fails);
+  - removes that update's data snapshot (no data could change);
+  - deletes `update-request.json`, but keeps the staged package so a retry needs no new download;
+  - writes the failure note with `"installed": false`.
+  `invalid-request` and `app-still-running` still start nothing, because the layout is unknown or the app is still
+  running.
+- The app reads the note as `UpdateFailure(Version, Installed)`. A note without `installed` means a rollback, as
+  before. For an abort it shows "Version x couldn't be installed, so nothing was changed. Try again later from
+  Settings › Updates." and logs event 1065 `UpdateNotInstalled`.
+- The updater that runs is the one in the **old** payload. So this applies to updates *from* the first version that
+  contains it; updates from 0.1.0 and 0.1.1 still behave the old way.

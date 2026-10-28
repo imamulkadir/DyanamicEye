@@ -113,11 +113,13 @@ public sealed class TrayController : IDisposable
         _icon.ShowNotification("Dynamic Island update", $"Version {release.Version} is available. Select to see what's new.");
     }
 
-    /// <summary>The updater restored this version because the new one did not start correctly (ADR 0035).</summary>
-    public void AnnounceRollback(string failedVersion)
+    /// <summary>The last update was rolled back, or the updater stopped before changing anything (ADR 0035).</summary>
+    public void AnnounceUpdateFailure(Infrastructure.Updates.UpdateFailure failure)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(failedVersion);
-        _icon.ShowNotification("Dynamic Island update", $"Version {failedVersion} didn't start correctly, so the previous version was restored.");
+        ArgumentNullException.ThrowIfNull(failure);
+        _icon.ShowNotification("Dynamic Island update", failure.Installed
+            ? $"Version {failure.Version} didn't start correctly, so the previous version was restored."
+            : $"Version {failure.Version} couldn't be installed, so nothing was changed. Try again later from Settings › Updates.");
     }
 
     /// <summary>What selecting the notification does (tests; the shell sends <c>NIN_BALLOONUSERCLICK</c>).</summary>

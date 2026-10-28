@@ -9,7 +9,14 @@ text: use headings and bullet points, not HTML.
 
 ## [Unreleased]
 
+## [0.1.0-beta.1] - 2026-10-28
+
 ### Added
+
+- Release pipeline dry run.
+
+### Added
+
 - The island at the top of the screen, shaped like a notch, with compact and expanded states, DPI and multi-monitor
   placement, fullscreen and click-through handling.
 - Tray icon and menu, settings window, keyboard shortcut, and an opt-in Windows startup entry.

@@ -23,14 +23,14 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-28 (SG1 done: owner key pinned, uncommitted; RL1 run by the owner, result pending; P06-09 committed as `8507b9e`)
+- **Last updated:** 2026-10-28 (SG1 done: owner key pinned, uncommitted; RL1 PASS on run 40645911137; P06-09 committed as `8507b9e`)
 
 ## NEXT ACTION (ONE task only)
 **Owner (once, before the first release): SG1.** In PowerShell 7 run `pwsh tools\New-ReleaseSigningKey.ps1`. Back up the private `.pem` offline and give the agent **only** the printed public key. The agent then pins it in `ReleaseSigningKeys.Pinned`, which registers the verified downloader (ADR 0034). Until then the update window keeps offering the release page. This is not blocking for the next agent task.
 
 **Owner (G06):**
 1. ~~SG1~~ **done 2026-10-28**: the public key is pinned in `ReleaseSigningKeys.Pinned` (uncommitted). Commit `src/DynamicIsland.Core/Updates/ReleaseManifest.cs` and `tests/DynamicIsland.UnitTests/Updates/ReleaseManifestTests.cs`.
-2. **RL1** (pre-release dry run): the owner pushed `v0.1.0-beta.1`. Report whether `gh attestation verify` succeeded and whether the draft had 4 files and the notes. Then delete the draft and the tag, and restore `CHANGELOG.md` so the `### Added` list sits under `[Unreleased]` again.
+2. ~~RL1~~ **PASS 2026-10-28.** Release run 40645911137 passed every step (tests in both configurations, packaging, attestation, draft). Attestation 60707323 covers both packages, and the API finds one attestation for each package's SHA-256 from the build log. The owner has already deleted the draft and the tag. **Still to do:** restore `CHANGELOG.md` so the `### Added` list sits under `[Unreleased]` again (the `0.1.0-beta.1` section is still in the working copy).
 3. **RL2:** release `0.1.0` signed with `tools/Complete-Release.ps1` (needs the commit from step 1). Install it portable and installed. Then release `0.1.1` (bump `<Version>`, add a CHANGELOG section) and run **UP8–UP13**, **IN1–IN5** and **SG2** against it.
 
 **Then agent: P07-01 — threat-model review** (guide §5 P07-01). Start it only with owner approval while G06 is open, as was done for P03–P06.

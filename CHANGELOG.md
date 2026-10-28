@@ -11,10 +11,6 @@ text: use headings and bullet points, not HTML.
 
 ### Added
 
-- Release pipeline dry run.
-
-### Added
-
 - The island at the top of the screen, shaped like a notch, with compact and expanded states, DPI and multi-monitor
   placement, fullscreen and click-through handling.
 - Tray icon and menu, settings window, keyboard shortcut, and an opt-in Windows startup entry.

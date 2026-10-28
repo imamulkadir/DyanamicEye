@@ -9,6 +9,8 @@ text: use headings and bullet points, not HTML.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-28
+
 ### Added
 
 - The island at the top of the screen, shaped like a notch, with compact and expanded states, DPI and multi-monitor

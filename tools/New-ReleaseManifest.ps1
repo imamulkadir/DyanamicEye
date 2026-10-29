@@ -11,8 +11,8 @@
 .PARAMETER Files
     The release files, e.g. artifacts/DynamicIsland-Setup-win-x64.exe and artifacts/DynamicIsland-Portable-win-x64.zip.
 .PARAMETER KeyPath
-    The private key from New-ReleaseSigningKey.ps1. Alternatively set the RELEASE_SIGNING_KEY environment variable to
-    the PEM text (CI secret, P06-09).
+    The private key file from New-ReleaseSigningKey.ps1. Only a file on the owner's PC: the key is never an
+    environment variable or a CI secret (ADR 0038, P07-01).
 .PARAMETER PublicKey
     Optional: the pinned public key (Base64); the script then refuses a private key that does not match it.
 #>
@@ -20,7 +20,7 @@
 param(
     [Parameter(Mandatory)] [string] $Version,
     [Parameter(Mandatory)] [string[]] $Files,
-    [string] $KeyPath,
+    [Parameter(Mandatory)] [string] $KeyPath,
     [string] $PublicKey,
     [string] $Output = (Join-Path $PSScriptRoot '..' 'artifacts')
 )
@@ -28,8 +28,8 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$') { throw "Version '$Version' is not a stable SemVer version." }
 
-$pem = if ($KeyPath) { Get-Content -Raw $KeyPath } else { $env:RELEASE_SIGNING_KEY }
-if (-not $pem) { throw 'Pass -KeyPath or set RELEASE_SIGNING_KEY.' }
+$pem = Get-Content -Raw $KeyPath
+if (-not $pem) { throw "The key file '$KeyPath' is empty." }
 
 $entries = foreach ($file in $Files) {
     $item = Get-Item $file

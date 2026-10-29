@@ -89,3 +89,16 @@ Inputs from earlier tasks:
   Settings › Updates." and logs event 1065 `UpdateNotInstalled`.
 - The updater that runs is the one in the **old** payload. So this applies to updates *from* the first version that
   contains it; updates from 0.1.0 and 0.1.1 still behave the old way.
+
+## Amendment 2026-10-29 (P07-01): no exception escapes the updater once the app has exited
+- An unreadable staged package during the re-check (antivirus lock, deleted file) aborts with
+  `package-unreadable:<Type>` and restarts the old version. An unreadable layout or a malformed path counts as
+  `invalid-request`. Empty or unreadable `--request` arguments exit with code 4 instead of crashing.
+- **Commit** happens once the health acknowledgement arrives. Tidying up afterwards (pruning old payload folders,
+  removing staging, the Installed apps version) is best effort. A failure, including `SecurityException` from the
+  registry, is logged as event 3010 and never rolls back a healthy update.
+- **Rollback** steps are best effort, so the old version is always started again. If `current.json` cannot be
+  restored, the new payload is kept rather than leaving the pointer aimed at a missing folder.
+- Tests: `UpdateSwapTests.A_package_locked_during_the_recheck_restarts_the_old_version_instead_of_crashing`,
+  `Tidying_up_after_a_healthy_update_never_undoes_it`, `A_rollback_that_cannot_remove_the_new_version_still_restarts_the_old_one`.
+  See `docs/THREAT_MODEL.md`.

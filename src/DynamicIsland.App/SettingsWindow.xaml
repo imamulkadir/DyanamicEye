@@ -67,7 +67,7 @@
                 Background="{DynamicResource {x:Static SystemColors.InfoBrushKey}}"
                 AutomationProperties.AutomationId="Settings.ReadOnlyBanner">
             <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
-                       Text="Settings can't be saved on this PC (the settings file belongs to a newer version or could not be upgraded). Changes apply until Dynamic Island restarts." />
+                       Text="Settings can't be saved on this PC (the settings file belongs to a newer version, could not be upgraded, or could not be read). Changes apply until Dynamic Island restarts." />
         </Border>
 
         <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" Padding="12,10"

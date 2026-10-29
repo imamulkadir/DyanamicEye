@@ -74,7 +74,17 @@ public sealed partial class UpdateSwap(
         ArgumentNullException.ThrowIfNull(request);
 
         // 1. Validate.
-        if (Validate(request) is not { } layout)
+        Layout? validated;
+        try
+        {
+            validated = Validate(request);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            validated = null; // An unreadable layout or a malformed path is an invalid request, never a crash.
+        }
+
+        if (validated is not { } layout)
         {
             return Abort("invalid-request");
         }
@@ -88,8 +98,19 @@ public sealed partial class UpdateSwap(
             }
         }
 
-        // 3. Re-verify the staged package (time of check vs time of use).
-        if (!await MatchesAsync(request, cancellationToken).ConfigureAwait(false))
+        // 3. Re-verify the staged package (time of check vs time of use). The app has exited by now, so an unreadable
+        // package (antivirus lock, deleted) must restart it rather than end the updater with an exception.
+        bool matches;
+        try
+        {
+            matches = await MatchesAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return AbortAndRestart(request, layout, "package-unreadable:" + ex.GetType().Name);
+        }
+
+        if (!matches)
         {
             return AbortAndRestart(request, layout, "package-mismatch");
         }
@@ -130,26 +151,30 @@ public sealed partial class UpdateSwap(
         // 5–6. Repoint, launch, wait for the health acknowledgment.
         var ack = Path.Combine(_updates, UpdateHandshake.AckFileName(request.Version));
         int? started = null;
+        bool healthy;
         try
         {
             TryDelete(ack);
             WriteAtomic(Path.Combine(_updates, UpdateHandshake.AwaitingHealthFile), new JsonObject { ["version"] = request.Version }.ToJsonString());
             WriteAtomic(layout.PointerPath, AppLayout.SerializePointer(new LayoutPointer(request.Version, layout.Pointer.Current)));
             started = processes.StartLauncher(Path.Combine(layout.Root, AppLayout.RootLauncher));
-
-            if (await WaitForFileAsync(ack, _healthTimeout, cancellationToken).ConfigureAwait(false))
-            {
-                Commit(request, layout, replaced);
-                LogCommitted(logger, request.Version);
-                return new SwapResult(SwapOutcome.Committed, null);
-            }
-
-            return Rollback(request, layout, replaced, started, "no-health-ack");
+            healthy = await WaitForFileAsync(ack, _healthTimeout, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
             return Rollback(request, layout, replaced, started, "swap-failed:" + ex.GetType().Name);
         }
+
+        if (!healthy)
+        {
+            return Rollback(request, layout, replaced, started, "no-health-ack");
+        }
+
+        // 7. The new version is running and healthy: from here on only tidying up remains, and a failure there (a locked
+        // old folder, a denied registry write) is logged, never a reason to undo a working update (P07-01).
+        Commit(request, layout, replaced);
+        LogCommitted(logger, request.Version);
+        return new SwapResult(SwapOutcome.Committed, null);
     }
 
     private Layout? Validate(UpdateRequest request)
@@ -290,22 +315,25 @@ public sealed partial class UpdateSwap(
         }
 
         // Keep only the new version and the one it replaced (rollback by the launcher stays possible).
-        foreach (var folder in Directory.GetDirectories(layout.Root, AppLayout.PayloadPrefix + "*"))
+        BestEffort("prune-payloads", () =>
         {
-            var name = Path.GetFileName(folder);
-            if (!string.Equals(name, AppLayout.PayloadPrefix + request.Version, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(name, AppLayout.PayloadPrefix + layout.Pointer.Current, StringComparison.OrdinalIgnoreCase))
+            foreach (var folder in Directory.GetDirectories(layout.Root, AppLayout.PayloadPrefix + "*"))
             {
-                DeleteDirectory(folder);
+                var name = Path.GetFileName(folder);
+                if (!string.Equals(name, AppLayout.PayloadPrefix + request.Version, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(name, AppLayout.PayloadPrefix + layout.Pointer.Current, StringComparison.OrdinalIgnoreCase))
+                {
+                    BestEffort("prune-payload", () => DeleteDirectory(folder));
+                }
             }
-        }
+        });
 
-        DeleteDirectory(Path.Combine(_updates, request.Version));
+        BestEffort("remove-staging", () => DeleteDirectory(Path.Combine(_updates, request.Version)));
         TryDelete(Path.Combine(_updates, UpdateHandshake.AwaitingHealthFile));
         TryDelete(Path.Combine(_updates, UpdateHandshake.AckFileName(request.Version)));
         TryDelete(Path.Combine(_updates, UpdateRequest.FileName));
         TryDelete(Path.Combine(_updates, UpdateHandshake.LastFailureFile));
-        versionRecorder.Record(layout.Root, request.Version);
+        BestEffort("record-version", () => versionRecorder.Record(layout.Root, request.Version));
     }
 
     private SwapResult Rollback(UpdateRequest request, Layout layout, List<(string Target, bool Existed)> replaced, int? started, string reason)
@@ -318,11 +346,18 @@ public sealed partial class UpdateSwap(
         // The old version compares its data with the snapshot at its next start (the new one may have upgraded it).
         MarkSnapshot(SnapshotState.RolledBack);
 
-        WriteAtomic(layout.PointerPath, layout.PointerText);
-        Cleanup(null, replaced, layout.Root);
-        DeleteDirectory(AppLayout.PayloadFolder(layout.Root, request.Version));
+        // Every step is best effort so that the old version is always started again (P07-01). If the pointer cannot be
+        // restored, the new payload stays: deleting it would leave the pointer aimed at a missing folder.
+        var pointerRestored = BestEffort("restore-pointer", () => WriteAtomic(layout.PointerPath, layout.PointerText));
+        BestEffort("restore-root-files", () => Cleanup(null, replaced, layout.Root));
+        if (pointerRestored)
+        {
+            BestEffort("remove-new-payload", () => DeleteDirectory(AppLayout.PayloadFolder(layout.Root, request.Version)));
+        }
+
         TryDelete(Path.Combine(_updates, UpdateHandshake.AwaitingHealthFile));
-        WriteAtomic(Path.Combine(_updates, UpdateHandshake.LastFailureFile), new JsonObject { ["version"] = request.Version, ["reason"] = reason }.ToJsonString());
+        BestEffort("write-failure-note", () => WriteAtomic(Path.Combine(_updates, UpdateHandshake.LastFailureFile),
+            new JsonObject { ["version"] = request.Version, ["reason"] = reason }.ToJsonString()));
         RestartOld(layout);
 
         LogRolledBack(logger, request.Version, reason);
@@ -425,6 +460,21 @@ public sealed partial class UpdateSwap(
         return File.Exists(path);
     }
 
+    /// <returns><c>false</c> when the step failed; the failure is logged by type.</returns>
+    private bool BestEffort(string step, Action action)
+    {
+        try
+        {
+            action();
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            LogStepFailed(logger, step, ex.GetType().Name);
+            return false;
+        }
+    }
+
     private static void WriteAtomic(string path, string content)
     {
         var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -463,6 +513,9 @@ public sealed partial class UpdateSwap(
 
     [LoggerMessage(EventId = 3009, Level = LogLevel.Warning, Message = "The pre-update snapshot could not be marked {State} ({ErrorType})")]
     private static partial void LogSnapshotMarkFailed(ILogger logger, SnapshotState state, string errorType);
+
+    [LoggerMessage(EventId = 3010, Level = LogLevel.Warning, Message = "Updater step {Step} failed ({ErrorType}); continuing")]
+    private static partial void LogStepFailed(ILogger logger, string step, string errorType);
 
     [LoggerMessage(EventId = 3003, Level = LogLevel.Error, Message = "The previous version could not be restarted after a failed update ({ErrorType})")]
     private static partial void LogRestartOldFailed(ILogger logger, string errorType);

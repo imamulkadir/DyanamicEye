@@ -43,3 +43,12 @@ Desktop.ini
 
 # Agent/tool local state
 .claude/
+
+# Keys and secrets (never commit; the release-signing key lives outside the repo, ADR 0034/0038)
+*.pem
+*.key
+*.pfx
+*.p12
+*.snk
+.env
+.env.*

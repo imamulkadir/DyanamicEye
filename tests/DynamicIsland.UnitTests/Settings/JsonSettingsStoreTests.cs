@@ -32,6 +32,27 @@ public sealed class JsonSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_locked_settings_file_gives_read_only_defaults_and_is_left_untouched()
+    {
+        const string content = """{ "schemaVersion": 1 }""";
+        await File.WriteAllTextAsync(SettingsPath, content, Ct);
+        using var store = CreateStore();
+
+        SettingsLoadResult result;
+        using (new FileStream(SettingsPath, FileMode.Open, FileAccess.Read, FileShare.None)) // e.g. a backup tool
+        {
+            result = await store.LoadAsync(Ct);
+            Assert.Equal(SettingsSaveResult.SkippedReadOnly, await store.SaveAsync(new AppSettings(), Ct));
+        }
+
+        Assert.Equal(SettingsLoadOutcome.UnreadableReadOnly, result.Outcome);
+        AssertDefaults(result.Settings);
+        Assert.True(store.IsReadOnly);
+        Assert.Equal(content, await File.ReadAllTextAsync(SettingsPath, Ct));
+        Assert.Equal([JsonSettingsStore.FileName], _directory.FileNames()); // Nothing quarantined or rewritten.
+    }
+
+    [Fact]
     public async Task Saved_settings_round_trip()
     {
         var settings = new AppSettings

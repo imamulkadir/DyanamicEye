@@ -75,6 +75,49 @@ public sealed class UpdateSwapTests : IDisposable
     }
 
     [Fact]
+    public async Task Tidying_up_after_a_healthy_update_never_undoes_it()
+    {
+        var stale = AppLayout.PayloadFolder(Root, "0.9.0");
+        Directory.CreateDirectory(stale);
+        _recorder.Failure = new System.Security.SecurityException("registry denied"); // Installed apps entry refused.
+
+        SwapResult result;
+        using (new FileStream(Path.Combine(stale, "locked.dll"), FileMode.Create, FileAccess.Write, FileShare.None)) // Old folder in use.
+        {
+            result = await CreateSwap().RunAsync(Request(Package()), Ct);
+        }
+
+        Assert.Equal(SwapOutcome.Committed, result.Outcome);
+        Assert.Equal(new LayoutPointer(NewVersion, OldVersion), AppLayout.ParsePointer(File.ReadAllText(Path.Combine(Root, AppLayout.PointerFileName))));
+        Assert.True(Directory.Exists(NewPayload));
+        Assert.Single(_processes.Started);
+        Assert.Empty(_processes.Stopped); // The healthy new version keeps running.
+    }
+
+    [Fact]
+    public async Task A_rollback_that_cannot_remove_the_new_version_still_restarts_the_old_one()
+    {
+        FileStream? held = null;
+        _processes.OnStart = _ => held = new FileStream(Path.Combine(NewPayload, "lib", "x.dll"), FileMode.Open, FileAccess.Read, FileShare.None); // A dying process.
+
+        SwapResult result;
+        try
+        {
+            result = await CreateSwap(healthTimeout: TimeSpan.FromMilliseconds(300)).RunAsync(Request(Package()), Ct);
+        }
+        finally
+        {
+            held?.Dispose();
+        }
+
+        Assert.Equal(SwapOutcome.RolledBack, result.Outcome);
+        Assert.Equal(OldPointer, File.ReadAllText(Path.Combine(Root, AppLayout.PointerFileName)));
+        Assert.Equal("old-launcher", File.ReadAllText(Path.Combine(Root, AppLayout.RootLauncher)));
+        Assert.Equal(2, _processes.Started.Count); // The old version was started again.
+        Assert.Contains(NewVersion, File.ReadAllText(Path.Combine(Updates, UpdateHandshake.LastFailureFile)), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Missing_health_acknowledgment_rolls_back_to_the_untouched_old_version()
     {
         _processes.OnStart = _ => { }; // The new version never confirms its health (crash, hang).
@@ -174,6 +217,23 @@ public sealed class UpdateSwapTests : IDisposable
         Assert.Equal(SwapOutcome.Aborted, result.Outcome);
         Assert.StartsWith("extract-failed", result.Reason, StringComparison.Ordinal);
         locked.Dispose();
+        AssertUnchanged();
+        AssertOldRestarted();
+    }
+
+    [Fact]
+    public async Task A_package_locked_during_the_recheck_restarts_the_old_version_instead_of_crashing()
+    {
+        var package = Package();
+        var request = Request(package);
+        SwapResult result;
+        using (new FileStream(package, FileMode.Open, FileAccess.Read, FileShare.None)) // e.g. an antivirus scan
+        {
+            result = await CreateSwap().RunAsync(request, Ct);
+        }
+
+        Assert.Equal(SwapOutcome.Aborted, result.Outcome);
+        Assert.Equal("package-unreadable:IOException", result.Reason);
         AssertUnchanged();
         AssertOldRestarted();
     }
@@ -391,6 +451,16 @@ public sealed class UpdateSwapTests : IDisposable
     {
         public string? Version { get; private set; }
 
-        public void Record(string layoutRoot, string version) => Version = version;
+        public Exception? Failure { get; set; }
+
+        public void Record(string layoutRoot, string version)
+        {
+            if (Failure is not null)
+            {
+                throw Failure;
+            }
+
+            Version = version;
+        }
     }
 }

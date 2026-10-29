@@ -126,6 +126,35 @@ public sealed class NotesAndTasksViewTests : IDisposable
         Assert.Equal((0, 0), await _store.CountTasksAsync(TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public async Task A_store_that_cannot_write_loses_the_command_but_never_crashes_the_ui_thread()
+    {
+        await ShowAsync(WidgetIds.Tasks);
+        var unhandled = new List<Exception>();
+        _ui.Invoke(() => System.Windows.Threading.Dispatcher.CurrentDispatcher.UnhandledException += (_, e) =>
+        {
+            unhandled.Add(e.Exception);
+            e.Handled = true; // Record instead of tearing down the test host.
+        });
+
+        var database = new FileInfo(Path.Combine(_folder, SqlitePersonalDataStore.FileName));
+        SqliteConnection.ClearAllPools(); // No pooled read-write connection may survive.
+        database.IsReadOnly = true; // e.g. a restored file with the read-only attribute, or a denied ACL
+        try
+        {
+            _ui.Invoke(() => _presenter!.Execute(WidgetIds.Tasks, PersonalDataWidget.AddCommand + "lost"));
+            await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+            _ui.Invoke(() => { }); // Drain the dispatcher.
+        }
+        finally
+        {
+            database.IsReadOnly = false;
+        }
+
+        Assert.Empty(unhandled);
+        Assert.Equal((0, 0), await _store.CountTasksAsync(TestContext.Current.CancellationToken)); // The command really failed.
+    }
+
     private async Task<FrameworkElement> ShowAsync(string widgetId)
     {
         Assert.True(await WaitAsync(() => _registry.Slots.Single(s => s.Id == widgetId).Snapshot is not null));

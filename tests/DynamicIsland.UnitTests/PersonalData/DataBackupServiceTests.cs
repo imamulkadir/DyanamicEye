@@ -202,6 +202,57 @@ public sealed class DataBackupServiceTests : IDisposable
         Assert.DoesNotContain(Directory.EnumerateFiles(_data, "*", SearchOption.AllDirectories), f => new FileInfo(f).Length > DataBackupService.MaxEntryBytes);
     }
 
+    [Fact]
+    public async Task Damaged_compressed_data_is_refused_instead_of_failing()
+    {
+        var (store, backup) = Create();
+        await store.AddTaskAsync("x", Ct);
+        await backup.ExportAsync(_archive, Ct);
+        SetCompressionMethod(_archive, "islands.db", 99); // Unknown method: reading the entry throws InvalidDataException.
+
+        var preview = await backup.PreviewAsync(_archive, Ct);
+
+        Assert.Equal(BackupProblem.DamagedContent, preview.Problem);
+        Assert.False(preview.CanRestore);
+    }
+
+    [Theory]
+    [InlineData("UPDATE notes SET created_utc = 'not a time';")]
+    [InlineData("UPDATE notes SET text = 'a' || char(7) || 'b';")]
+    [InlineData("UPDATE notes SET text = replace(hex(zeroblob(1100)), '0', 'n');")] // 4400 characters
+    [InlineData("UPDATE tasks SET done = 5;")]
+    public async Task Rows_the_app_could_not_have_written_are_refused(string damage)
+    {
+        var (store, backup) = Create();
+        await store.AddNoteAsync("note", Ct);
+        await store.AddTaskAsync("task", Ct);
+        using (var connection = new SqliteConnection($"Data Source={Path.Combine(_data, SqlitePersonalDataStore.FileName)};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = damage;
+            Assert.Equal(1, command.ExecuteNonQuery());
+        }
+
+        await backup.ExportAsync(_archive, Ct);
+
+        Assert.Equal(BackupProblem.DamagedContent, (await backup.PreviewAsync(_archive, Ct)).Problem);
+    }
+
+    [Theory]
+    [InlineData("2.0.0-beta.1+abc", "2.0.0-beta.1+abc")]
+    [InlineData("1.0 <b>Click here</b>", null)]
+    [InlineData("", null)]
+    public async Task Only_a_plausible_app_version_is_shown_for_a_backup(string written, string? shown)
+    {
+        var (store, _) = Create();
+        await store.AddTaskAsync("x", Ct);
+        var backup = new DataBackupService(_data, store, written, TimeProvider.System, NullLogger<DataBackupService>.Instance);
+        await backup.ExportAsync(_archive, Ct);
+
+        Assert.Equal(shown, (await backup.PreviewAsync(_archive, Ct)).AppVersion);
+    }
+
     private (SqlitePersonalDataStore Store, DataBackupService Backup) Create()
     {
         var store = new SqlitePersonalDataStore(_data, TimeProvider.System, NullLogger<SqlitePersonalDataStore>.Instance);
@@ -234,6 +285,32 @@ public sealed class DataBackupServiceTests : IDisposable
 
         entry.Delete();
         Write(zip, name, change(bytes));
+    }
+
+    /// <summary>Patches the compression method of <paramref name="name"/> in both its local and central ZIP headers.</summary>
+    private static void SetCompressionMethod(string archive, string name, ushort method)
+    {
+        var bytes = File.ReadAllBytes(archive);
+        var nameBytes = Encoding.UTF8.GetBytes(name);
+        var patched = 0;
+        for (var i = 0; i + 46 < bytes.Length; i++)
+        {
+            var signature = BitConverter.ToUInt32(bytes, i);
+            var (methodOffset, nameOffset) = signature switch
+            {
+                0x04034b50 => (8, 30), // Local file header.
+                0x02014b50 => (10, 46), // Central directory header.
+                _ => (-1, -1),
+            };
+            if (methodOffset >= 0 && bytes.AsSpan(i + nameOffset).StartsWith(nameBytes))
+            {
+                BitConverter.TryWriteBytes(bytes.AsSpan(i + methodOffset, 2), method);
+                patched++;
+            }
+        }
+
+        Assert.Equal(2, patched);
+        File.WriteAllBytes(archive, bytes);
     }
 
     private static void Write(ZipArchive zip, string name, string text) => Write(zip, name, Encoding.UTF8.GetBytes(text));

@@ -28,10 +28,7 @@ internal static class Program
             TimeProvider.System);
         var logger = logs.CreateLogger("DynamicIsland.Updater");
 
-        if (args.Length != 2 || !string.Equals(args[0], RequestSwitch, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(Path.GetFullPath(args[1]), Path.Combine(Path.GetFullPath(updates), UpdateRequest.FileName), StringComparison.OrdinalIgnoreCase)
-            || new FileInfo(args[1]) is not { Exists: true, Length: <= UpdateRequest.MaxBytes } file
-            || UpdateRequest.Parse(File.ReadAllText(file.FullName)) is not { } request)
+        if (ReadRequest(args, updates) is not { } request)
         {
             UpdaterLog.InvalidArguments(logger);
             return InvalidArguments;
@@ -45,5 +42,26 @@ internal static class Program
             SwapOutcome.RolledBack => RolledBack,
             _ => Aborted,
         };
+    }
+
+    /// <returns>The request, or <c>null</c> for anything but <c>--request</c> with the per-user request file.</returns>
+    private static UpdateRequest? ReadRequest(string[] args, string updates)
+    {
+        if (args.Length != 2 || !string.Equals(args[0], RequestSwitch, StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(args[1]))
+        {
+            return null;
+        }
+
+        try
+        {
+            return string.Equals(Path.GetFullPath(args[1]), Path.Combine(Path.GetFullPath(updates), UpdateRequest.FileName), StringComparison.OrdinalIgnoreCase)
+                && new FileInfo(args[1]) is { Exists: true, Length: <= UpdateRequest.MaxBytes } file
+                ? UpdateRequest.Parse(File.ReadAllText(file.FullName))
+                : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return null;
+        }
     }
 }

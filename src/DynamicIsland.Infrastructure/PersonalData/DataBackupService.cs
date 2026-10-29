@@ -213,15 +213,17 @@ public sealed partial class DataBackupService(
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Put the previous data back exactly as it was; keep the pending folder for diagnosis.
+            // Put the previous data back exactly as it was; keep the pending folder for diagnosis. Each move is best
+            // effort: this runs before startup's crash handling, and a file that cannot move back stays safe in the
+            // rollback folder (P07-01).
             foreach (var name in restored)
             {
-                File.Move(Path.Combine(dataDirectory, name), Path.Combine(pending, name), overwrite: true);
+                TryMove(Path.Combine(dataDirectory, name), Path.Combine(pending, name), logger);
             }
 
             foreach (var name in moved)
             {
-                File.Move(Path.Combine(rollback, name), Path.Combine(dataDirectory, name), overwrite: true);
+                TryMove(Path.Combine(rollback, name), Path.Combine(dataDirectory, name), logger);
             }
 
             BackupLog.RestoreFailed(logger, ex.GetType().Name);
@@ -318,7 +320,16 @@ public sealed partial class DataBackupService(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var target = Path.Combine(staging, name);
-                var actual = Extract(archive.GetEntry(name)!, target);
+                (long Bytes, string Sha256)? actual;
+                try
+                {
+                    actual = Extract(archive.GetEntry(name)!, target);
+                }
+                catch (InvalidDataException)
+                {
+                    return BackupPreview.Refused(BackupProblem.DamagedContent); // Corrupt compressed data or unknown method.
+                }
+
                 if (actual is null)
                 {
                     return BackupPreview.Refused(BackupProblem.TooLarge);
@@ -379,13 +390,17 @@ public sealed partial class DataBackupService(
                 Bytes: f["bytes"]!.GetValue<long>(),
                 Sha256: f["sha256"]!.GetValue<string>())).ToList();
             DateTimeOffset? created = DateTimeOffset.TryParse(node["createdUtc"]?.GetValue<string>(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var c) ? c : null;
-            return new Manifest(list, created, node["appVersion"]?.GetValue<string>());
+            return new Manifest(list, created, VersionText(node["appVersion"]?.GetValue<string>()));
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or NullReferenceException or InvalidDataException)
         {
             return null;
         }
     }
+
+    /// <summary>The version shown in the restore dialog: a short version string, or <c>null</c> for anything else.</summary>
+    private static string? VersionText(string? text) =>
+        text is { Length: > 0 and <= 64 } && text.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '+' or '-') ? text : null;
 
     /// <summary>Copies an entry while counting, so a lying header cannot unpack more than <see cref="MaxEntryBytes"/>.</summary>
     private static (long Bytes, string Sha256)? Extract(ZipArchiveEntry entry, string target)
@@ -445,14 +460,57 @@ public sealed partial class DataBackupService(
                 return (schema, 0, 0);
             }
 
-            return (schema,
-                Convert.ToInt32(Scalar(connection, "SELECT COUNT(*) FROM notes;"), CultureInfo.InvariantCulture),
-                Convert.ToInt32(Scalar(connection, "SELECT COUNT(*) FROM tasks;"), CultureInfo.InvariantCulture));
+            var notes = Convert.ToInt32(Scalar(connection, "SELECT COUNT(*) FROM notes;"), CultureInfo.InvariantCulture);
+            var tasks = Convert.ToInt32(Scalar(connection, "SELECT COUNT(*) FROM tasks;"), CultureInfo.InvariantCulture);
+            return notes <= PersonalDataRules.MaxNotes && tasks <= PersonalDataRules.MaxTasks && RowsAreValid(connection) ? (schema, notes, tasks) : null;
         }
         catch (SqliteException)
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Every row must be one the app could have written (text rules and timestamps), so restored data never fails later
+    /// when the widgets read it.
+    /// </summary>
+    private static bool RowsAreValid(SqliteConnection connection)
+    {
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT text, created_utc, updated_utc FROM notes;";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (PersonalDataRules.NormalizeNote(Text(reader, 0)) is null || !IsTime(Text(reader, 1)) || !IsTime(Text(reader, 2)))
+                {
+                    return false;
+                }
+            }
+        }
+
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT text, done, created_utc, updated_utc, completed_utc FROM tasks;";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (PersonalDataRules.NormalizeTask(Text(reader, 0)) is null
+                    || reader.GetValue(1) is not long done || done is not (0 or 1)
+                    || !IsTime(Text(reader, 2)) || !IsTime(Text(reader, 3))
+                    || !(reader.IsDBNull(4) || IsTime(Text(reader, 4))))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+
+        static string? Text(SqliteDataReader reader, int column) => reader.GetValue(column) as string;
+
+        static bool IsTime(string? text) =>
+            DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out _);
     }
 
     private static object? Scalar(SqliteConnection connection, string sql)
@@ -471,6 +529,18 @@ public sealed partial class DataBackupService(
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Best effort; a leftover temporary file is harmless.
+        }
+    }
+
+    private static void TryMove(string from, string to, ILogger logger)
+    {
+        try
+        {
+            File.Move(from, to, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            BackupLog.UndoFailed(logger, Path.GetFileName(from), ex.GetType().Name);
         }
     }
 
@@ -512,5 +582,9 @@ public sealed partial class DataBackupService(
         [LoggerMessage(EventId = 3114, EventName = "RestoreFailed", Level = LogLevel.Error,
             Message = "Restore could not be applied ({ErrorType}); the previous data was kept")]
         public static partial void RestoreFailed(ILogger logger, string errorType);
+
+        [LoggerMessage(EventId = 3115, EventName = "RestoreUndoFailed", Level = LogLevel.Error,
+            Message = "After a failed restore, {File} could not be moved back ({ErrorType}); it is kept in the restore folders")]
+        public static partial void UndoFailed(ILogger logger, string file, string errorType);
     }
 }

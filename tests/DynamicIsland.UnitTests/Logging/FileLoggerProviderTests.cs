@@ -38,20 +38,37 @@ public sealed class FileLoggerProviderTests : IDisposable
     }
 
     [Fact]
-    public void Exception_type_and_stack_are_written_and_redacted()
+    public void Exception_type_and_stack_are_written_without_the_message()
     {
         using (var provider = CreateProvider())
         {
-            var exception = Throw(new InvalidOperationException(@"Cannot open C:\Users\alice\db"));
+            var exception = Throw(new InvalidOperationException(@"Cannot open D:\Private\taxes-backup.zip"));
             provider.CreateLogger(Category).LogError(exception, "Operation failed");
         }
 
         using var json = JsonDocument.Parse(Assert.Single(ReadAllLines()));
         var text = json.RootElement.GetProperty("exception").GetString();
         Assert.NotNull(text);
-        Assert.Contains("System.InvalidOperationException", text, StringComparison.Ordinal);
+        Assert.Contains("System.InvalidOperationException (HResult 0x80131509)", text, StringComparison.Ordinal);
         Assert.Contains(nameof(Throw), text, StringComparison.Ordinal);
-        Assert.Contains(@"%USERPROFILE%\db", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("taxes-backup", text, StringComparison.Ordinal); // Messages can name personal files (P07-01).
+        Assert.DoesNotContain("Cannot open", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Inner_and_aggregated_exceptions_are_described_by_type()
+    {
+        var exception = new AggregateException(
+            new IOException("secret-a", Throw(new UnauthorizedAccessException("secret-b"))),
+            new FormatException("secret-c"));
+
+        var text = ExceptionText.Describe(exception);
+
+        Assert.Contains("System.AggregateException", text, StringComparison.Ordinal);
+        Assert.Contains(" ---> System.IO.IOException", text, StringComparison.Ordinal);
+        Assert.Contains(" ---> System.UnauthorizedAccessException", text, StringComparison.Ordinal);
+        Assert.Contains(" ---> System.FormatException", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", text, StringComparison.Ordinal);
     }
 
     [Fact]

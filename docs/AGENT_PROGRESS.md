@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P06 is complete in code (P06-01…09); **G06 waits for the owner** (SG1, RL1/RL2, UP/IN rows). P06-09 is implemented and uncommitted (the owner commits). P06-08 committed as `629c1a3`. G02/G03/P04/P05/P06 manual rows are still owed by the owner, plus SG1 (the signing key).
-- **Active task status:** P06-09 IMPLEMENTED_AWAITING_VALIDATION (uncommitted). P06-08 IMPLEMENTED_AWAITING_VALIDATION (`629c1a3`); CI run 40643274045 **success** (the race fix held on CI).
+- **Active task:** P07-01 threat-model review (owner approved, 2026-10-29). G06 waits only for owner-only rows (IN1/IN4/IN5, optional UP13 b). G02–G05 manual rows are still owed by the owner.
+- **Active task status:** P07-01 IMPLEMENTED_AWAITING_VALIDATION (uncommitted): `docs/THREAT_MODEL.md` written, 7 concrete gaps fixed with tests, full suites green on Windows 11. It still needs the owner to review the threat model, its open risks and the Windows SDK notice wording.
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,17 +23,15 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-28 (UP11 run by the agent: (b) PASS, (a) found the abort-without-restart bug, fixed (ADR 0035 amendment), awaiting validation; uncommitted)
+- **Last updated:** 2026-10-29 (P07-01 implemented, uncommitted)
 
 ## NEXT ACTION (ONE task only)
-**Owner (G06), remaining manual rows** (agent gives step-by-step instructions on request):
-1. **UP11 (a)** re-run after a release that contains the abort-restart fix (it is the old payload's updater that runs), **UP13 (b)** (low disk space; optional, automated), **UP10** (rollback with a deliberately broken `0.1.2`), the UP9 uninstall part, and the "no update" check on the newest copy.
-2. **IN1, IN3–IN5** (IN2 passed); G02–G05 manual rows still owed.
-3. Done 2026-10-28: SG1, RL1, **RL2**, **SG2**, **UP8**, **UP9**, **UP12**, **UP13 (a)**, **UP11 (b)** (see RECENT VERIFIED CHANGES).
+**Owner:**
+1. Review and commit P07-01. Files are listed in RECENT VERIFIED CHANGES; suggested message `security: P07-01 threat model and fixes for gaps found`.
+2. Read `docs/THREAT_MODEL.md` §7 (open risks) and the new Windows SDK notice in `THIRD_PARTY_NOTICES.md`. Not legal advice: decide whether the README or installer also needs the end-user terms the SDK license asks for.
+3. Still owed: G06 IN1/IN4/IN5 (and optionally UP13 b); G02–G05 manual rows.
 
-**Then agent: P07-01 — threat-model review** (guide §5 P07-01). Start it only with owner approval while G06 is open, as was done for P03–P06.
-- **Scope:** dependency and license check, including the open item on the REDIST status of `Microsoft.Windows.SDK.NET.dll` noted under P02; secrets audit; an archive path-traversal test (already covered in `UpdateSwapTests`/`UpdatePackageValidator`: cite it); input validation; unexpected permission denials.
-- **Output:** `docs/THREAT_MODEL.md` (assets, trust boundaries, threats, mitigations with test or ADR links, open risks); fix only concrete gaps found.
+**Then agent: P07-02, the Windows compatibility matrix** (guide §5 P07-02). Most of it is manual hardware and OS checks, so the agent's part is to write the matrix with exact steps, run what this PC can (Windows 11 25H2, one monitor, network on and off, standard-account behaviour), and label Windows 10 best-effort or out of support per ADR 0001. Start only with owner approval while G02–G06 are open.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -46,7 +44,7 @@
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
 | P05 — Customization/performance | P05-01…P05-04 | IMPLEMENTED_AWAITING_VALIDATION (01–04) | **G05 automated PASS** 2026-10-27, CI run 40437920943 (`802906f`): goals met on the reference machine (idle CPU ~0 %, private 62–77 MB at rest; 94–104 MB after heavy automated use, documented deviation) — docs/PERFORMANCE.md; manual rows owed |
 | P06 — Packaging/updates | P06-01…P06-09 | IMPLEMENTED_AWAITING_VALIDATION (01–09) | G06 pending: owner rows SG1, RL1, RL2, UP8–UP13, IN1–IN5 |
-| P07 — Release validation | P07-01…P07-05 | NOT_STARTED | G07 pending |
+| P07 — Release validation | P07-01…P07-05 | IN_PROGRESS (P07-01 IMPLEMENTED_AWAITING_VALIDATION) | G07 pending |
 
 ### G01 evidence (guide §5: "corrupt settings recover; simulated widget failure isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app")
 | Criterion | Proof |
@@ -58,6 +56,40 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-29 **P07-01 IMPLEMENTED_AWAITING_VALIDATION: threat-model review** (uncommitted; the owner commits).
+  - **How:** three read-only review agents covered input validation, secrets and privacy, and permission denials. The agent checked each gap they reported against the code before fixing it (some cited line numbers were off), and did the dependency/license inventory itself from the `src` lock files.
+  - **Output:** `docs/THREAT_MODEL.md`: assets, 6 trust boundaries, threats with mitigations and test links, dependencies and licenses, fixes, open risks.
+  - **REDIST item closed:** the official Windows SDK REDIST list (section "Microsoft.Windows.SDK.NET.Ref", updated 2024-10-21) names `lib/net8.0/Microsoft.Windows.SDK.NET.dll` and `WinRT.Runtime.dll`. The shipped DLL is byte-identical to the package copy. `THIRD_PARTY_NOTICES.md` now states the conditions: unmodified, still under Microsoft's terms, not MIT.
+  - **Concrete gaps fixed, all with tests:**
+    1. **Updater:** a staged package locked during the re-check (antivirus), an unreadable layout or `--request ""` no longer crash it after the app has exited. Commit cleanup failures (locked old payload, registry `SecurityException`) no longer roll back a healthy update. Every rollback step is best effort, so the old version always restarts. New event 3010; ADR 0035 amendment.
+    2. **Backup restore:** corrupt compressed data is refused as `DamagedContent` instead of crashing the app. Restored databases are row-checked with the app's own rules. `appVersion` must be a short version string. The undo after a failed restore is best effort (event 3115).
+    3. **Settings:** a locked or denied `settings.json` used to crash every start (launcher crash loop, then Safe Mode). It now loads read-only defaults (`SettingsLoadOutcome.UnreadableReadOnly`) and leaves the file untouched; the banner text is widened.
+    4. **Widget commands:** `WidgetPresenter.Execute` (async void) now catches `DbException`, `IOException` and `UnauthorizedAccessException`. A read-only or denied store used to crash the UI thread; the new integration test **fails without the fix** with `SqliteException: 'attempt to write a readonly database'`.
+    5. **Single instance:** a mutex this process may not open (a copy running elevated) now means "already running" instead of a startup crash. The new integration test **fails without the fix** with `UnauthorizedAccessException`.
+    6. **Logs:** exceptions are written as type, HRESULT and stack only. Messages could hold file names outside the profile. New `Core/Diagnostics/ExceptionText`.
+    7. **Repository:** `.gitignore` covers `*.pem *.key *.pfx *.p12 *.snk .env .env.*`. `New-ReleaseManifest.ps1 -KeyPath` is now mandatory (the `RELEASE_SIGNING_KEY` environment-variable path is removed; ADR 0034 updated). `ReleasePipelineTests.No_workflow_uses_secrets_or_the_signing_key` checks every workflow.
+  - **Not fixed (THREAT_MODEL §7):** a silent unwritable data folder and an unreported failed restore go to P07-03 UX. Unrestricted download redirects, header-declared zip sizes, `layoutRoot` not pinned, unlimited media title length and the shared CI cache are accepted with reasons.
+  - **Changed files:**
+    - `src/DynamicIsland.Infrastructure/Updates/UpdateSwap.cs`, `src/DynamicIsland.Updater/Program.cs`
+    - `src/DynamicIsland.Infrastructure/PersonalData/DataBackupService.cs`
+    - `src/DynamicIsland.Core/Settings/ISettingsStore.cs`, `src/DynamicIsland.Infrastructure/Settings/JsonSettingsStore.cs`, `src/DynamicIsland.App/SettingsWindow.xaml`
+    - `src/DynamicIsland.App/WidgetPresenter.cs`, `src/DynamicIsland.Platform.Windows/Instance/SingleInstanceGuard.cs`
+    - new `src/DynamicIsland.Core/Diagnostics/ExceptionText.cs`, `src/DynamicIsland.Infrastructure/Logging/FileLoggerProvider.cs`
+    - `tools/New-ReleaseManifest.ps1`, `.gitignore`, `THIRD_PARTY_NOTICES.md`
+    - docs: new `docs/THREAT_MODEL.md`, `docs/ADR/0034-signed-release-manifest.md`, `docs/ADR/0035-updater-swap-and-rollback.md`, this file
+    - tests: `UpdateSwapTests`, `DataBackupServiceTests`, `JsonSettingsStoreTests`, `FileLoggerProviderTests`, `ReleasePipelineTests` (unit); `NotesAndTasksViewTests`, `SingleInstanceGuardTests` (integration)
+  - **Tests 2026-10-29, Windows 11 Pro 25H2 build 26200:**
+    - Release build 0 warnings; full Release suite **875/875**; full Debug suite **888/888** (the intermittent smoke failure did not occur).
+    - `New-ReleaseManifest.ps1` was checked with a throwaway key: it signs with `-KeyPath` and refuses to run without it.
+- 2026-10-28 **G06 rows run by the agent on real Windows** (Windows 11 Pro 25H2 build 26200; UI Automation for the tray, Settings, update window and uninstaller).
+  - **Owner's request:** the agent never used the private key and never ran git.
+  - **Local delivery:** for UP10 and the UP11 (a) re-run, the agent built the packages with `tools/Publish-Layout.ps1 -Version 0.1.2/0.1.3` (scratchpad output, repo untouched). It placed them where a finished download goes (`%LOCALAPPDATA%\DynamicIsland\updates\<v>\`) and wrote `update-request.json` by hand. The real updater did the swap; signature checking and download were already covered by UP8/UP9.
+  - **UP1 live:** the 0.1.1 copy says "You have the latest version, 0.1.1".
+  - **UP10 PASS:** the real 0.1.1 updater on a broken 0.1.2 → crash loop → rollback after 62 s (event 3001 `no-health-ack`). 0.1.1 restarted, data check `Kept`, app event 1064.
+  - **UP11 (a) re-run PASS** with the `0284bae` fix: the 0.1.2 updater aborted on the locked `LICENSE.txt` and **restarted 0.1.2**. The snapshot and request were removed, the package kept, app event 1065.
+  - **UP9 uninstall + IN3 PASS:** the interactive uninstaller asked "Also delete your settings…" and with **No** kept the data. The folder (both payloads), uninstall entry and shortcut were removed. 0.1.1 was reinstalled silently afterwards (hash checked, exit 0, no UAC) and is running.
+  - **Side effect, agent error:** during cleanup the agent's tray-exit step failed while the local 0.1.2 test copy was still running, and the folder delete that followed removed its DLLs. That copy crashed twice (crash history, then "previous session did not exit cleanly", warning 1002 on the next start). There was no data loss, and the crash records expire after 5 minutes (`CrashPolicy.Window`). Lesson: check the process has exited before deleting a test copy.
+  - **No code changes in this step.**
 - 2026-10-28 **G06 UP11 run by the agent on real Windows; abort-restart fix IMPLEMENTED_AWAITING_VALIDATION** (uncommitted).
   - **How:** fresh 0.1.0 portable copies from the published ZIP, driven through UI Automation (tray icon → Check for updates → View update → Download / Install / Show file). Test copies removed afterwards.
   - **UP11 (b) PASS:** with Write and Delete-child denied on the copy's folder, the window offered **Show file** instead of Install, and Explorer opened `updates\0.1.1` with the ZIP selected.
@@ -337,6 +369,6 @@
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **G06 owner checks, then P07-01 per NEXT ACTION** (G02–G06 manual rows and SG1 still owed by the owner).
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **owner review of P07-01, then P07-02 per NEXT ACTION** (G02–G06 manual rows still owed by the owner). Security review baseline: `docs/THREAT_MODEL.md`.
 - Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

@@ -118,7 +118,18 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
             return new SettingsLoadResult(new AppSettings(), SettingsLoadOutcome.CreatedDefaults, []);
         }
 
-        var document = await TryReadDocumentAsync(_path, cancellationToken).ConfigureAwait(false);
+        JsonObject? document;
+        try
+        {
+            document = await TryReadDocumentAsync(_path, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Locked (backup or antivirus scan) or denied: never crash startup, and never overwrite a file we could not read.
+            _isReadOnly = true;
+            return new SettingsLoadResult(new AppSettings(), SettingsLoadOutcome.UnreadableReadOnly, []);
+        }
+
         if (document is not null)
         {
             var loaded = await TryMaterializeAsync(document, _path, cancellationToken).ConfigureAwait(false);

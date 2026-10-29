@@ -25,6 +25,23 @@ public sealed class SingleInstanceGuardTests
     }
 
     [Fact]
+    public void A_running_copy_this_process_may_not_open_counts_as_the_running_instance()
+    {
+        // Like a copy started with "Run as administrator": its mutex exists, but a normal process may only wait on it.
+        var sid = WindowsIdentity.GetCurrent().User!;
+        var security = new MutexSecurity();
+        security.AddAccessRule(new MutexAccessRule(sid, MutexRights.Synchronize, AccessControlType.Allow));
+        using var elevated = MutexAcl.Create(initiallyOwned: false, $@"Local\{_appId}.{sid.Value}.instance", out var created, security);
+        Assert.True(created);
+
+        var exception = Record.Exception(() => SingleInstanceGuard.TryAcquire(_appId)?.Dispose());
+        using var guard = SingleInstanceGuard.TryAcquire(_appId);
+
+        Assert.Null(exception);
+        Assert.Null(guard);
+    }
+
+    [Fact]
     public void Guard_can_be_reacquired_after_release()
     {
         SingleInstanceGuard.TryAcquire(_appId)!.Dispose();

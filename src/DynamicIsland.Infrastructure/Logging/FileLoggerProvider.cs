@@ -45,7 +45,7 @@ public sealed class FileLoggerProvider : ILoggerProvider
                 return;
             }
 
-            writer.Enqueue(new LogEntry(writer.UtcNow, logLevel, category, eventId, formatter(state, exception), exception?.ToString()));
+            writer.Enqueue(new LogEntry(writer.UtcNow, logLevel, category, eventId, formatter(state, exception), exception is null ? null : ExceptionText.Describe(exception)));
         }
     }
 }

@@ -47,6 +47,12 @@ public enum SettingsLoadOutcome
 
     /// <summary>Migration failed; file left untouched, defaults used, saving disabled.</summary>
     MigrationFailedReadOnly,
+
+    /// <summary>
+    /// The file exists but could not be read (locked by another program or access denied); left untouched, defaults
+    /// used, saving disabled until the next start.
+    /// </summary>
+    UnreadableReadOnly,
 }
 
 public enum SettingsSaveResult

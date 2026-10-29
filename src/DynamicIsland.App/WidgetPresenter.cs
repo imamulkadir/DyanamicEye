@@ -89,8 +89,10 @@ public sealed class WidgetPresenter : IDisposable
         {
             await _registry.ExecuteAsync(widgetId, command, _lifecycle.ApplicationStopping).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is OperationCanceledException or InvalidOperationException or System.Runtime.InteropServices.COMException)
+        catch (Exception ex) when (ex is OperationCanceledException or InvalidOperationException or System.Runtime.InteropServices.COMException
+            or System.Data.Common.DbException or System.IO.IOException or UnauthorizedAccessException)
         {
+            // A busy or denied store, or a denied audio device (P07-01): the command is lost, never the app.
             AppLog.WidgetCommandFailed(_logger, widgetId, ex.GetType().Name);
         }
     }

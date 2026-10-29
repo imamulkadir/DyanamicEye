@@ -43,7 +43,19 @@ public sealed class SingleInstanceGuard : IDisposable
     public static SingleInstanceGuard? TryAcquire(string appId)
     {
         var names = InstanceNames.For(appId);
-        var mutex = new Mutex(initiallyOwned: false, names.Mutex, out var createdNew);
+        Mutex mutex;
+        bool createdNew;
+        try
+        {
+            mutex = new Mutex(initiallyOwned: false, names.Mutex, out createdNew);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The mutex exists but this process may not open it: a copy running elevated ("Run as administrator") owns
+            // this session (P07-01). It is still the running instance, so leave instead of crashing at startup.
+            return null;
+        }
+
         if (!createdNew)
         {
             mutex.Dispose();

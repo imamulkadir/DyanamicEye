@@ -25,6 +25,18 @@ public sealed partial class ReleasePipelineTests
         Assert.All(uses, use => Assert.Matches(PinnedAction(), use));
     }
 
+    [Theory]
+    [MemberData(nameof(WorkflowFiles))]
+    public void No_workflow_uses_secrets_or_the_signing_key(string file)
+    {
+        var workflow = File.ReadAllText(Path.Combine(Workflows, file));
+
+        Assert.DoesNotContain("secrets.", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("RELEASE_SIGNING_KEY", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("New-ReleaseManifest", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("pull_request_target", workflow, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Release_workflow_never_touches_the_signing_key_and_only_creates_drafts()
     {

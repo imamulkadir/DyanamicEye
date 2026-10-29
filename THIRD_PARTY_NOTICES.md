@@ -88,9 +88,13 @@ Versions are pinned in `Directory.Packages.props`. Resolved transitive packages 
   distributing the files on the SDK's REDIST list. WinRT.Runtime.dll: MIT (C#/WinRT).
 - Used by: DynamicIsland.App and Platform.Windows: media sessions (ADR 0020). The .NET SDK copies both into every app
   that targets a `net*-windows10.0.*` framework.
-- Redistributed: yes
-- Notice: **open item (P07-01):** confirm that Microsoft.Windows.SDK.NET.dll is covered by the Windows SDK REDIST list
-  before the first public release; checked on 2026-10-27 only that the license has a REDIST-list distribution clause.
+- Redistributed: yes, unmodified. The Windows SDK REDIST list (https://learn.microsoft.com/en-us/legal/windows-sdk/redist,
+  updated 2024-10-21, section "Microsoft.Windows.SDK.NET.Ref") names `lib/net8.0/Microsoft.Windows.SDK.NET.dll` and
+  `lib/net8.0/WinRT.Runtime.dll`, which may be distributed unmodified as part of a program so that it can call WinRT
+  APIs. The shipped file is byte-identical to that package copy (checked 2026-10-29, P07-01).
+- Notice: Microsoft.Windows.SDK.NET.dll is © Microsoft Corporation and is **not** covered by this project's MIT
+  License. It remains under the Windows SDK license terms. Recipients may not modify it, separate it from Dynamic Island
+  and distribute it on its own, or use it on a non-Microsoft platform. Microsoft provides it without warranty.
 
 ### Inno Setup 6 (setup and uninstall runtime embedded in DynamicIsland-Setup-win-x64.exe)
 - Source: https://jrsoftware.org/isinfo.php

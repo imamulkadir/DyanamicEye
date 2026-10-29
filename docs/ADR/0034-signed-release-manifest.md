@@ -66,7 +66,7 @@
    - `tools/New-ReleaseSigningKey.ps1` writes the private key as PKCS#8 PEM. It refuses a path inside the repository,
      refuses to overwrite an existing key, and restricts the file to the current user with `icacls`. It prints the
      public key.
-   - `tools/New-ReleaseManifest.ps1 -Version -Files [-KeyPath | env RELEASE_SIGNING_KEY] [-PublicKey]` writes the
+   - `tools/New-ReleaseManifest.ps1 -Version -Files -KeyPath [-PublicKey]` (the environment-variable key option was removed in P07-01) writes the
      manifest and the signature. It self-verifies, and refuses a key that doesn't match the pinned public key.
    - Interop is proven by a unit test pinned to script output made with a throwaway key whose private half was deleted.
    - CI signing with a GitHub secret is P06-09.

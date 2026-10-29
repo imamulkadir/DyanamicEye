@@ -33,3 +33,14 @@ The page does not define "(E)" or "(IoT)". We read "(E)" as Enterprise/Education
 - README, installer and About must state this matrix. P07 adds a compatibility-validation row per OS.
 - Hosts should install SDK 10.0.402 / runtime 10.0.13, the 2026-10-13 security release, before release builds. CI (P00-04) uses the latest 10.0.x SDK through `global.json` roll-forward.
 - Re-check `supported-os.md` before each release; it changes over time.
+
+## Amendment 2026-10-29 (P07-02): installer labels and Windows 10 LTSC 1809/1607
+- Re-checked `supported-os.md` (last updated 2026-09-28): unchanged.
+- The installer has required Windows 10 2004 or later since P06-02 (`MinVersion=10.0.19041`), matching the app's
+  `net10.0-windows10.0.19041.0` target. Windows 10 1809 and 1607 Enterprise LTSC therefore move from "may work" to
+  **not supported in v1**. Their support would need a separate target framework and testing; it can be reconsidered
+  after v1.
+- On Windows 10, the installer shows a notice before installing. It says Windows 11 is the tested target, Windows 10
+  Enterprise/IoT 21H2 is best effort, and Home/Pro is not supported. The default button is No. With
+  `/SUPPRESSMSGBOXES` the answer is Yes, so IT silent installs are not blocked.
+- The full matrix and test status: `docs/COMPATIBILITY.md`. Guarded by `InstallerScriptTests`.

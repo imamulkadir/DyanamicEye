@@ -4,6 +4,8 @@ Automated tests cover logic and what a single CI desktop can show. This file lis
 that gates require. Record each run in `docs/AGENT_PROGRESS.md` → TEST EVIDENCE: the date, Windows version/build,
 monitors (resolution @ scaling) and PASS/FAIL with a note. Status values: `NOT_RUN`, `PASS`, `FAIL`, `N/A`.
 
+The OS and environment compatibility matrix (P07-02: Windows versions, RDP, battery, audio, offline, standard account, policies) is in `docs/COMPATIBILITY.md`.
+
 ## How to run the app for a check
 1. Build: `dotnet build DynamicIsland.sln -c Release`.
 2. Start: `src\DynamicIsland.App\bin\Release\net10.0-windows10.0.19041.0\DynamicIsland.exe` (folder name since ADR 0020). Use the Launcher next to it once packaging exists (P06).

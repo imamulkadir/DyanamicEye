@@ -4,8 +4,8 @@
 
 ## CURRENT STATUS (read first)
 - **Overall:** IN_PROGRESS. P00 is done (G00 PASS). P01 is done (G01 PASS, confirmed on CI run 40201274900). P02-01 is done; P02-02..P02-05 are implemented and **G02 waits for the owner's hardware matrix**. P03 is in progress with owner approval; P03-01…P03-05 are implemented (awaiting manual validation); **G03 waits for the owner's hardware checks**. P04 started with owner approval while G02/G03 stay open.
-- **Active task:** P07-01 threat-model review (owner approved, 2026-10-29). G06 waits only for owner-only rows (IN1/IN4/IN5, optional UP13 b). G02–G05 manual rows are still owed by the owner.
-- **Active task status:** P07-01 IMPLEMENTED_AWAITING_VALIDATION (uncommitted): `docs/THREAT_MODEL.md` written, 7 concrete gaps fixed with tests, full suites green on Windows 11. It still needs the owner to review the threat model, its open risks and the Windows SDK notice wording.
+- **Active task:** P07-02 Windows compatibility matrix (owner approved, 2026-10-29). P07-01 was committed by the owner as `a298fa5`. G06 waits only for owner-only rows (IN1/IN4/IN5, optional UP13 b); G02–G05 manual rows are still owed.
+- **Active task status:** P07-02 IMPLEMENTED_AWAITING_VALIDATION (uncommitted): `docs/COMPATIBILITY.md` written; installer Windows 10 notice added; this hosts rows PASS. Owner hardware, OS and account rows are NOT_RUN. P07-01 IMPLEMENTED_AWAITING_VALIDATION (`a298fa5`, owner review of THREAT_MODEL §7 and the SDK notice).
 - **Last passed gate:** G01 (2026-10-25; CI run https://github.com/imamulkadir/DyanamicEye/actions/runs/40201274900). G00: CI run 40196393380.
 - **Repository:** https://github.com/imamulkadir/DyanamicEye (public; default branch `master`).
 - **Commits:** **the owner reviews and makes all commits; agents must NOT commit.** List the changed files and a suggested message instead.
@@ -23,15 +23,17 @@
   - the same two with `-c Debug`. Debug compiles the test hooks and runs the crash-injection smoke tests.
 
   The smoke tests start the real app and launcher on the desktop, and they assume no other Dynamic Island instance is running.
-- **Last updated:** 2026-10-29 (P07-01 implemented, uncommitted)
+- **Last updated:** 2026-10-29 (P07-02 implemented, uncommitted)
 
 ## NEXT ACTION (ONE task only)
 **Owner:**
-1. Review and commit P07-01. Files are listed in RECENT VERIFIED CHANGES; suggested message `security: P07-01 threat model and fixes for gaps found`.
-2. Read `docs/THREAT_MODEL.md` §7 (open risks) and the new Windows SDK notice in `THIRD_PARTY_NOTICES.md`. Not legal advice: decide whether the README or installer also needs the end-user terms the SDK license asks for.
-3. Still owed: G06 IN1/IN4/IN5 (and optionally UP13 b); G02–G05 manual rows.
+1. Review and commit P07-02. Files are listed in RECENT VERIFIED CHANGES; suggested message `docs: P07-02 Windows compatibility matrix and Windows 10 installer notice`.
+2. When convenient, run the NOT_RUN rows in `docs/COMPATIBILITY.md`. The most valuable: C4 (Windows 10 VM: the notice), C8 (Remote Desktop), C9 (no audio device), C10 (offline), C7 (laptop), C11 = IN4, C13 = IN5, C14 (AppLocker VM). Also the G02–G06 rows still owed.
 
-**Then agent: P07-02, the Windows compatibility matrix** (guide §5 P07-02). Most of it is manual hardware and OS checks, so the agent's part is to write the matrix with exact steps, run what this PC can (Windows 11 25H2, one monitor, network on and off, standard-account behaviour), and label Windows 10 best-effort or out of support per ADR 0001. Start only with owner approval while G02–G06 are open.
+**Then agent: P07-03, install/uninstall and first-run UX** (guide §5 P07-03). Start only with owner approval.
+- **Scope:** portable copy moved or deleted, and startup entry repair; first-run flow; a log-privacy and no-telemetry check.
+- **Also:** the two items deferred from `THREAT_MODEL.md` §7: a notice when the data folder or settings cannot be saved, and telling the user when a scheduled restore failed after the restart.
+- **Rollback from a real release:** already covered by G06 UP10.
 
 ## TASK BOARD (compact; detailed definitions live in the guide)
 
@@ -44,7 +46,7 @@
 | P04 — Core widgets/data | P04-01…P04-07 | IMPLEMENTED_AWAITING_VALIDATION (started with owner approval while G02/G03 are open) | **G04 automated PASS** 2026-10-26, CI run 40342549483 (`706daf7`); `TEST_MATRIX.md` G04; real-hardware rows MD/SM/VO/NT/BK/TB owed by the owner |
 | P05 — Customization/performance | P05-01…P05-04 | IMPLEMENTED_AWAITING_VALIDATION (01–04) | **G05 automated PASS** 2026-10-27, CI run 40437920943 (`802906f`): goals met on the reference machine (idle CPU ~0 %, private 62–77 MB at rest; 94–104 MB after heavy automated use, documented deviation) — docs/PERFORMANCE.md; manual rows owed |
 | P06 — Packaging/updates | P06-01…P06-09 | IMPLEMENTED_AWAITING_VALIDATION (01–09) | G06 pending: owner rows SG1, RL1, RL2, UP8–UP13, IN1–IN5 |
-| P07 — Release validation | P07-01…P07-05 | IN_PROGRESS (P07-01 IMPLEMENTED_AWAITING_VALIDATION) | G07 pending |
+| P07 — Release validation | P07-01…P07-05 | IN_PROGRESS (P07-01, P07-02 IMPLEMENTED_AWAITING_VALIDATION) | G07 pending |
 
 ### G01 evidence (guide §5: "corrupt settings recover; simulated widget failure isolated; deliberate Exit never auto-relaunches; third crash does not loop; no duplicate app")
 | Criterion | Proof |
@@ -56,6 +58,19 @@
 | No duplicate app | Smoke `Second_launch_exits_quietly_and_leaves_the_first_instance_running`; `SingleInstanceGuardTests` |
 
 ## RECENT VERIFIED CHANGES (newest first; max 10; older detail in `docs/WORK_LOG.md`)
+- 2026-10-29 **P07-02 IMPLEMENTED_AWAITING_VALIDATION: Windows compatibility matrix** (uncommitted; the owner commits).
+  - **Re-checked .NET 10 `supported-os.md`:** last updated 2026-09-28, unchanged since ADR 0001. Windows 10 22H2 Home/Pro is still not listed.
+  - **Found:** the installer (`MinVersion=10.0.19041`) installed on Windows 10 Home/Pro without saying it is unsupported, and it already blocked the 1809/1607 LTSC builds that ADR 0001 called "may work".
+    - **Fix:** `InitializeSetup` in `packaging/installer/DynamicIsland.iss` shows a Windows 10 notice on builds below 22000. It says Enterprise/IoT 21H2 is best effort and Home/Pro is not supported, and asks "Install anyway?" with No as the default.
+    - `SuppressibleMsgBox` answers Yes under `/SUPPRESSMSGBOXES`, so IT silent installs continue.
+    - ADR 0001 amendment: 1809/1607 LTSC are not supported in v1.
+    - The installer compiles with ISCC 6 (`Publish-Layout.ps1 -Installer` to the scratchpad, 2026-10-29). The Windows 10 path is not run: there is no Windows 10 host (row C4).
+  - **New `docs/COMPATIBILITY.md`:** the OS matrix (supported / best effort / not supported, with installer behaviour) and 15 environment rows (C1–C15), each with steps, expected result, automated evidence and status.
+    - PASS on this host (Windows 11 Pro 25H2 build 26200.9711, desktop, 1 × 1920×1080, audio present, administrator with a UAC-filtered token): C1–C3, 100 % scaling, 1 monitor, battery tile hidden without a battery, audio present, online update check, non-elevated run.
+    - NOT_RUN (owner): Windows 11 24H2 and Windows 10 VMs, 2 monitors, laptop (battery, dock, Energy saver), RDP, no audio device, offline, a real standard account (IN4), the HKLM policy (IN5), AppLocker.
+  - **New test** `tests/DynamicIsland.UnitTests/Architecture/InstallerScriptTests.cs` (2): per-user install, x64 only, `MinVersion`, and the Windows 10 notice with its silent default.
+  - **Changed files:** `packaging/installer/DynamicIsland.iss`, new `docs/COMPATIBILITY.md`, new `InstallerScriptTests.cs`, `docs/ADR/0001-supported-windows-versions.md`, `docs/TEST_MATRIX.md` (link), this file.
+  - **Tests 2026-10-29:** Release build 0 warnings; unit tests **745/745**.
 - 2026-10-29 **P07-01 IMPLEMENTED_AWAITING_VALIDATION: threat-model review** (uncommitted; the owner commits).
   - **How:** three read-only review agents covered input validation, secrets and privacy, and permission denials. The agent checked each gap they reported against the code before fixing it (some cited line numbers were off), and did the dependency/license inventory itself from the `src` lock files.
   - **Output:** `docs/THREAT_MODEL.md`: assets, 6 trust boundaries, threats with mitigations and test links, dependencies and licenses, fixes, open risks.
@@ -369,6 +384,6 @@
 - Pending: per-user installer technology and updater trust model (P06).
 
 ## HANDOFF NOTES
-- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **owner review of P07-01, then P07-02 per NEXT ACTION** (G02–G06 manual rows still owed by the owner). Security review baseline: `docs/THREAT_MODEL.md`.
+- Read `AGENTS.md` first; guide §5 has the task definitions. Current next task: **owner review of P07-02, then P07-03 per NEXT ACTION** (G02–G06 manual rows still owed by the owner). Security review baseline: `docs/THREAT_MODEL.md`.
 - Widgets and providers (P04) must be `IIsolatedComponent`s registered as optional (ADR 0007). They must honor Safe Mode (ADR 0006) and never log free text (ADR 0004).
 - If code is present that this file does not describe, inspect git and tests and reconcile this file before editing.

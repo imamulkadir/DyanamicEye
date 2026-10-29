@@ -97,6 +97,24 @@ begin
   Sleep(1500); { The launcher exits right after the app. }
 end;
 
+{ Windows 10 is labelled honestly (ADR 0001, P07-02): Windows 11 is the tested target; Windows 10 Enterprise/IoT 21H2
+  is best effort; Windows 10 Home/Pro is not supported by .NET 10. The user decides; IT installs with
+  /SUPPRESSMSGBOXES continue (default Yes). }
+function InitializeSetup(): Boolean;
+var
+  Version: TWindowsVersion;
+begin
+  Result := True;
+  GetWindowsVersionEx(Version);
+  if Version.Build < 22000 then
+    Result := SuppressibleMsgBox(
+      'Dynamic Island is made and tested for Windows 11. This PC runs Windows 10 (build ' + IntToStr(Version.Build) + ').' + #13#10#13#10 +
+      'Windows 10 Enterprise or IoT Enterprise 21H2 may work, but it is not tested (best effort). ' +
+      'Windows 10 Home and Pro are not supported: .NET 10, which Dynamic Island is built on, does not support them.' + #13#10#13#10 +
+      'Install anyway?',
+      mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDYES) = IDYES;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   CloseRunningIsland();
